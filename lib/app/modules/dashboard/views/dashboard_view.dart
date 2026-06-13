@@ -20,13 +20,16 @@ class DashboardView extends GetView<DashboardController> {
     final homeController = Get.find<HomeController>();
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      backgroundColor:
+          isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: isDark ? Colors.white : AppColors.textPrimary),
+          icon: Icon(Icons.menu_rounded,
+              color: isDark ? Colors.white : AppColors.textPrimary),
           onPressed: () {},
         ),
-        title: const AppText('The Highway Authority', style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
+        title: const AppText('The Highway Authority',
+            style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
         actions: [
           IconButton(
             icon: const Icon(Icons.star_rounded, color: Colors.red),
@@ -50,14 +53,16 @@ class DashboardView extends GetView<DashboardController> {
                     shape: BoxShape.circle,
                     border: Border.all(color: AppColors.primary, width: 1.5),
                   ),
-                  child: const Icon(Icons.person_pin_rounded, color: AppColors.primary, size: 38),
+                  child: const Icon(Icons.person_pin_rounded,
+                      color: AppColors.primary, size: 38),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const AppText('Welcome back,', style: AppTextStyle.bodyMedium),
+                      const AppText('Welcome back,',
+                          style: AppTextStyle.bodyMedium),
                       Obx(() => AppText(
                             controller.driverName.value,
                             style: AppTextStyle.bodyLarge,
@@ -68,16 +73,21 @@ class DashboardView extends GetView<DashboardController> {
                 ),
                 // Active status badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.green.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Row(
                     children: [
-                      Icon(Icons.fiber_manual_record, color: Colors.green, size: 10),
+                      Icon(Icons.fiber_manual_record,
+                          color: Colors.green, size: 10),
                       SizedBox(width: 4),
-                      AppText('ACTIVE DUTY', style: AppTextStyle.labelMedium, color: Colors.green, fontWeight: FontWeight.bold),
+                      AppText('ACTIVE DUTY',
+                          style: AppTextStyle.labelMedium,
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold),
                     ],
                   ),
                 ),
@@ -87,26 +97,25 @@ class DashboardView extends GetView<DashboardController> {
             const SizedBox(height: 20),
 
             // Today's Truck & Trips summary cards
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: _buildSummaryCard(
-                    title: 'ASSIGNED TRUCK',
-                    value: () => controller.vehicleNo.value,
-                    icon: Icons.local_shipping_rounded,
-                    color: AppColors.primary,
-                    isDark: isDark,
-                  ),
+                _buildSummaryCard(
+                  title: 'ASSIGNED TRUCK',
+                  value: () => controller.vehicleNo.value,
+                  icon: Icons.local_shipping_rounded,
+                  color: AppColors.primary,
+                  isDark: isDark,
                 ),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: _buildSummaryCard(
-                    title: 'TODAY\'S TRIPS',
-                    value: () => controller.todayTripsCount.value.toString().padLeft(2, '0'),
-                    icon: Icons.calendar_today_rounded,
-                    color: AppColors.tertiaryDark,
-                    isDark: isDark,
-                  ),
+                _buildSummaryCard(
+                  title: 'TODAY\'S TRIPS',
+                  value: () => controller.todayTripsCount.value
+                      .toString()
+                      .padLeft(2, '0'),
+                  icon: Icons.calendar_today_rounded,
+                  color: AppColors.tertiaryDark,
+                  isDark: isDark,
                 ),
               ],
             ),
@@ -124,7 +133,7 @@ class DashboardView extends GetView<DashboardController> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withOpacity(0.3),
+                    color: AppColors.primary.withValues(alpha: 0.3),
                     blurRadius: 12,
                     offset: const Offset(0, 6),
                   ),
@@ -137,8 +146,20 @@ class DashboardView extends GetView<DashboardController> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const AppText('ACTIVE TRIP', style: AppTextStyle.labelMedium, color: Colors.white70, fontWeight: FontWeight.bold),
-                      Obx(() => AppText('ETA ${controller.activeEta.value}', style: AppTextStyle.labelLarge, color: Colors.white, fontWeight: FontWeight.bold)),
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(18),
+                            color: AppColors.surface.withValues(alpha: 0.2)),
+                        child: const AppText('ACTIVE TRIP',
+                            style: AppTextStyle.labelMedium,
+                            color: AppColors.surface,
+                            fontWeight: FontWeight.bold),
+                      ),
+                      Obx(() => AppText('ETA ${controller.activeEta.value}',
+                          style: AppTextStyle.labelLarge,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold)),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -149,51 +170,51 @@ class DashboardView extends GetView<DashboardController> {
                         fontWeight: FontWeight.bold,
                       )),
                   const Divider(height: 24, color: Colors.white24),
-                  
+
                   // Source Terminal
                   Row(
                     children: [
-                      const Icon(Icons.radio_button_checked_rounded, color: Colors.greenAccent, size: 16),
+                      const Icon(Icons.radio_button_checked_rounded,
+                          color: Colors.greenAccent, size: 16),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Obx(() => AppText(
                               controller.activeSourcePoint.value,
                               style: AppTextStyle.bodyMedium,
+                              fontWeight: FontWeight.bold,
                               color: Colors.white70,
                             )),
                       ),
                     ],
                   ),
-                  
-                  // Line connector
-                  Padding(
-                    padding: const EdgeInsets.only(left: 7),
-                    child: Container(width: 2, height: 16, color: Colors.white24),
-                  ),
-                  
+
+                  const SizedBox(height: 28),
                   // Destination terminal
                   Row(
                     children: [
-                      const Icon(Icons.location_on_rounded, color: Colors.redAccent, size: 16),
+                      const Icon(Icons.location_on_rounded,
+                          color: Colors.redAccent, size: 16),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Obx(() => AppText(
                               controller.activeDestPoint.value,
                               style: AppTextStyle.bodyMedium,
-                              color: Colors.white70,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.surface,
                             )),
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 20),
-                  
+
                   // Resume navigation button
                   AppButton(
                     text: 'Resume Navigation',
                     icon: Icons.navigation_rounded,
-                    type: AppButtonType.outlined,
-                    onPressed: () => Get.toNamed(Routes.TRIP_DETAILS, arguments: {'tripId': 'TRP-882910'}),
+                    type: AppButtonType.secondary,
+                    onPressed: () => Get.toNamed(Routes.TRIP_DETAILS,
+                        arguments: {'tripId': 'TRP-882910'}),
                   ),
                 ],
               ),
@@ -202,7 +223,8 @@ class DashboardView extends GetView<DashboardController> {
             const SizedBox(height: 24),
 
             // Quick Actions Panel
-            const AppText('QUICK ACTIONS', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+            const AppText('QUICK ACTIONS',
+                style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
             const SizedBox(height: 12),
             GridView.count(
               shrinkWrap: true,
@@ -223,14 +245,17 @@ class DashboardView extends GetView<DashboardController> {
                   icon: Icons.play_circle_outline_rounded,
                   label: 'Start Trip',
                   color: Colors.green,
-                  onTap: () => Get.toNamed(Routes.TRIP_DETAILS, arguments: {'tripId': 'TRP-882910'}),
+                  onTap: () => Get.toNamed(Routes.TRIP_DETAILS,
+                      arguments: {'tripId': 'TRP-882910'}),
                   isDark: isDark,
                 ),
                 _buildActionTile(
                   icon: Icons.my_location_rounded,
                   label: 'Update Location',
                   color: Colors.orange,
-                  onTap: () => AppSnackBar.showSuccess(title: 'GPS Updated', message: 'Current coordinates matches NH-48.'),
+                  onTap: () => AppSnackBar.showSuccess(
+                      title: 'GPS Updated',
+                      message: 'Current coordinates matches NH-48.'),
                   isDark: isDark,
                 ),
                 _buildActionTile(
@@ -260,15 +285,20 @@ class DashboardView extends GetView<DashboardController> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const AppText('NOTIFICATIONS', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+                const AppText('NOTIFICATIONS',
+                    style: AppTextStyle.labelMedium,
+                    fontWeight: FontWeight.bold),
                 TextButton(
                   onPressed: () {},
-                  child: const AppText('View All', style: AppTextStyle.labelMedium, color: AppColors.primary, fontWeight: FontWeight.bold),
+                  child: const AppText('View All',
+                      style: AppTextStyle.labelMedium,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            
+
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -286,8 +316,11 @@ class DashboardView extends GetView<DashboardController> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              AppText(notif.title, style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
-                              AppText(notif.time, style: AppTextStyle.labelMedium),
+                              AppText(notif.title,
+                                  style: AppTextStyle.bodyLarge,
+                                  fontWeight: FontWeight.bold),
+                              AppText(notif.time,
+                                  style: AppTextStyle.labelMedium),
                             ],
                           ),
                           const SizedBox(height: 6),
@@ -318,11 +351,14 @@ class DashboardView extends GetView<DashboardController> {
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : color.withOpacity(0.1),
+                color: isDark
+                    ? const Color(0xFF0F172A)
+                    : color.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 20),
@@ -332,7 +368,9 @@ class DashboardView extends GetView<DashboardController> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppText(title, style: AppTextStyle.labelMedium, overflow: TextOverflow.ellipsis),
+                  AppText(title,
+                      style: AppTextStyle.labelMedium,
+                      overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 2),
                   Obx(() => AppText(
                         value(),
@@ -367,7 +405,8 @@ class DashboardView extends GetView<DashboardController> {
             children: [
               Icon(icon, color: color, size: 28),
               const SizedBox(height: 10),
-              AppText(label, style: AppTextStyle.labelLarge, fontWeight: FontWeight.bold),
+              AppText(label,
+                  style: AppTextStyle.labelLarge, fontWeight: FontWeight.bold),
             ],
           ),
         ),
