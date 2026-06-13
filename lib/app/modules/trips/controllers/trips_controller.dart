@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../data/services/firebase_service.dart';
 
 class TripsController extends GetxController {
   final searchController = TextEditingController();
@@ -9,6 +10,8 @@ class TripsController extends GetxController {
   // Static stats
   final int pendingPickups = 4;
   final int weeklyTrips = 12;
+
+  final RxBool isLoading = false.obs;
 
   // List of trips matching reference layout (Right Screen)
   final RxList<TripItemModel> allTrips = <TripItemModel>[
@@ -70,9 +73,22 @@ class TripsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    fetchTripsFromFirebase();
     searchController.addListener(() {
       searchQuery.value = searchController.text;
     });
+  }
+
+  Future<void> fetchTripsFromFirebase() async {
+    isLoading.value = true;
+    try {
+      final firebaseService = Get.find<FirebaseService>();
+      final list = await firebaseService.getTrips();
+      if (list.isNotEmpty) {
+        allTrips.assignAll(list);
+      }
+    } catch (_) {}
+    isLoading.value = false;
   }
 
   @override
@@ -93,6 +109,9 @@ class TripItemModel {
   final String date;
   final String tabType;
   final bool isActive;
+  final String remainingDistance;
+  final String estimatedTime;
+  final String currentAddress;
 
   TripItemModel({
     required this.id,
@@ -105,5 +124,8 @@ class TripItemModel {
     required this.date,
     required this.tabType,
     required this.isActive,
+    this.remainingDistance = '',
+    this.estimatedTime = '',
+    this.currentAddress = '',
   });
 }

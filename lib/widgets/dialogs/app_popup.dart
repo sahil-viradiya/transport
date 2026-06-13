@@ -26,7 +26,11 @@ class AppPopup {
         actions: [
           TextButton(
             onPressed: () {
-              Get.back(result: false);
+              try {
+                Navigator.of(context).pop(false);
+              } catch (_) {
+                Get.back(result: false);
+              }
               if (onCancel != null) onCancel();
             },
             child: AppText(
@@ -41,7 +45,11 @@ class AppPopup {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () {
-              Get.back(result: true);
+              try {
+                Navigator.of(context).pop(true);
+              } catch (_) {
+                Get.back(result: true);
+              }
               if (onConfirm != null) onConfirm();
             },
             child: AppText(
@@ -91,7 +99,18 @@ class AppPopup {
 
   static void hideLoading() {
     if (Get.isDialogOpen ?? false) {
-      Get.back();
+      try {
+        final context = Get.overlayContext ?? Get.context;
+        if (context != null) {
+          Navigator.of(context).pop();
+        } else {
+          Get.back();
+        }
+      } catch (_) {
+        try {
+          Get.back();
+        } catch (_) {}
+      }
     }
   }
 }

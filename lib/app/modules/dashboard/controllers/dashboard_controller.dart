@@ -4,22 +4,51 @@ import 'package:transport/app/data/services/storage_service.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/routes/app_pages.dart';
+import 'package:transport/app/data/services/connectivity_service.dart';
+import 'package:transport/app/data/services/firebase_service.dart';
+import '../../trips/controllers/trips_controller.dart';
 
 class DashboardController extends GetxController {
   final _storage = Get.find<StorageService>();
+  final _connectivity = Get.find<ConnectivityService>();
+
+  RxBool get isOnline => _connectivity.isConnected;
+
+  Future<void> retryConnection() async {
+    AppPopup.showLoading(message: 'Checking connection...');
+    await _connectivity.checkCurrentConnection();
+    await Future.delayed(const Duration(milliseconds: 800));
+    AppPopup.hideLoading();
+    if (_connectivity.isConnected.value) {
+      AppSnackBar.showSuccess(
+        title: 'Connection Restored',
+        message: 'You are back online.',
+      );
+    } else {
+      AppSnackBar.showError(
+        title: 'Still Offline',
+        message: 'Unable to reach the network. Please try again.',
+      );
+    }
+  }
 
   // Profile details matching reference layout (Left Screen)
   final RxString driverName = 'Rajesh Kumar'.obs;
   final RxString driverPhone = '+91 9876543210'.obs;
   final RxString vehicleNo = 'MH-12-AB-1234'.obs;
   final RxString vehicleModel = 'Tata Signa 5530.S'.obs;
+  final RxString avatarUrl = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop'.obs;
   final RxInt todayTripsCount = 4.obs;
 
-  // Active Trip Details
-  final RxString activeDestination = 'Nagpur Industrial Area'.obs;
-  final RxString activeEta = '14:45'.obs;
-  final RxString activeSourcePoint = 'Mumbai Port Terminal 2'.obs;
-  final RxString activeDestPoint = 'Warehouse 14, Nagpur'.obs;
+  // Active Trip Getter
+  TripItemModel? get activeTrip {
+    try {
+      final tripsController = Get.find<TripsController>();
+      return tripsController.allTrips.firstWhere((t) => t.isActive);
+    } catch (_) {
+      return null;
+    }
+  }
 
   // Dummy notifications matching reference image
   final List<NotificationModel> notifications = [
@@ -43,6 +72,21 @@ class DashboardController extends GetxController {
     if (phone != null) {
       driverPhone.value = phone;
     }
+    loadProfileFromFirebase();
+  }
+
+  Future<void> loadProfileFromFirebase() async {
+    try {
+      final firebaseService = Get.find<FirebaseService>();
+      final profile = await firebaseService.getDriverProfile();
+      if (profile.isNotEmpty) {
+        driverName.value = profile['driverName'] ?? 'Rajesh Kumar';
+        driverPhone.value = profile['driverPhone'] ?? profile['phone'] ?? '+91 98765 43210';
+        vehicleNo.value = profile['vehicleNo'] ?? 'MH-12-AB-1234';
+        vehicleModel.value = profile['vehicleModel'] ?? 'Tata Signa 5530.S';
+        avatarUrl.value = profile['avatarUrl'] ?? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop';
+      }
+    } catch (_) {}
   }
 
   // SOS button trigger

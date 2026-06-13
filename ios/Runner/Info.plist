@@ -45,5 +45,13 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app requires access to your location when open to track transport progress and verify milestones.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app requires access to your location to calculate distance and ETA in real-time.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app requires access to your camera to upload profile pictures and scanned documents.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app requires access to your photo library to select profile pictures and documents.</string>
 </dict>
 </plist>

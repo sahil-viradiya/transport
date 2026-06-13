@@ -18,7 +18,7 @@ class TripsView extends GetView<TripsController> {
     final filterTabs = ['Today', 'Upcoming', 'Active', 'Past'];
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF3F7FD),
       appBar: AppBar(
         leading: IconButton(
           icon: Icon(Icons.menu_rounded, color: isDark ? Colors.white : AppColors.textPrimary),
@@ -27,7 +27,7 @@ class TripsView extends GetView<TripsController> {
         title: const AppText('The Highway Authority', style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
         actions: [
           IconButton(
-            icon: const Icon(Icons.star_rounded, color: AppColors.primary),
+            icon: const Icon(Icons.hub_rounded, color: AppColors.primary),
             onPressed: () {},
           ),
         ],
@@ -64,12 +64,12 @@ class TripsView extends GetView<TripsController> {
                       decoration: BoxDecoration(
                         color: isSelected
                             ? AppColors.primary
-                            : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                            : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE9F0FA)),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
                           color: isSelected
                               ? AppColors.primary
-                              : (isDark ? const Color(0xFF334155) : AppColors.border),
+                              : (isDark ? const Color(0xFF334155) : Colors.transparent),
                           width: 1,
                         ),
                       ),
@@ -92,42 +92,64 @@ class TripsView extends GetView<TripsController> {
           
           const SizedBox(height: 16),
 
+          // Dynamic Header: e.g. ASSIGNED TODAY
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Obx(() => AppText(
+                  'ASSIGNED ${controller.activeTab.value.toUpperCase()}',
+                  style: AppTextStyle.labelLarge,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white70 : AppColors.secondary,
+                )),
+          ),
+
           // Main List View
           Expanded(
-            child: Obx(() {
-              final trips = controller.filteredTrips;
-              
-              if (trips.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+            child: RefreshIndicator(
+              onRefresh: controller.fetchTripsFromFirebase,
+              color: AppColors.primary,
+              child: Obx(() {
+                final trips = controller.filteredTrips;
+                
+                if (trips.isEmpty) {
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     children: [
-                      Icon(Icons.local_shipping_outlined, color: AppColors.textHint, size: 50),
-                      const SizedBox(height: 12),
-                      const AppText('No trips assigned for this filter.', style: AppTextStyle.bodyLarge),
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                      const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.local_shipping_outlined, color: AppColors.textHint, size: 50),
+                            SizedBox(height: 12),
+                            AppText('No trips assigned for this filter.', style: AppTextStyle.bodyLarge),
+                          ],
+                        ),
+                      ),
                     ],
-                  ),
+                  );
+                }
+
+                return ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 80),
+                  itemCount: trips.length + 1, // Include the metrics card row
+                  itemBuilder: (context, index) {
+                    // Put the stats cards at index 2 (simulating middle of list)
+                    if (index == 2) {
+                      return _buildStatsRow(isDark);
+                    }
+
+                    // Adjust index mapping for the extra stats widget
+                    final tripIndex = index > 2 ? index - 1 : index;
+                    if (tripIndex >= trips.length) return const SizedBox.shrink();
+                    
+                    final trip = trips[tripIndex];
+                    return _buildTripCard(context, trip, isDark);
+                  },
                 );
-              }
-
-              return ListView.builder(
-                padding: const EdgeInsets.only(bottom: 80),
-                itemCount: trips.length + 1, // Include the metrics card row
-                itemBuilder: (context, index) {
-                  // Put the stats cards at index 2 (simulating middle of list)
-                  if (index == 2) {
-                    return _buildStatsRow(isDark);
-                  }
-
-                  // Adjust index mapping for the extra stats widget
-                  final tripIndex = index > 2 ? index - 1 : index;
-                  if (tripIndex >= trips.length) return const SizedBox.shrink();
-                  
-                  final trip = trips[tripIndex];
-                  return _buildTripCard(trip, isDark);
-                },
-              );
-            }),
+              }),
+            ),
           ),
         ],
       ),
@@ -139,163 +161,218 @@ class TripsView extends GetView<TripsController> {
     );
   }
 
-  Widget _buildTripCard(TripItemModel trip, bool isDark) {
+  Widget _buildTripCard(BuildContext context, TripItemModel trip, bool isDark) {
     final isTripActive = trip.isActive;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Top Details ID & Truck Info
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border(
+          left: BorderSide(
+            color: isTripActive ? AppColors.success : AppColors.primary,
+            width: 4,
+          ),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Top Details ID & Truck Info
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isTripActive
+                        ? const Color(0xFFFFF0B3) // Gold bg
+                        : AppColors.primaryLight, // Blue bg
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: AppText(
+                    trip.status,
+                    style: AppTextStyle.labelMedium,
+                    color: isTripActive ? const Color(0xFFBF2600) : AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Row(
+                  children: [
+                    const AppText('Truck #  ', style: AppTextStyle.labelMedium),
+                    AppText(trip.truckNo, style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            AppText(trip.id, style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
+            
+            const Divider(height: 24),
+
+            // Pickup and drop terminals (Side-by-Side matching reference design)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Pickup
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: isTripActive
-                              ? Colors.orange.withOpacity(0.1)
-                              : AppColors.primaryLight.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: AppText(
-                          trip.status,
-                          style: AppTextStyle.labelMedium,
-                          color: isTripActive ? Colors.orange : AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      AppText(trip.id, style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
+                      const AppText('Pickup', style: AppTextStyle.labelMedium),
+                      const SizedBox(height: 2),
+                      AppText(trip.pickupCity, style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
+                      AppText(trip.pickupLocation, style: AppTextStyle.labelMedium, overflow: TextOverflow.ellipsis),
                     ],
                   ),
-                  Column(
+                ),
+                
+                // Route center icon
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF3F7FD),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    isTripActive ? Icons.local_shipping_rounded : Icons.alt_route_rounded,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                ),
+                
+                // Drop
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      const AppText('Truck #', style: AppTextStyle.labelMedium),
-                      const SizedBox(height: 4),
-                      AppText(trip.truckNo, style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
+                      const AppText('Drop', style: AppTextStyle.labelMedium),
+                      const SizedBox(height: 2),
+                      AppText(trip.dropCity, style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
+                      AppText(trip.dropLocation, style: AppTextStyle.labelMedium, overflow: TextOverflow.ellipsis),
                     ],
                   ),
-                ],
-              ),
-              
-              const Divider(height: 24),
+                ),
+              ],
+            ),
 
-              // Pickup and drop terminals
-              Row(
-                children: [
-                  // Terminals route icons block
-                  const Icon(Icons.radio_button_checked_rounded, color: Colors.green, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const AppText('Pickup', style: AppTextStyle.labelMedium),
-                        AppText('${trip.pickupCity} (${trip.pickupLocation})', style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(Icons.arrow_forward_rounded, color: AppColors.textHint, size: 16),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.location_on_rounded, color: AppColors.error, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const AppText('Drop', style: AppTextStyle.labelMedium),
-                        AppText('${trip.dropCity} (${trip.dropLocation})', style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            const Divider(height: 24),
 
-              const Divider(height: 24),
-
-              // Date and Actions
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.calendar_today_rounded, size: 14, color: AppColors.textHint),
-                      const SizedBox(width: 6),
-                      AppText(trip.date, style: AppTextStyle.labelMedium),
-                    ],
+            // Date and Actions
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today_rounded, size: 14, color: AppColors.textHint),
+                    const SizedBox(width: 6),
+                    AppText(trip.date, style: AppTextStyle.labelMedium),
+                  ],
+                ),
+                AppButton(
+                  text: isTripActive ? 'Track Live' : 'Details',
+                  type: isTripActive ? AppButtonType.primary : AppButtonType.secondary,
+                  isFullWidth: false,
+                  height: 36,
+                  onPressed: () => Navigator.of(context, rootNavigator: true).pushNamed(
+                    Routes.TRIP_DETAILS,
+                    arguments: {
+                      'tripId': trip.id,
+                      'isAlreadyActive': isTripActive,
+                    },
                   ),
-                  AppButton(
-                    text: isTripActive ? 'Track Live' : 'Details',
-                    type: isTripActive ? AppButtonType.primary : AppButtonType.secondary,
-                    isFullWidth: false,
-                    height: 38,
-                    onPressed: () => Get.toNamed(Routes.TRIP_DETAILS, arguments: {'tripId': trip.id}),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 
-  // Side-by-side stats cards inside list view
+  // Side-by-side stats cards inside list view matching the design reference
   Widget _buildStatsRow(bool isDark) {
+    const Color statsBlueBg = Color(0xFFE9F2FF);
+    const Color statsBlueText = Color(0xFF0052CC);
+    const Color statsGreyBg = Color(0xFFF0F3FA);
+    const Color statsGreyText = Color(0xFF42526E);
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
           Expanded(
-            child: Card(
-              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFDEEBFF).withOpacity(0.3),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.alarm_on_rounded, color: AppColors.primary, size: 28),
-                    const SizedBox(height: 12),
-                    AppText(
-                      '${controller.pendingPickups.toString().padLeft(2, '0')} Pending',
-                      style: AppTextStyle.bodyLarge,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    AppText('Pickups Today', style: AppTextStyle.labelMedium),
-                  ],
-                ),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : statsBlueBg,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.assignment_rounded, 
+                    color: isDark ? Colors.white70 : statsBlueText, 
+                    size: 24,
+                  ),
+                  const SizedBox(height: 12),
+                  AppText(
+                    controller.pendingPickups.toString().padLeft(2, '0'),
+                    style: AppTextStyle.headlineLarge,
+                    color: isDark ? Colors.white : statsBlueText,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  AppText(
+                    'Pending\nPickups', 
+                    style: AppTextStyle.labelMedium,
+                    color: isDark ? Colors.white70 : statsBlueText,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ],
               ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Card(
-              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFFFE380).withOpacity(0.2),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.history_rounded, color: AppColors.tertiaryDark, size: 28),
-                    const SizedBox(height: 12),
-                    AppText(
-                      '${controller.weeklyTrips.toString().padLeft(2, '0')} Trips',
-                      style: AppTextStyle.bodyLarge,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    AppText('This Active Week', style: AppTextStyle.labelMedium),
-                  ],
-                ),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : statsGreyBg,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.verified_outlined, 
+                    color: isDark ? Colors.white70 : statsGreyText, 
+                    size: 24,
+                  ),
+                  const SizedBox(height: 12),
+                  AppText(
+                    controller.weeklyTrips.toString().padLeft(2, '0'),
+                    style: AppTextStyle.headlineLarge,
+                    color: isDark ? Colors.white : statsGreyText,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  AppText(
+                    'Trips This\nWeek', 
+                    style: AppTextStyle.labelMedium,
+                    color: isDark ? Colors.white70 : statsGreyText,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ],
               ),
             ),
           ),

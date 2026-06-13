@@ -18,6 +18,11 @@ class ConnectivityService extends GetxService {
     return this;
   }
 
+  Future<void> checkCurrentConnection() async {
+    final results = await _connectivity.checkConnectivity();
+    _updateConnectionStatus(results);
+  }
+
   void _updateConnectionStatus(List<ConnectivityResult> results) {
     // If we have any active connection (wifi, mobile, ethernet, vpn) we are connected
     final hasConnection = results.any((result) => result != ConnectivityResult.none);

@@ -1,87 +1,399 @@
+import 'dart:async';
 import 'package:get/get.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
+import 'package:transport/app/routes/app_pages.dart';
+import '../../trips/controllers/trips_controller.dart';
+import '../../../data/services/firebase_service.dart';
+import '../../../data/services/location_service.dart';
 
 class TripDetailsController extends GetxController {
-  // Static arguments or loaded details matching reference (Middle Screen: Trip Details)
-  final String tripId = 'TRP-882910';
-  final RxString remainingDistance = '142.5 KM'.obs;
+  // Journey state toggles
+  final RxBool isJourneyStarted = false.obs;
   
-  // Addresses
-  final String pickupAddress = 'Reliance Industries Warehouse, Sector 4, Vashi, Navi Mumbai, Maharashtra 400703';
-  final String pickupContact = 'Anand Mehta';
-  final String dropoffAddress = 'Amazon Fulfilment Centre (BOM7), Chakan Industrial Area, Phase II, Pune 410501';
-  final String dropoffContact = 'Suresh G.';
-  
-  // Material Logs
-  final String materialType = 'Industrial Goods';
-  final String materialSubtitle = 'Steel Coils & Heavy Parts';
-  final String loadWeight = '10 Tons';
-  
-  // Status Milestones
-  final RxList<MilestoneModel> milestones = <MilestoneModel>[
-    MilestoneModel(title: 'Assigned', time: 'Oct 24, 08:00 AM', isCompleted: true),
-    MilestoneModel(title: 'Accepted', time: 'Oct 24, 08:15 AM', isCompleted: true),
-    MilestoneModel(title: 'Started', time: 'Oct 24, 11:00 AM', isCompleted: true),
-    MilestoneModel(
-      title: 'In Transit',
-      time: 'Oct 24, 01:30 PM',
-      isCompleted: true,
-      description: 'Currently at Kolhapur Plaza',
-    ),
-    MilestoneModel(title: 'Delivered', time: 'Expected by 05:00 PM', isCompleted: false),
-  ].obs;
+  // Speed and sync variables for active tracking
+  final RxInt speed = 64.obs;
+  final RxString lastSynced = '2 mins ago'.obs;
 
-  // Estimated values
-  final RxString estimatedTime = '2h 45m'.obs;
+  // Active milestone index (1 = Reached Pickup, 2 = Loaded, 3 = Reached Drop)
+  final RxInt currentMilestone = 2.obs; // Default to loaded stage matching design mockup
+
+  // Active route coordinates or estimates
+  final RxString remainingDistance = '112 KM'.obs;
+  final RxString estimatedTime = '14:45'.obs; // Next Stop ETA
   final RxInt fuelConsumed = 42.obs;
+  final RxString currentAddress = 'Locating...'.obs;
 
-  // Update Status action
-  void updateStatus() {
-    // If last element is not completed, complete it
-    final deliveredIndex = milestones.indexWhere((m) => m.title == 'Delivered');
-    if (deliveredIndex != -1 && !milestones[deliveredIndex].isCompleted) {
-      milestones[deliveredIndex] = MilestoneModel(
-        title: 'Delivered',
-        time: 'Oct 24, 04:15 PM',
-        isCompleted: true,
-        description: 'Delivered to Amazon BOM7 Dock 4',
-      );
-      remainingDistance.value = '0.0 KM';
-      estimatedTime.value = '0m';
-      AppSnackBar.showSuccess(title: 'Delivered', message: 'Trip status updated to Delivered!');
-    } else {
-      AppSnackBar.showInfo(title: 'No Updates', message: 'Cargo has already been marked as Delivered.');
+  // Journey details matching reference layout (Left Screen)
+  late String tripId;
+  late String vehicleNo;
+  late String consignmentNo;
+  
+  // Departure Info
+  late String departureTitle;
+  late String departureSubtitle;
+  late String departureTime;
+
+  // Destination Info
+  late String destinationTitle;
+  late String destinationSubtitle;
+
+  List<double> _getCoordinates(String title, String city) {
+    double lat = 18.9482;
+    double lng = 72.9469;
+    
+    final search = '${title.trim()} ${city.trim()}'.toLowerCase();
+    
+    locationCoordinates.forEach((key, value) {
+      if (search.contains(key.toLowerCase())) {
+        lat = value[0];
+        lng = value[1];
+      }
+    });
+    
+    return [lat, lng];
+  }
+
+  @override
+  void onInit() {
+    super.onInit();
+    
+    // Set default values matching TRP-882910 fallback
+    tripId = 'TRP-882910';
+    vehicleNo = 'HR-22-9012';
+    consignmentNo = '#9012';
+    departureTitle = 'JNPT Port Terminal';
+    departureSubtitle = 'Navi Mumbai, Maharashtra';
+    departureTime = 'Today, 06:30 AM';
+    destinationTitle = 'Indore Logistics Hub';
+    destinationSubtitle = 'Pithampur, Madhya Pradesh';
+
+    String pickupCity = 'Mumbai';
+    String dropCity = 'Indore';
+
+    final args = Get.arguments;
+    if (args != null && args is Map) {
+      if (args['isAlreadyActive'] == true) {
+        isJourneyStarted.value = true;
+      }
+      
+      final argTripId = args['tripId'];
+      if (argTripId != null) {
+        try {
+          final tripsController = Get.find<TripsController>();
+          final trip = tripsController.allTrips.firstWhere((t) => t.id == argTripId);
+          tripId = trip.id;
+          vehicleNo = trip.truckNo;
+          
+          final cleanIdDigits = trip.id.replaceAll(RegExp(r'\D'), '');
+          consignmentNo = '#${cleanIdDigits.isNotEmpty ? cleanIdDigits : "9012"}';
+          
+          departureTitle = trip.pickupLocation;
+          departureSubtitle = '${trip.pickupCity}, India';
+          departureTime = trip.date;
+          destinationTitle = trip.dropLocation;
+          destinationSubtitle = '${trip.dropCity}, India';
+          
+          pickupCity = trip.pickupCity;
+          dropCity = trip.dropCity;
+        } catch (_) {
+          // Keep defaults
+        }
+      }
+    }
+
+    // Calculate initial distance and ETA
+    final startCoords = _getCoordinates(departureTitle, pickupCity);
+    final endCoords = _getCoordinates(destinationTitle, dropCity);
+    
+    final locationService = Get.find<LocationService>();
+    final initialDistance = locationService.calculateDistance(
+      startCoords[0],
+      startCoords[1],
+      endCoords[0],
+      endCoords[1],
+    );
+    remainingDistance.value = '${initialDistance.toStringAsFixed(1)} KM';
+    estimatedTime.value = locationService.estimateTravelTime(initialDistance);
+
+    if (isJourneyStarted.value) {
+      startLocationUpdates();
     }
   }
 
-  // SOS button trigger
-  void triggerEmergencySos() {
+  // Manifest Details
+  final String manifestTitle = 'Industrial Components';
+  final String weight = '18.5 Tons';
+  final String units = '14 Pallets';
+
+  static const Map<String, List<double>> locationCoordinates = {
+    'Mumbai': [18.9482, 72.9469],
+    'JNPT Port Terminal': [18.9482, 72.9469],
+    'JNPT Terminal': [18.9482, 72.9469],
+    'Nagpur': [21.0792, 79.0274],
+    'Mihan Hub': [21.0792, 79.0274],
+    'Pune': [18.5204, 73.8567],
+    'Chakan Plant': [18.7892, 73.8567],
+    'Nashik': [19.9975, 73.7898],
+    'Ahmedabad': [23.0225, 72.5714],
+    'Indore Logistics Hub': [22.6208, 75.8039],
+    'Pithampur': [22.6208, 75.8039],
+  };
+
+  Timer? _locationTimer;
+  double simulatedLat = 18.9482;
+  double simulatedLng = 72.9469;
+  bool isSimulatingMovement = false;
+
+  void startLocationUpdates() {
+    // Look up departure coordinates to start simulation from
+    String pickupCity = 'Mumbai';
+    try {
+      final tripsController = Get.find<TripsController>();
+      final trip = tripsController.allTrips.firstWhere((t) => t.id == tripId);
+      pickupCity = trip.pickupCity;
+    } catch (_) {}
+    
+    final startCoords = _getCoordinates(departureTitle, pickupCity);
+    simulatedLat = startCoords[0];
+    simulatedLng = startCoords[1];
+
+    _locationTimer?.cancel();
+    updateCurrentLocationDetails();
+    _locationTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (isJourneyStarted.value && currentMilestone.value < 4) {
+        updateCurrentLocationDetails();
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  Future<void> updateCurrentLocationDetails() async {
+    try {
+      final locationService = Get.find<LocationService>();
+      final position = await locationService.getCurrentPosition();
+      
+      // Determine if we should simulate movement (i.e., we received fallback coordinates or are running in test emulator)
+      if (position.latitude == LocationService.fallbackLatitude && 
+          position.longitude == LocationService.fallbackLongitude) {
+        isSimulatingMovement = true;
+      }
+      
+      double currentLat = position.latitude;
+      double currentLng = position.longitude;
+      
+      // Look up destination coordinates
+      String dropCity = 'Indore';
+      try {
+        final tripsController = Get.find<TripsController>();
+        final trip = tripsController.allTrips.firstWhere((t) => t.id == tripId);
+        dropCity = trip.dropCity;
+      } catch (_) {}
+      
+      final endCoords = _getCoordinates(destinationTitle, dropCity);
+      double destLat = endCoords[0];
+      double destLng = endCoords[1];
+
+      if (isSimulatingMovement) {
+        // Incrementally move closer to destination coordinates by 3% each step
+        simulatedLat = simulatedLat + (destLat - simulatedLat) * 0.03;
+        simulatedLng = simulatedLng + (destLng - simulatedLng) * 0.03;
+        currentLat = simulatedLat;
+        currentLng = simulatedLng;
+      }
+
+      // Get full address
+      final address = await locationService.getAddressFromCoordinates(currentLat, currentLng);
+      currentAddress.value = address;
+      
+      // Calculate distance
+      final distance = locationService.calculateDistance(
+        currentLat,
+        currentLng,
+        destLat,
+        destLng,
+      );
+      
+      // Update remaining distance and ETA
+      remainingDistance.value = '${distance.toStringAsFixed(1)} KM';
+      estimatedTime.value = locationService.estimateTravelTime(distance);
+      
+      // Update speed with a realistic highway value or 0 if delivered
+      if (currentMilestone.value >= 4) {
+        speed.value = 0;
+        remainingDistance.value = '0 KM';
+        estimatedTime.value = 'Delivered';
+      } else {
+        speed.value = 55 + (currentLat * 10).toInt() % 15;
+      }
+      
+      // Update last synced text
+      final now = DateTime.now();
+      lastSynced.value = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+      // Save live location and geocoded address directly to Firestore collections
+      final firebaseService = Get.find<FirebaseService>();
+      await firebaseService.updateTripLocation(
+        tripId,
+        currentLat,
+        currentLng,
+        address,
+        remainingDistance: remainingDistance.value,
+        estimatedTime: estimatedTime.value,
+      );
+      await firebaseService.updateDriverLocation(
+        currentLat,
+        currentLng,
+        address,
+      );
+
+      // Update local state in TripsController
+      try {
+        final tripsController = Get.find<TripsController>();
+        final updatedTrips = tripsController.allTrips.map((trip) {
+          if (trip.id == tripId) {
+            return TripItemModel(
+              id: trip.id,
+              truckNo: trip.truckNo,
+              status: trip.status,
+              pickupCity: trip.pickupCity,
+              pickupLocation: trip.pickupLocation,
+              dropCity: trip.dropCity,
+              dropLocation: trip.dropLocation,
+              date: trip.date,
+              tabType: trip.tabType,
+              isActive: trip.isActive,
+              remainingDistance: remainingDistance.value,
+              estimatedTime: estimatedTime.value,
+              currentAddress: address,
+            );
+          }
+          return trip;
+        }).toList();
+        tripsController.allTrips.assignAll(updatedTrips);
+      } catch (_) {}
+    } catch (_) {}
+  }
+
+  // Action to start the journey
+  void startJourney() {
+    final tripsController = Get.find<TripsController>();
+    final hasActiveTrip = tripsController.allTrips.any((t) => t.isActive && t.id != tripId);
+    
+    String descriptionText = 'Are you ready to initiate your trip $tripId and start GPS route sync?';
+    if (hasActiveTrip) {
+      final activeTrip = tripsController.allTrips.firstWhere((t) => t.isActive);
+      descriptionText = 'Warning: Trip ${activeTrip.id} is currently active. Starting this journey will automatically suspend/deactivate it. Proceed?';
+    }
+
     AppPopup.showConfirmation(
-      title: 'ACTIVATE EMERGENCY SOS',
-      description: 'Do you want to broadcast your emergency coordinates for trip TRP-882910?',
-      confirmText: 'Broadcast',
+      title: 'START JOURNEY',
+      description: descriptionText,
+      confirmText: 'Start',
       cancelText: 'Cancel',
-      onConfirm: () {
-        AppSnackBar.showError(
-          title: 'SOS ACTIVE',
-          message: 'Safety dispatch and highway assistance have been alerted.',
+      onConfirm: () async {
+        isJourneyStarted.value = true;
+        startLocationUpdates();
+        try {
+          final firebaseService = Get.find<FirebaseService>();
+          await firebaseService.updateTripMilestone(tripId, 2, status: 'ACTIVE NOW');
+          
+          // Update local TripsController state so that only this trip is active
+          final updatedTrips = tripsController.allTrips.map((trip) {
+            if (trip.id == tripId) {
+              return TripItemModel(
+                id: trip.id,
+                truckNo: trip.truckNo,
+                status: 'ACTIVE NOW',
+                pickupCity: trip.pickupCity,
+                pickupLocation: trip.pickupLocation,
+                dropCity: trip.dropCity,
+                dropLocation: trip.dropLocation,
+                date: trip.date,
+                tabType: trip.tabType,
+                isActive: true,
+              );
+            } else {
+              return TripItemModel(
+                id: trip.id,
+                truckNo: trip.truckNo,
+                status: trip.status == 'ACTIVE NOW' ? 'ASSIGNED' : trip.status,
+                pickupCity: trip.pickupCity,
+                pickupLocation: trip.pickupLocation,
+                dropCity: trip.dropCity,
+                dropLocation: trip.dropLocation,
+                date: trip.date,
+                tabType: trip.tabType,
+                isActive: false,
+              );
+            }
+          }).toList();
+          tripsController.allTrips.assignAll(updatedTrips);
+        } catch (_) {}
+        AppSnackBar.showSuccess(
+          title: 'Journey Started',
+          message: 'GPS tracking is now active. Drive safely!',
         );
       },
     );
   }
-}
 
-class MilestoneModel {
-  final String title;
-  final String time;
-  final bool isCompleted;
-  final String? description;
+  // Update milestone checkpoint progress
+  void selectMilestone(int milestoneIndex) {
+    if (milestoneIndex < currentMilestone.value) {
+      AppSnackBar.showInfo(
+        title: 'Checkpoint Completed',
+        message: 'This milestone has already been logged.',
+      );
+      return;
+    }
+    
+    String milestoneName = '';
+    if (milestoneIndex == 1) milestoneName = 'Reached Pickup';
+    if (milestoneIndex == 2) milestoneName = 'Loaded';
+    if (milestoneIndex == 3) milestoneName = 'Reached Drop';
 
-  MilestoneModel({
-    required this.title,
-    required this.time,
-    required this.isCompleted,
-    this.description,
-  });
+    if (milestoneIndex == 3) {
+      // Reaching the drop point triggers the Proof of Delivery flow
+      Get.toNamed(Routes.PROOF_OF_DELIVERY, arguments: {'tripId': tripId})?.then((result) async {
+        if (result == true) {
+          currentMilestone.value = 4;
+          remainingDistance.value = '0 KM';
+          speed.value = 0;
+          estimatedTime.value = 'Delivered';
+          _locationTimer?.cancel();
+          try {
+            final firebaseService = Get.find<FirebaseService>();
+            await firebaseService.updateTripMilestone(tripId, 4, status: 'DELIVERED');
+          } catch (_) {}
+        }
+      });
+      return;
+    }
+
+    AppPopup.showConfirmation(
+      title: 'CONFIRM CHECKPOINT',
+      description: 'Would you like to mark "$milestoneName" as completed?',
+      confirmText: 'Confirm',
+      cancelText: 'Cancel',
+      onConfirm: () async {
+        currentMilestone.value = milestoneIndex + 1;
+        try {
+          final firebaseService = Get.find<FirebaseService>();
+          await firebaseService.updateTripMilestone(tripId, milestoneIndex + 1);
+        } catch (_) {}
+        AppSnackBar.showSuccess(
+          title: 'Checkpoint Verified',
+          message: 'Logged milestone: $milestoneName',
+        );
+      },
+    );
+  }
+
+  @override
+  void onClose() {
+    _locationTimer?.cancel();
+    super.onClose();
+  }
 }

@@ -9,6 +9,7 @@ abstract class Routes {
   static const OTP_VERIFICATION = _Paths.OTP_VERIFICATION;
   static const HOME = _Paths.HOME;
   static const TRIP_DETAILS = _Paths.TRIP_DETAILS;
+  static const PROOF_OF_DELIVERY = _Paths.PROOF_OF_DELIVERY;
 }
 
 abstract class _Paths {
@@ -20,4 +21,5 @@ abstract class _Paths {
   static const OTP_VERIFICATION = '/otp-verification';
   static const HOME = '/home';
   static const TRIP_DETAILS = '/trip-details';
+  static const PROOF_OF_DELIVERY = '/proof-of-delivery';
 }

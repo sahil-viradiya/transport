@@ -6,7 +6,6 @@ import '../../trips/views/trips_view.dart';
 import '../../expenses/views/expenses_view.dart';
 import '../../profile/views/profile_view.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../../widgets/app_text.dart';
 
 class HomeView extends GetView<HomeController> {
   const HomeView({super.key});
@@ -28,35 +27,30 @@ class HomeView extends GetView<HomeController> {
             index: controller.currentIndex.value,
             children: pages,
           )),
-      bottomNavigationBar: Obx(() => BottomNavigationBar(
-            currentIndex: controller.currentIndex.value,
-            onTap: controller.changeTabIndex,
-            type: BottomNavigationBarType.fixed,
+      bottomNavigationBar: Obx(() => NavigationBar(
+            selectedIndex: controller.currentIndex.value,
+            onDestinationSelected: controller.changeTabIndex,
             backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-            selectedItemColor: AppColors.primary,
-            unselectedItemColor: isDark ? Colors.white30 : Colors.grey.shade400,
-            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 12),
-            elevation: 8,
-            items: const [
-              BottomNavigationBarItem(
+            indicatorColor: AppColors.primaryLight,
+            destinations: const [
+              NavigationDestination(
                 icon: Icon(Icons.home_outlined),
-                activeIcon: Icon(Icons.home_rounded),
+                selectedIcon: Icon(Icons.home_rounded, color: AppColors.primary),
                 label: 'Home',
               ),
-              BottomNavigationBarItem(
+              NavigationDestination(
                 icon: Icon(Icons.local_shipping_outlined),
-                activeIcon: Icon(Icons.local_shipping_rounded),
+                selectedIcon: Icon(Icons.local_shipping_rounded, color: AppColors.primary),
                 label: 'Trips',
               ),
-              BottomNavigationBarItem(
+              NavigationDestination(
                 icon: Icon(Icons.receipt_long_outlined),
-                activeIcon: Icon(Icons.receipt_long_rounded),
+                selectedIcon: Icon(Icons.receipt_long_rounded, color: AppColors.primary),
                 label: 'Expenses',
               ),
-              BottomNavigationBarItem(
+              NavigationDestination(
                 icon: Icon(Icons.person_outline_rounded),
-                activeIcon: Icon(Icons.person_rounded),
+                selectedIcon: Icon(Icons.person_rounded, color: AppColors.primary),
                 label: 'Profile',
               ),
             ],
