@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/trip_details_controller.dart';
@@ -519,12 +520,123 @@ class TripDetailsView extends GetView<TripDetailsController> {
                 icon: Icons.check_circle_outline_rounded,
                 label: 'Reached Drop',
               ),
+              _buildPODDetailsCard(context, isDark),
               const SizedBox(height: 32),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildPODDetailsCard(BuildContext context, bool isDark) {
+    return Obx(() {
+      final hasPod = controller.currentMilestone.value == 4;
+      if (!hasPod) return const SizedBox.shrink();
+
+      final imgPath = controller.podUrl.value;
+      final remarksText = controller.remarks.value;
+
+      ImageProvider? imgProvider;
+      if (imgPath.isNotEmpty) {
+        if (imgPath.startsWith('http://') || imgPath.startsWith('https://')) {
+          imgProvider = NetworkImage(imgPath);
+        } else {
+          final file = File(imgPath);
+          if (file.existsSync()) {
+            imgProvider = FileImage(file);
+          } else {
+            imgProvider = const NetworkImage('https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=600');
+          }
+        }
+      }
+
+      return Container(
+        margin: const EdgeInsets.only(top: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            )
+          ],
+          border: Border.all(
+            color: Colors.green.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.verified_rounded, color: Colors.green, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const AppText(
+                  'PROOF OF DELIVERY SUBMITTED',
+                  style: AppTextStyle.labelMedium,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            if (remarksText.isNotEmpty) ...[
+              const AppText(
+                'REMARKS / NOTES',
+                style: AppTextStyle.labelMedium,
+                fontWeight: FontWeight.bold,
+              ),
+              const SizedBox(height: 6),
+              AppText(
+                remarksText,
+                style: AppTextStyle.bodyMedium,
+                color: isDark ? Colors.white70 : AppColors.secondary,
+              ),
+              const SizedBox(height: 16),
+            ],
+            if (imgProvider != null) ...[
+              const AppText(
+                'DELIVERY RECEIPT PHOTO',
+                style: AppTextStyle.labelMedium,
+                fontWeight: FontWeight.bold,
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  height: 180,
+                  width: double.infinity,
+                  child: Image(
+                    image: imgProvider,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: Colors.black12,
+                        child: const Center(
+                          child: Icon(Icons.broken_image_outlined, color: Colors.grey, size: 40),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    });
   }
 
   // Common UI building helpers for Confirm Journey

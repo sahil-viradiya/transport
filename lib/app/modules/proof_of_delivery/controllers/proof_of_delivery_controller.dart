@@ -105,6 +105,7 @@ class ProofOfDeliveryController extends GetxController {
               date: trip.date,
               tabType: trip.tabType,
               isActive: false,
+              driverPhone: trip.driverPhone,
             );
           }
           return trip;

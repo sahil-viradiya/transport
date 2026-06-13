@@ -10,6 +10,7 @@ abstract class Routes {
   static const HOME = _Paths.HOME;
   static const TRIP_DETAILS = _Paths.TRIP_DETAILS;
   static const PROOF_OF_DELIVERY = _Paths.PROOF_OF_DELIVERY;
+  static const ADMIN_HOME = _Paths.ADMIN_HOME;
 }
 
 abstract class _Paths {
@@ -22,4 +23,5 @@ abstract class _Paths {
   static const HOME = '/home';
   static const TRIP_DETAILS = '/trip-details';
   static const PROOF_OF_DELIVERY = '/proof-of-delivery';
+  static const ADMIN_HOME = '/admin-home';
 }

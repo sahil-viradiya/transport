@@ -25,8 +25,8 @@ class AppOtpField extends StatelessWidget {
 
     // Define standard PinTheme
     final defaultPinTheme = PinTheme(
-      width: 56,
-      height: 56,
+      width: 48,
+      height: 52,
       textStyle: theme.textTheme.headlineMedium?.copyWith(
         color: isDark ? Colors.white : AppColors.textPrimary,
         fontWeight: FontWeight.bold,

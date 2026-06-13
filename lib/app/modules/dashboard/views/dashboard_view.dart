@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import '../controllers/dashboard_controller.dart';
 import '../../home/controllers/home_controller.dart';
-import '../../trips/controllers/trips_controller.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../../widgets/app_button.dart';
 import '../../../core/theme/app_colors.dart';

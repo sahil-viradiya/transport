@@ -15,6 +15,8 @@ import '../modules/trip_details/bindings/trip_details_binding.dart';
 import '../modules/trip_details/views/trip_details_view.dart';
 import '../modules/proof_of_delivery/bindings/proof_of_delivery_binding.dart';
 import '../modules/proof_of_delivery/views/proof_of_delivery_view.dart';
+import '../modules/admin_home/bindings/admin_home_binding.dart';
+import '../modules/admin_home/views/admin_home_view.dart';
 
 part 'app_routes.dart';
 
@@ -63,6 +65,11 @@ class AppPages {
       name: _Paths.PROOF_OF_DELIVERY,
       page: () => const ProofOfDeliveryView(),
       binding: ProofOfDeliveryBinding(),
+    ),
+    GetPage(
+      name: _Paths.ADMIN_HOME,
+      page: () => const AdminHomeView(),
+      binding: AdminHomeBinding(),
     ),
   ];
 }

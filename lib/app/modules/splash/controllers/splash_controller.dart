@@ -38,7 +38,12 @@ class SplashController extends GetxController {
     final isLoggedIn = _storage.read<bool>('isLoggedIn') ?? false;
 
     if (isLoggedIn) {
-      Get.offAllNamed(Routes.HOME);
+      final role = _storage.read<String>('userRole') ?? 'driver';
+      if (role == 'admin') {
+        Get.offAllNamed(Routes.ADMIN_HOME);
+      } else {
+        Get.offAllNamed(Routes.HOME);
+      }
     } else {
       Get.offAllNamed(Routes.LOGIN);
     }

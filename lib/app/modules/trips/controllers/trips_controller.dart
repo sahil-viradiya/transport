@@ -26,6 +26,7 @@ class TripsController extends GetxController {
       date: '24 Oct, 08:30 AM',
       tabType: 'Today',
       isActive: true,
+      driverPhone: '+919876543210',
     ),
     TripItemModel(
       id: 'TRP-8842-B',
@@ -38,6 +39,7 @@ class TripsController extends GetxController {
       date: '24 Oct, 02:00 PM',
       tabType: 'Today',
       isActive: false,
+      driverPhone: '+919876543210',
     ),
     TripItemModel(
       id: 'TRP-7761-Z',
@@ -50,6 +52,7 @@ class TripsController extends GetxController {
       date: '25 Oct, 06:00 AM',
       tabType: 'Upcoming',
       isActive: false,
+      driverPhone: '+919876543210',
     ),
   ].obs;
 
@@ -112,6 +115,7 @@ class TripItemModel {
   final String remainingDistance;
   final String estimatedTime;
   final String currentAddress;
+  final String driverPhone;
 
   TripItemModel({
     required this.id,
@@ -127,5 +131,8 @@ class TripItemModel {
     this.remainingDistance = '',
     this.estimatedTime = '',
     this.currentAddress = '',
+    this.driverPhone = '',
   });
 }
+
+

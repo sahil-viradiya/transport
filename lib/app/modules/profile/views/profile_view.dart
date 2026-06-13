@@ -190,8 +190,13 @@ class ProfileView extends GetView<ProfileController> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(24),
                     child: Image.network(
-                      'https://images.unsplash.com/photo-1519003722824-192d992a605e?w=400&auto=format&fit=crop',
+                      'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=400&auto=format&fit=crop',
                       fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.black26,
+                        );
+                      },
                     ),
                   ),
                 ),

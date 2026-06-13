@@ -81,7 +81,7 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
               Center(
                 child: AppOtpField(
                   controller: controller.otpController,
-                  length: 4,
+                  length: 6,
                   onCompleted: (pin) => controller.verifyOtp(),
                 ),
               ),

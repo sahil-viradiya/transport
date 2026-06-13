@@ -24,6 +24,10 @@ class TripDetailsController extends GetxController {
   final RxInt fuelConsumed = 42.obs;
   final RxString currentAddress = 'Locating...'.obs;
 
+  // Proof of delivery info
+  final RxString podUrl = ''.obs;
+  final RxString remarks = ''.obs;
+
   // Journey details matching reference layout (Left Screen)
   late String tripId;
   late String vehicleNo;
@@ -96,6 +100,14 @@ class TripDetailsController extends GetxController {
           
           pickupCity = trip.pickupCity;
           dropCity = trip.dropCity;
+
+          if (trip.status == 'DELIVERED') {
+            isJourneyStarted.value = true;
+            currentMilestone.value = 4;
+            remainingDistance.value = '0 KM';
+            estimatedTime.value = 'Delivered';
+            speed.value = 0;
+          }
         } catch (_) {
           // Keep defaults
         }
@@ -119,6 +131,49 @@ class TripDetailsController extends GetxController {
     if (isJourneyStarted.value) {
       startLocationUpdates();
     }
+    _loadLiveTripData();
+  }
+
+  Future<void> _loadLiveTripData() async {
+    try {
+      final firebaseService = Get.find<FirebaseService>();
+      final data = await firebaseService.getTripData(tripId);
+      if (data != null) {
+        final milestone = data['currentMilestone'] as int?;
+        final status = data['status'] as String?;
+        final dbPodUrl = data['podUrl'] as String?;
+        final dbRemarks = data['remarks'] as String?;
+
+        if (dbPodUrl != null) {
+          podUrl.value = dbPodUrl;
+        }
+        if (dbRemarks != null) {
+          remarks.value = dbRemarks;
+        }
+        
+        if (status == 'DELIVERED') {
+          isJourneyStarted.value = true;
+          currentMilestone.value = 4;
+          remainingDistance.value = '0 KM';
+          estimatedTime.value = 'Delivered';
+          speed.value = 0;
+          _locationTimer?.cancel();
+        } else {
+          if (milestone != null) {
+            currentMilestone.value = milestone;
+          }
+          if (status == 'ACTIVE NOW') {
+            isJourneyStarted.value = true;
+            if (_locationTimer == null || !_locationTimer!.isActive) {
+              startLocationUpdates();
+            }
+          } else {
+            isJourneyStarted.value = false;
+            _locationTimer?.cancel();
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   // Manifest Details
@@ -267,6 +322,7 @@ class TripDetailsController extends GetxController {
               remainingDistance: remainingDistance.value,
               estimatedTime: estimatedTime.value,
               currentAddress: address,
+              driverPhone: trip.driverPhone,
             );
           }
           return trip;
@@ -279,6 +335,19 @@ class TripDetailsController extends GetxController {
   // Action to start the journey
   void startJourney() {
     final tripsController = Get.find<TripsController>();
+    
+    // Prevent starting/resuming a completed trip
+    try {
+      final trip = tripsController.allTrips.firstWhere((t) => t.id == tripId);
+      if (trip.status == 'DELIVERED') {
+        AppSnackBar.showError(
+          title: 'Trip Completed',
+          message: 'This trip is already completed and cannot be restarted.',
+        );
+        return;
+      }
+    } catch (_) {}
+
     final hasActiveTrip = tripsController.allTrips.any((t) => t.isActive && t.id != tripId);
     
     String descriptionText = 'Are you ready to initiate your trip $tripId and start GPS route sync?';
@@ -313,6 +382,7 @@ class TripDetailsController extends GetxController {
                 date: trip.date,
                 tabType: trip.tabType,
                 isActive: true,
+                driverPhone: trip.driverPhone,
               );
             } else {
               return TripItemModel(
@@ -326,6 +396,7 @@ class TripDetailsController extends GetxController {
                 date: trip.date,
                 tabType: trip.tabType,
                 isActive: false,
+                driverPhone: trip.driverPhone,
               );
             }
           }).toList();
@@ -367,6 +438,10 @@ class TripDetailsController extends GetxController {
             final firebaseService = Get.find<FirebaseService>();
             await firebaseService.updateTripMilestone(tripId, 4, status: 'DELIVERED');
           } catch (_) {}
+
+          // Automatically return to the Home/Dashboard screen after showing the completed state for a brief moment
+          await Future.delayed(const Duration(milliseconds: 1500));
+          Get.back();
         }
       });
       return;

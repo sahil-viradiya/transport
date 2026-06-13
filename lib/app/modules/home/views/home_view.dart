@@ -22,39 +22,46 @@ class HomeView extends GetView<HomeController> {
       const ProfileView(),
     ];
 
-    return Scaffold(
-      body: Obx(() => IndexedStack(
-            index: controller.currentIndex.value,
-            children: pages,
-          )),
-      bottomNavigationBar: Obx(() => NavigationBar(
-            selectedIndex: controller.currentIndex.value,
-            onDestinationSelected: controller.changeTabIndex,
-            backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-            indicatorColor: AppColors.primaryLight,
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home_rounded, color: AppColors.primary),
-                label: 'Home',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.local_shipping_outlined),
-                selectedIcon: Icon(Icons.local_shipping_rounded, color: AppColors.primary),
-                label: 'Trips',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.receipt_long_outlined),
-                selectedIcon: Icon(Icons.receipt_long_rounded, color: AppColors.primary),
-                label: 'Expenses',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.person_outline_rounded),
-                selectedIcon: Icon(Icons.person_rounded, color: AppColors.primary),
-                label: 'Profile',
-              ),
-            ],
-          )),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        controller.handleBackPress();
+      },
+      child: Scaffold(
+        body: Obx(() => IndexedStack(
+              index: controller.currentIndex.value,
+              children: pages,
+            )),
+        bottomNavigationBar: Obx(() => NavigationBar(
+              selectedIndex: controller.currentIndex.value,
+              onDestinationSelected: controller.changeTabIndex,
+              backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+              indicatorColor: AppColors.primaryLight,
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home_rounded, color: AppColors.primary),
+                  label: 'Home',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.local_shipping_outlined),
+                  selectedIcon: Icon(Icons.local_shipping_rounded, color: AppColors.primary),
+                  label: 'Trips',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.receipt_long_outlined),
+                  selectedIcon: Icon(Icons.receipt_long_rounded, color: AppColors.primary),
+                  label: 'Expenses',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.person_outline_rounded),
+                  selectedIcon: Icon(Icons.person_rounded, color: AppColors.primary),
+                  label: 'Profile',
+                ),
+              ],
+            )),
+      ),
     );
   }
 }

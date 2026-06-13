@@ -73,18 +73,70 @@ class DashboardController extends GetxController {
       driverPhone.value = phone;
     }
     loadProfileFromFirebase();
+
+    // Listen to allTrips in TripsController to reactively refresh profile statistics
+    try {
+      final tripsController = Get.find<TripsController>();
+      ever(tripsController.allTrips, (_) {
+        loadProfileFromFirebase();
+      });
+    } catch (_) {}
   }
 
   Future<void> loadProfileFromFirebase() async {
     try {
       final firebaseService = Get.find<FirebaseService>();
-      final profile = await firebaseService.getDriverProfile();
-      if (profile.isNotEmpty) {
-        driverName.value = profile['driverName'] ?? 'Rajesh Kumar';
-        driverPhone.value = profile['driverPhone'] ?? profile['phone'] ?? '+91 98765 43210';
-        vehicleNo.value = profile['vehicleNo'] ?? 'MH-12-AB-1234';
-        vehicleModel.value = profile['vehicleModel'] ?? 'Tata Signa 5530.S';
-        avatarUrl.value = profile['avatarUrl'] ?? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop';
+      final phone = driverPhone.value.trim().replaceAll(' ', '');
+      if (phone.isEmpty) return;
+
+      // 1. Fetch driver profile details from users collection
+      final userData = await firebaseService.getUserData(phone);
+      if (userData != null) {
+        driverName.value = userData['name'] ?? 'Driver';
+        driverPhone.value = userData['phone'] ?? phone;
+        avatarUrl.value = userData['avatarUrl'] ?? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop';
+      }
+
+      // 2. Fetch trips to count assigned ones and retrieve active/latest truck number
+      final allTrips = await firebaseService.getTrips();
+      final driverTrips = allTrips.where((t) => t.driverPhone.trim().replaceAll(' ', '') == phone).toList();
+
+      todayTripsCount.value = driverTrips.length;
+
+      final activeOrLatestTrip = driverTrips.firstWhere(
+        (t) => t.isActive,
+        orElse: () => driverTrips.isNotEmpty ? driverTrips.first : TripItemModel(
+          id: '',
+          truckNo: '',
+          status: '',
+          pickupCity: '',
+          pickupLocation: '',
+          dropCity: '',
+          dropLocation: '',
+          date: '',
+          tabType: '',
+          isActive: false,
+        ),
+      );
+
+      if (activeOrLatestTrip.id.isNotEmpty) {
+        final truckNoVal = activeOrLatestTrip.truckNo;
+        vehicleNo.value = truckNoVal;
+
+        // Lookup truck details from trucks collection to get truck model info
+        final allTrucks = await firebaseService.getTrucks();
+        final truck = allTrucks.firstWhere(
+          (t) => t['truckNo'] == truckNoVal,
+          orElse: () => <String, dynamic>{},
+        );
+        if (truck.isNotEmpty) {
+          vehicleModel.value = truck['model'] ?? 'Tata Signa 5530.S';
+        } else {
+          vehicleModel.value = 'N/A';
+        }
+      } else {
+        vehicleNo.value = 'No Truck Assigned';
+        vehicleModel.value = 'N/A';
       }
     } catch (_) {}
   }
@@ -118,6 +170,7 @@ class DashboardController extends GetxController {
         
         _storage.remove('isLoggedIn');
         _storage.remove('userPhone');
+        _storage.remove('userRole');
         Get.offAllNamed(Routes.LOGIN);
         AppSnackBar.showSuccess(title: 'Logged Out', message: 'Session closed successfully.');
       },

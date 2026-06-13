@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'app/core/theme/app_theme.dart';
 import 'app/data/services/storage_service.dart';
 import 'app/data/services/connectivity_service.dart';
+import 'app/data/services/firebase_service.dart';
 import 'app/routes/app_pages.dart';
 
 void main() async {
@@ -13,21 +15,25 @@ void main() async {
 }
 
 Future<void> initServices() async {
-  print('Initializing critical GetX services...');
+  debugPrint('Initializing critical GetX services...');
   // Initialize Firebase Core
   try {
     await Firebase.initializeApp();
-    print('Firebase initialized successfully.');
+    // Set locale to suppress "X-Firebase-Locale was null" warning
+    FirebaseAuth.instance.setLanguageCode('en');
+    debugPrint('Firebase initialized successfully.');
   } catch (e) {
-    print('Firebase initialization failed: $e');
-    print('App running in Mock Mode.');
+    debugPrint('Firebase initialization failed: $e');
+    debugPrint('App running in Mock Mode.');
   }
 
   // Initialize Shared Preferences Storage
   await Get.putAsync(() => StorageService().init());
   // Initialize Live Connectivity Checker
   await Get.putAsync(() => ConnectivityService().init());
-  print('All services successfully registered.');
+  // Initialize Firebase Service (Firestore CRUD)
+  await Get.putAsync(() => FirebaseService().init());
+  debugPrint('All services successfully registered.');
 }
 
 class MyApp extends StatelessWidget {

@@ -5,6 +5,7 @@ import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/routes/app_pages.dart';
 import 'package:transport/app/data/services/storage_service.dart';
+import 'package:transport/app/data/services/firebase_service.dart';
 
 class LoginController extends GetxController {
   // Inputs
@@ -18,16 +19,16 @@ class LoginController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Force mock mode for local testing to bypass Firebase reCAPTCHA and console restrictions
-    isMockMode.value = true;
-    print('Mock Mode forced active for developer testing.');
+    // Set to false to use real Firebase Phone Auth, true for mock/developer testing
+    isMockMode.value = false;
+    debugPrint('Firebase Auth mode: ${isMockMode.value ? "MOCK" : "LIVE"}');
   }
 
   // Send Verification Code (Phone Number)
   Future<void> sendOtp() async {
     if (!formKey.currentState!.validate()) return;
 
-    final phone = phoneController.text.trim();
+    final phone = phoneController.text.trim().replaceAll(' ', '');
     isLoading.value = true;
     AppPopup.showLoading(message: 'Requesting OTP...');
 
@@ -49,7 +50,7 @@ class LoginController extends GetxController {
       
       AppSnackBar.showSuccess(
         title: 'SMS Sent (Mock Mode)',
-        message: 'Mock verification code is sent! Enter code: 1234',
+        message: 'Mock verification code is sent! Enter code: 123456',
       );
     } else {
       // Actual Firebase Authentication
@@ -101,18 +102,31 @@ class LoginController extends GetxController {
     }
   }
 
-  // Instant sign in helper
+  // Instant sign in helper — checks role from Firestore before routing
   Future<void> _signInWithCredential(PhoneAuthCredential credential) async {
     try {
       final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
       final user = userCredential.user;
       
       if (user != null) {
+        final phone = user.phoneNumber ?? phoneController.text.trim();
         final storage = Get.find<StorageService>();
-        storage.write('isLoggedIn', true);
-        storage.write('userPhone', user.phoneNumber ?? phoneController.text.trim());
-        Get.offAllNamed(Routes.HOME);
-        AppSnackBar.showSuccess(title: 'Welcome', message: 'Logged in successfully!');
+        final firebaseService = Get.find<FirebaseService>();
+        
+        // Lookup user role from Firestore
+        final userData = await firebaseService.getUserData(phone);
+        final role = userData?['role'] ?? 'driver';
+        
+        await storage.write('isLoggedIn', true);
+        await storage.write('userPhone', phone);
+        await storage.write('userRole', role);
+        
+        if (role == 'admin') {
+          Get.offAllNamed(Routes.ADMIN_HOME);
+        } else {
+          Get.offAllNamed(Routes.HOME);
+        }
+        AppSnackBar.showSuccess(title: 'Welcome', message: 'Logged in as ${role.toUpperCase()}!');
       }
     } catch (e) {
       AppSnackBar.showError(

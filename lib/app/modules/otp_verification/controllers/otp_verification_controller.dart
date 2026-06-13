@@ -6,6 +6,9 @@ import 'package:transport/app/data/services/storage_service.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/routes/app_pages.dart';
+import 'package:transport/widgets/app_text.dart';
+import 'package:transport/app/core/theme/app_colors.dart';
+import 'package:transport/app/data/services/firebase_service.dart';
 
 class OtpVerificationController extends GetxController {
   final _storage = Get.find<StorageService>();
@@ -48,8 +51,8 @@ class OtpVerificationController extends GetxController {
   // Verify Code Entry
   Future<void> verifyOtp() async {
     final code = otpController.text.trim();
-    if (code.length < 4) {
-      AppSnackBar.showWarning(title: 'Validation', message: 'Please enter the 4-digit code.');
+    if (code.length < 6) {
+      AppSnackBar.showWarning(title: 'Validation', message: 'Please enter the 6-digit code.');
       return;
     }
 
@@ -62,13 +65,10 @@ class OtpVerificationController extends GetxController {
       AppPopup.hideLoading();
       isLoading.value = false;
 
-      if (code == '1234') {
-        _storage.write('isLoggedIn', true);
-        _storage.write('userPhone', rawPhone);
-        Get.offAllNamed(Routes.HOME);
-        AppSnackBar.showSuccess(title: 'Welcome', message: 'Successfully logged in!');
+      if (code == '123456') {
+        await _handleUserLoginOrSignup(rawPhone);
       } else {
-        AppSnackBar.showError(title: 'Invalid Code', message: 'Mock verification code mismatch. Enter: 1234');
+        AppSnackBar.showError(title: 'Invalid Code', message: 'Mock verification code mismatch. Enter: 123456');
       }
     } else {
       // Firebase Verification
@@ -85,10 +85,7 @@ class OtpVerificationController extends GetxController {
         isLoading.value = false;
 
         if (user != null) {
-          _storage.write('isLoggedIn', true);
-          _storage.write('userPhone', user.phoneNumber ?? rawPhone);
-          Get.offAllNamed(Routes.HOME);
-          AppSnackBar.showSuccess(title: 'Welcome', message: 'Successfully logged in!');
+          await _handleUserLoginOrSignup(user.phoneNumber ?? rawPhone);
         }
       } catch (e) {
         AppPopup.hideLoading();
@@ -99,6 +96,131 @@ class OtpVerificationController extends GetxController {
         );
       }
     }
+  }
+
+  Future<void> _handleUserLoginOrSignup(String phone) async {
+    // Normalize phone: remove spaces so '+91 9999999999' becomes '+919999999999'
+    phone = phone.replaceAll(' ', '');
+    try {
+      final firebaseService = Get.find<FirebaseService>();
+      final userData = await firebaseService.getUserData(phone);
+      
+      if (userData != null) {
+        // User exists, log them in immediately
+        final role = userData['role'] ?? 'driver';
+        await _storage.write('isLoggedIn', true);
+        await _storage.write('userPhone', phone);
+        await _storage.write('userRole', role);
+        
+        if (role == 'admin') {
+          Get.offAllNamed(Routes.ADMIN_HOME);
+        } else {
+          Get.offAllNamed(Routes.HOME);
+        }
+        AppSnackBar.showSuccess(title: 'Welcome Back', message: 'Successfully logged in as ${role.toUpperCase()}!');
+      } else {
+        // User does not exist, show role selection signup dialog
+        _showRoleSelectionSignupDialog(phone);
+      }
+    } catch (e) {
+      AppSnackBar.showError(title: 'Authentication Error', message: e.toString());
+    }
+  }
+
+  void _showRoleSelectionSignupDialog(String phone) {
+    String selectedRole = 'driver';
+    final nameController = TextEditingController();
+
+    Get.dialog(
+      AlertDialog(
+        title: const AppText('Complete Profile', style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const AppText('Please enter your details and choose your role to sign up.', style: AppTextStyle.bodyMedium),
+            const SizedBox(height: 16),
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Full Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const AppText('Select Role:', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: selectedRole,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'driver', child: AppText('Driver', style: AppTextStyle.bodyMedium)),
+                DropdownMenuItem(value: 'admin', child: AppText('Admin', style: AppTextStyle.bodyMedium)),
+              ],
+              onChanged: (val) {
+                if (val != null) selectedRole = val;
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const AppText('Cancel', style: AppTextStyle.bodyMedium),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            onPressed: () async {
+              final name = nameController.text.trim();
+              if (name.isEmpty) {
+                AppSnackBar.showWarning(title: 'Validation', message: 'Please enter your name.');
+                return;
+              }
+
+              Get.back(); // Close dialog
+              AppPopup.showLoading(message: 'Creating profile...');
+
+              try {
+                final firebaseService = Get.find<FirebaseService>();
+                final avatarUrl = selectedRole == 'admin' 
+                    ? 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop'
+                    : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop';
+                
+                final userData = {
+                  'name': name,
+                  'phone': phone,
+                  'role': selectedRole,
+                  'avatarUrl': avatarUrl,
+                };
+
+                await firebaseService.saveUser(phone, userData);
+
+                await _storage.write('isLoggedIn', true);
+                await _storage.write('userPhone', phone);
+                await _storage.write('userRole', selectedRole);
+
+                AppPopup.hideLoading();
+
+                if (selectedRole == 'admin') {
+                  Get.offAllNamed(Routes.ADMIN_HOME);
+                } else {
+                  Get.offAllNamed(Routes.HOME);
+                }
+                AppSnackBar.showSuccess(title: 'Account Created', message: 'Signed up successfully as ${selectedRole.toUpperCase()}!');
+              } catch (e) {
+                AppPopup.hideLoading();
+                AppSnackBar.showError(title: 'Error', message: e.toString());
+              }
+            },
+            child: const AppText('Submit', style: AppTextStyle.bodyMedium, color: Colors.white),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
   }
 
   // Resend OTP
@@ -115,7 +237,7 @@ class OtpVerificationController extends GetxController {
       _startResendTimer();
       AppSnackBar.showSuccess(
         title: 'SMS Sent (Mock Mode)',
-        message: 'Mock verification code resent! Enter code: 1234',
+        message: 'Mock verification code resent! Enter code: 123456',
       );
     } else {
       // Trigger Firebase Phone Auth Resend
@@ -123,13 +245,16 @@ class OtpVerificationController extends GetxController {
         await FirebaseAuth.instance.verifyPhoneNumber(
           phoneNumber: rawPhone,
           verificationCompleted: (PhoneAuthCredential credential) async {
-            // Auto login
-            final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-            if (userCredential.user != null) {
+            // Auto login — check role before routing
+            try {
+              final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+              if (userCredential.user != null) {
+                AppPopup.hideLoading();
+                await _handleUserLoginOrSignup(userCredential.user!.phoneNumber ?? rawPhone);
+              }
+            } catch (e) {
               AppPopup.hideLoading();
-              _storage.write('isLoggedIn', true);
-              _storage.write('userPhone', rawPhone);
-              Get.offAllNamed(Routes.HOME);
+              AppSnackBar.showError(title: 'Auto Login Error', message: e.toString());
             }
           },
           verificationFailed: (FirebaseAuthException e) {
