@@ -41,6 +41,13 @@ class FirebaseService extends GetxService {
           estimatedTime: data['estimatedTime'] ?? '',
           currentAddress: data['currentAddress'] ?? '',
           driverPhone: data['driverPhone'] ?? '',
+          pickupLatitude: data['pickupLatitude'] != null ? (data['pickupLatitude'] as num).toDouble() : null,
+          pickupLongitude: data['pickupLongitude'] != null ? (data['pickupLongitude'] as num).toDouble() : null,
+          dropLatitude: data['dropLatitude'] != null ? (data['dropLatitude'] as num).toDouble() : null,
+          dropLongitude: data['dropLongitude'] != null ? (data['dropLongitude'] as num).toDouble() : null,
+          milestonesLog: data['milestonesLog'],
+          podUrl: data['podUrl'],
+          remarks: data['remarks'],
         );
       }).toList();
     } catch (_) {
@@ -206,7 +213,14 @@ class FirebaseService extends GetxService {
   }
 
   // Update trip milestones & status in Firestore
-  Future<void> updateTripMilestone(String tripId, int milestone, {String? status}) async {
+  Future<void> updateTripMilestone(
+    String tripId, 
+    int milestone, {
+    String? status,
+    String? locationName,
+    double? latitude,
+    double? longitude,
+  }) async {
     try {
       if (status == 'ACTIVE NOW') {
         // Query other trips that are active and deactivate them
@@ -232,6 +246,25 @@ class FirebaseService extends GetxService {
           updates['isActive'] = false;
         }
       }
+
+      // Append to milestone history/logs
+      String milestoneLabel = 'Created';
+      if (milestone == 1) milestoneLabel = 'Trip Assigned';
+      if (milestone == 2) milestoneLabel = 'Reached Pickup';
+      if (milestone == 3) milestoneLabel = 'Loaded';
+      if (milestone == 4) milestoneLabel = 'Reached Drop / Delivered';
+
+      final logEntry = {
+        'milestone': milestone,
+        'label': milestoneLabel,
+        'timestamp': DateTime.now().toIso8601String().split('T').join(' ').substring(0, 16),
+        'address': locationName ?? 'Terminal Gate',
+        'latitude': latitude ?? 0.0,
+        'longitude': longitude ?? 0.0,
+      };
+
+      updates['milestonesLog'] = FieldValue.arrayUnion([logEntry]);
+
       await _db.collection('trips').doc(tripId).set(updates, SetOptions(merge: true));
     } catch (_) {}
   }
@@ -265,14 +298,27 @@ class FirebaseService extends GetxService {
   }
 
   // Update Firestore trip record with POD downloads
-  Future<void> saveProofOfDeliveryDetails(String tripId, String downloadUrl, String remarks) async {
+  Future<void> saveProofOfDeliveryDetails(
+    String tripId, 
+    String downloadUrl, 
+    String remarks, {
+    String? locationName,
+    double? latitude,
+    double? longitude,
+  }) async {
     try {
+      await updateTripMilestone(
+        tripId, 
+        4, 
+        status: 'DELIVERED', 
+        locationName: locationName, 
+        latitude: latitude, 
+        longitude: longitude,
+      );
+      
       await _db.collection('trips').doc(tripId).set({
         'podUrl': downloadUrl,
         'remarks': remarks,
-        'status': 'DELIVERED',
-        'isActive': false,
-        'currentMilestone': 4,
       }, SetOptions(merge: true));
     } catch (_) {}
   }

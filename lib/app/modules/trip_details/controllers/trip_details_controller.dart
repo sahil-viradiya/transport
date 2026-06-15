@@ -74,6 +74,11 @@ class TripDetailsController extends GetxController {
 
     String pickupCity = 'Mumbai';
     String dropCity = 'Indore';
+    double startLat = 18.9482;
+    double startLng = 72.9469;
+    double endLat = 22.6208;
+    double endLng = 75.8039;
+    bool hasCoords = false;
 
     final args = Get.arguments;
     if (args != null && args is Map) {
@@ -101,6 +106,17 @@ class TripDetailsController extends GetxController {
           pickupCity = trip.pickupCity;
           dropCity = trip.dropCity;
 
+          if (trip.pickupLatitude != null && trip.pickupLongitude != null) {
+            startLat = trip.pickupLatitude!;
+            startLng = trip.pickupLongitude!;
+            hasCoords = true;
+          }
+          if (trip.dropLatitude != null && trip.dropLongitude != null) {
+            endLat = trip.dropLatitude!;
+            endLng = trip.dropLongitude!;
+            hasCoords = true;
+          }
+
           if (trip.status == 'DELIVERED') {
             isJourneyStarted.value = true;
             currentMilestone.value = 4;
@@ -114,16 +130,23 @@ class TripDetailsController extends GetxController {
       }
     }
 
-    // Calculate initial distance and ETA
-    final startCoords = _getCoordinates(departureTitle, pickupCity);
-    final endCoords = _getCoordinates(destinationTitle, dropCity);
+    if (!hasCoords) {
+      // Calculate initial distance and ETA from fallback
+      final startCoords = _getCoordinates(departureTitle, pickupCity);
+      startLat = startCoords[0];
+      startLng = startCoords[1];
+      
+      final endCoords = _getCoordinates(destinationTitle, dropCity);
+      endLat = endCoords[0];
+      endLng = endCoords[1];
+    }
     
     final locationService = Get.find<LocationService>();
     final initialDistance = locationService.calculateDistance(
-      startCoords[0],
-      startCoords[1],
-      endCoords[0],
-      endCoords[1],
+      startLat,
+      startLng,
+      endLat,
+      endLng,
     );
     remainingDistance.value = '${initialDistance.toStringAsFixed(1)} KM';
     estimatedTime.value = locationService.estimateTravelTime(initialDistance);
@@ -202,16 +225,34 @@ class TripDetailsController extends GetxController {
 
   void startLocationUpdates() {
     // Look up departure coordinates to start simulation from
-    String pickupCity = 'Mumbai';
+    double depLat = 18.9482;
+    double depLng = 72.9469;
+    bool hasDepCoords = false;
+    
     try {
       final tripsController = Get.find<TripsController>();
       final trip = tripsController.allTrips.firstWhere((t) => t.id == tripId);
-      pickupCity = trip.pickupCity;
+      if (trip.pickupLatitude != null && trip.pickupLongitude != null) {
+        depLat = trip.pickupLatitude!;
+        depLng = trip.pickupLongitude!;
+        hasDepCoords = true;
+      }
     } catch (_) {}
     
-    final startCoords = _getCoordinates(departureTitle, pickupCity);
-    simulatedLat = startCoords[0];
-    simulatedLng = startCoords[1];
+    if (!hasDepCoords) {
+      String pickupCity = 'Mumbai';
+      try {
+        final tripsController = Get.find<TripsController>();
+        final trip = tripsController.allTrips.firstWhere((t) => t.id == tripId);
+        pickupCity = trip.pickupCity;
+      } catch (_) {}
+      final startCoords = _getCoordinates(departureTitle, pickupCity);
+      depLat = startCoords[0];
+      depLng = startCoords[1];
+    }
+    
+    simulatedLat = depLat;
+    simulatedLng = depLng;
 
     _locationTimer?.cancel();
     updateCurrentLocationDetails();
@@ -239,16 +280,31 @@ class TripDetailsController extends GetxController {
       double currentLng = position.longitude;
       
       // Look up destination coordinates
-      String dropCity = 'Indore';
+      double destLat = 22.6208;
+      double destLng = 75.8039;
+      bool hasDestCoords = false;
+      
       try {
         final tripsController = Get.find<TripsController>();
         final trip = tripsController.allTrips.firstWhere((t) => t.id == tripId);
-        dropCity = trip.dropCity;
+        if (trip.dropLatitude != null && trip.dropLongitude != null) {
+          destLat = trip.dropLatitude!;
+          destLng = trip.dropLongitude!;
+          hasDestCoords = true;
+        }
       } catch (_) {}
       
-      final endCoords = _getCoordinates(destinationTitle, dropCity);
-      double destLat = endCoords[0];
-      double destLng = endCoords[1];
+      if (!hasDestCoords) {
+        String dropCity = 'Indore';
+        try {
+          final tripsController = Get.find<TripsController>();
+          final trip = tripsController.allTrips.firstWhere((t) => t.id == tripId);
+          dropCity = trip.dropCity;
+        } catch (_) {}
+        final endCoords = _getCoordinates(destinationTitle, dropCity);
+        destLat = endCoords[0];
+        destLng = endCoords[1];
+      }
 
       if (isSimulatingMovement) {
         // Incrementally move closer to destination coordinates by 3% each step
@@ -363,10 +419,18 @@ class TripDetailsController extends GetxController {
       cancelText: 'Cancel',
       onConfirm: () async {
         isJourneyStarted.value = true;
+        currentMilestone.value = 2;
         startLocationUpdates();
         try {
           final firebaseService = Get.find<FirebaseService>();
-          await firebaseService.updateTripMilestone(tripId, 2, status: 'ACTIVE NOW');
+          await firebaseService.updateTripMilestone(
+            tripId, 
+            2, 
+            status: 'ACTIVE NOW',
+            locationName: currentAddress.value == 'Locating...' ? departureTitle : currentAddress.value,
+            latitude: simulatedLat,
+            longitude: simulatedLng,
+          );
           
           // Update local TripsController state so that only this trip is active
           final updatedTrips = tripsController.allTrips.map((trip) {
@@ -434,10 +498,6 @@ class TripDetailsController extends GetxController {
           speed.value = 0;
           estimatedTime.value = 'Delivered';
           _locationTimer?.cancel();
-          try {
-            final firebaseService = Get.find<FirebaseService>();
-            await firebaseService.updateTripMilestone(tripId, 4, status: 'DELIVERED');
-          } catch (_) {}
 
           // Automatically return to the Home/Dashboard screen after showing the completed state for a brief moment
           await Future.delayed(const Duration(milliseconds: 1500));
@@ -456,7 +516,13 @@ class TripDetailsController extends GetxController {
         currentMilestone.value = milestoneIndex + 1;
         try {
           final firebaseService = Get.find<FirebaseService>();
-          await firebaseService.updateTripMilestone(tripId, milestoneIndex + 1);
+          await firebaseService.updateTripMilestone(
+            tripId, 
+            milestoneIndex + 1,
+            locationName: currentAddress.value == 'Locating...' ? departureTitle : currentAddress.value,
+            latitude: simulatedLat,
+            longitude: simulatedLng,
+          );
         } catch (_) {}
         AppSnackBar.showSuccess(
           title: 'Checkpoint Verified',

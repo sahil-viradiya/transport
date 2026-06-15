@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:transport/widgets/app_text.dart';
+import 'package:transport/widgets/dialogs/app_snackbar.dart';
+import 'package:transport/widgets/dialogs/app_popup.dart';
 import '../controllers/admin_home_controller.dart';
 import '../../../core/theme/app_colors.dart';
 
@@ -90,58 +95,62 @@ class AdminHomeView extends GetView<AdminHomeController> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Stats Row
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    'TOTAL TRIPS',
-                    '${controller.trips.length}',
-                    Icons.alt_route_rounded,
-                    const Color(0xFFE0F2FE),
-                    const Color(0xFF0369A1),
-                    isDark,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    'TOTAL TRUCKS',
-                    '${controller.trucks.length}',
-                    Icons.local_shipping_rounded,
-                    const Color(0xFFDCFCE7),
-                    const Color(0xFF15803D),
-                    isDark,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    'DRIVERS / USERS',
-                    '${controller.users.length}',
-                    Icons.people_rounded,
-                    const Color(0xFFFEF9C3),
-                    const Color(0xFFA16207),
-                    isDark,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    'ACTIVE DRIVERS',
-                    '${controller.trips.where((t) => t['isActive'] == true).length}',
-                    Icons.my_location_rounded,
-                    const Color(0xFFF3E8FF),
-                    const Color(0xFF7E22CE),
-                    isDark,
-                  ),
-                ),
-              ],
-            ),
+            Obx(() => Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildStatCard(
+                            'TOTAL TRIPS',
+                            '${controller.trips.length}',
+                            Icons.alt_route_rounded,
+                            const Color(0xFFE0F2FE),
+                            const Color(0xFF0369A1),
+                            isDark,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildStatCard(
+                            'TOTAL TRUCKS',
+                            '${controller.trucks.length}',
+                            Icons.local_shipping_rounded,
+                            const Color(0xFFDCFCE7),
+                            const Color(0xFF15803D),
+                            isDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildStatCard(
+                            'DRIVERS / USERS',
+                            '${controller.users.length}',
+                            Icons.people_rounded,
+                            const Color(0xFFFEF9C3),
+                            const Color(0xFFA16207),
+                            isDark,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildStatCard(
+                            'ACTIVE DRIVERS',
+                            '${controller.trips.where((t) => t['isActive'] == true).length}',
+                            Icons.my_location_rounded,
+                            const Color(0xFFF3E8FF),
+                            const Color(0xFF7E22CE),
+                            isDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                )),
             const SizedBox(height: 24),
 
             // Live Tracking Panel Header
@@ -298,7 +307,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                         ),
                         Obx(() {
                           final tripId = trip['id'];
-                          final tripExpenses = controller.expenses.where((exp) => exp['tripId'] == tripId).toList();
+                          final tripExpenses = controller.expenses
+                              .where((exp) => exp['tripId'] == tripId)
+                              .toList();
                           if (tripExpenses.isEmpty) {
                             return const SizedBox.shrink();
                           }
@@ -306,7 +317,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Divider(height: 24),
-                              const AppText('EXPENSE CLAIMS', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+                              const AppText('EXPENSE CLAIMS',
+                                  style: AppTextStyle.labelMedium,
+                                  fontWeight: FontWeight.bold),
                               const SizedBox(height: 8),
                               ...tripExpenses.map((exp) {
                                 final title = exp['title'] ?? 'Expense';
@@ -319,43 +332,63 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                   margin: const EdgeInsets.only(bottom: 8),
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade100,
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.05)
+                                        : Colors.grey.shade100,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Row(
                                     children: [
                                       Icon(
-                                        title.contains('Fuel') ? Icons.local_gas_station_rounded : Icons.receipt_rounded,
+                                        title.contains('Fuel')
+                                            ? Icons.local_gas_station_rounded
+                                            : Icons.receipt_rounded,
                                         color: AppColors.primary,
                                       ),
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
-                                            AppText(title, style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                                            AppText(title,
+                                                style: AppTextStyle.bodyMedium,
+                                                fontWeight: FontWeight.bold),
                                             if (desc.isNotEmpty)
-                                              AppText(desc, style: AppTextStyle.labelMedium),
+                                              AppText(desc,
+                                                  style:
+                                                      AppTextStyle.labelMedium),
                                           ],
                                         ),
                                       ),
                                       Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
                                         children: [
-                                          AppText(amt, style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                                          AppText(amt,
+                                              style: AppTextStyle.bodyMedium,
+                                              fontWeight: FontWeight.bold),
                                           const SizedBox(height: 2),
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
-                                              color: status == 'Approved' ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(4),
+                                              color: status == 'Approved'
+                                                  ? Colors.green
+                                                      .withValues(alpha: 0.1)
+                                                  : Colors.orange
+                                                      .withValues(alpha: 0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
                                             ),
                                             child: AppText(
                                               status,
                                               style: AppTextStyle.labelMedium,
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,
-                                              color: status == 'Approved' ? Colors.green : Colors.orange,
+                                              color: status == 'Approved'
+                                                  ? Colors.green
+                                                  : Colors.orange,
                                             ),
                                           ),
                                         ],
@@ -363,49 +396,75 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                       if (receiptUrl.isNotEmpty) ...[
                                         const SizedBox(width: 8),
                                         IconButton(
-                                          icon: const Icon(Icons.image_outlined, size: 20, color: AppColors.primary),
+                                          icon: const Icon(Icons.image_outlined,
+                                              size: 20,
+                                              color: AppColors.primary),
                                           tooltip: 'View Receipt',
                                           onPressed: () {
                                             showDialog(
                                               context: context,
-                                              builder: (dialogCtx) => AlertDialog(
-                                                backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                                                title: AppText(title, style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
-                                                content: Column(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    ClipRRect(
-                                                      borderRadius: BorderRadius.circular(12),
-                                                      child: Image.network(
-                                                        receiptUrl,
-                                                        height: 260,
-                                                        width: double.infinity,
-                                                        fit: BoxFit.cover,
-                                                        errorBuilder: (context, error, stackTrace) =>
-                                                            const Icon(Icons.broken_image_outlined, size: 80),
+                                              builder: (dialogCtx) =>
+                                                  AlertDialog(
+                                                backgroundColor: isDark
+                                                    ? const Color(0xFF1E293B)
+                                                    : Colors.white,
+                                                title: AppText(title,
+                                                    style: AppTextStyle.headlineSmall,
+                                                    fontWeight: FontWeight.bold),
+                                                content: SizedBox(
+                                                  width: 400,
+                                                  child: Column(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      ClipRRect(
+                                                        borderRadius:
+                                                            BorderRadius.circular(12),
+                                                        child: Image.network(
+                                                          _getCorsWebUrl(receiptUrl),
+                                                          height: 260,
+                                                          width: double.infinity,
+                                                          fit: BoxFit.cover,
+                                                          errorBuilder: (context, error,
+                                                                  stackTrace) =>
+                                                              const Icon(
+                                                                  Icons
+                                                                      .broken_image_outlined,
+                                                                  size: 80),
+                                                        ),
                                                       ),
-                                                    ),
-                                                    const SizedBox(height: 12),
-                                                    AppText('Amount: $amt', style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
-                                                    if (desc.isNotEmpty) ...[
-                                                      const SizedBox(height: 6),
-                                                      AppText(desc, style: AppTextStyle.bodyMedium),
+                                                      const SizedBox(height: 12),
+                                                      AppText('Amount: $amt',
+                                                          style: AppTextStyle.bodyLarge,
+                                                          fontWeight: FontWeight.bold),
+                                                      if (desc.isNotEmpty) ...[
+                                                        const SizedBox(height: 6),
+                                                        AppText(desc,
+                                                            style:
+                                                                AppTextStyle.bodyMedium),
+                                                      ],
                                                     ],
-                                                  ],
+                                                  ),
                                                 ),
                                                 actions: [
                                                   if (status == 'Pending')
                                                     ElevatedButton(
-                                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                                                      style: ElevatedButton.styleFrom(
+                                                          backgroundColor:
+                                                              Colors.green),
                                                       onPressed: () {
                                                         Navigator.of(dialogCtx).pop();
                                                         controller.approveExpense(exp);
                                                       },
-                                                      child: const AppText('Approve', style: AppTextStyle.bodyMedium, color: Colors.white),
+                                                      child: const AppText('Approve',
+                                                          style:
+                                                              AppTextStyle.bodyMedium,
+                                                          color: Colors.white),
                                                     ),
                                                   TextButton(
-                                                    onPressed: () => Navigator.of(dialogCtx).pop(),
-                                                    child: const AppText('Close', style: AppTextStyle.bodyMedium),
+                                                    onPressed: () =>
+                                                        Navigator.of(dialogCtx).pop(),
+                                                    child: const AppText('Close',
+                                                        style: AppTextStyle.bodyMedium),
                                                   ),
                                                 ],
                                               ),
@@ -618,8 +677,16 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           Row(
                             children: [
                               IconButton(
+                                icon: const Icon(Icons.visibility_rounded,
+                                    color: AppColors.primary, size: 20),
+                                tooltip: 'View Audit Log & Details',
+                                onPressed: () => _showTripDetailsDialog(
+                                    context, isDark, trip),
+                              ),
+                              IconButton(
                                 icon: const Icon(Icons.edit_rounded,
                                     color: AppColors.primary, size: 20),
+                                tooltip: 'Edit Trip',
                                 onPressed: () => _showTripFormDialog(
                                     context, isDark,
                                     editModeTrip: trip),
@@ -895,23 +962,40 @@ class AdminHomeView extends GetView<AdminHomeController> {
   void _showTripFormDialog(BuildContext context, bool isDark,
       {Map<String, dynamic>? editModeTrip}) {
     final formKey = GlobalKey<FormState>();
-    final idCtrl = TextEditingController(
-        text: editModeTrip?['id'] ?? '');
+    final idCtrl = TextEditingController(text: editModeTrip?['id'] ?? '');
     final pickupCityCtrl =
         TextEditingController(text: editModeTrip?['pickupCity'] ?? '');
-    final pickupLocCtrl = TextEditingController(
-        text: editModeTrip?['pickupLocation'] ?? '');
+    final pickupLocCtrl =
+        TextEditingController(text: editModeTrip?['pickupLocation'] ?? '');
     final dropCityCtrl =
         TextEditingController(text: editModeTrip?['dropCity'] ?? '');
-    final dropLocCtrl = TextEditingController(
-        text: editModeTrip?['dropLocation'] ?? '');
-    final dateCtrl = TextEditingController(
-        text: editModeTrip?['date'] ?? '');
+    final dropLocCtrl =
+        TextEditingController(text: editModeTrip?['dropLocation'] ?? '');
+    final dateCtrl = TextEditingController(text: editModeTrip?['date'] ?? '');
+    final pickupLatCtrl = TextEditingController(
+        text: editModeTrip?['pickupLatitude'] != null
+            ? editModeTrip!['pickupLatitude'].toString()
+            : '18.9482');
+    final pickupLngCtrl = TextEditingController(
+        text: editModeTrip?['pickupLongitude'] != null
+            ? editModeTrip!['pickupLongitude'].toString()
+            : '72.9469');
+    final dropLatCtrl = TextEditingController(
+        text: editModeTrip?['dropLatitude'] != null
+            ? editModeTrip!['dropLatitude'].toString()
+            : '21.0792');
+    final dropLngCtrl = TextEditingController(
+        text: editModeTrip?['dropLongitude'] != null
+            ? editModeTrip!['dropLongitude'].toString()
+            : '79.0274');
 
     final availableTrucks =
         controller.trucks.map((t) => t['truckNo'] as String).toList();
     if (availableTrucks.isEmpty) availableTrucks.add('MH-12-BV-0045');
     String selectedTruck = editModeTrip?['truckNo'] ?? availableTrucks.first;
+    if (!availableTrucks.contains(selectedTruck)) {
+      availableTrucks.add(selectedTruck);
+    }
 
     final availableDrivers = controller.users
         .where((u) => u['role'] == 'driver')
@@ -920,6 +1004,40 @@ class AdminHomeView extends GetView<AdminHomeController> {
     if (availableDrivers.isEmpty) availableDrivers.add('+919876543210');
     String selectedDriver =
         editModeTrip?['driverPhone'] ?? availableDrivers.first;
+    if (!availableDrivers.contains(selectedDriver)) {
+      availableDrivers.add(selectedDriver);
+    }
+
+    final availableTabs = ['Today', 'Upcoming', 'Active', 'Past'];
+    String selectedTabType = editModeTrip?['tabType'] ?? 'Today';
+    if (!availableTabs.contains(selectedTabType)) {
+      selectedTabType = 'Today';
+    }
+
+    String formatDateTime(DateTime date, TimeOfDay time) {
+      final months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
+      ];
+      final monthStr = months[date.month - 1];
+      final day = date.day;
+
+      final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+      final minute = time.minute.toString().padLeft(2, '0');
+      final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+
+      return "$day $monthStr, ${hour.toString().padLeft(2, '0')}:$minute $period";
+    }
 
     showModalBottomSheet(
       context: context,
@@ -1023,6 +1141,22 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           },
                         ),
                         const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          value: selectedTabType,
+                          decoration: const InputDecoration(
+                            labelText: 'Tab Category',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.category_rounded),
+                          ),
+                          items: availableTabs
+                              .map((tab) => DropdownMenuItem(
+                                  value: tab, child: Text(tab)))
+                              .toList(),
+                          onChanged: (val) {
+                            if (val != null) selectedTabType = val;
+                          },
+                        ),
+                        const SizedBox(height: 16),
                         Row(
                           children: [
                             Expanded(
@@ -1055,33 +1189,159 @@ class AdminHomeView extends GetView<AdminHomeController> {
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: pickupLocCtrl,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Pickup Location',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.pin_drop_rounded),
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.pin_drop_rounded),
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.search_rounded,
+                                  color: AppColors.primary),
+                              tooltip: 'Search Coordinates',
+                              onPressed: () async {
+                                final query =
+                                    "${pickupLocCtrl.text.trim()}, ${pickupCityCtrl.text.trim()}";
+                                await _resolveCoordinates(context, query,
+                                    pickupLatCtrl, pickupLngCtrl);
+                              },
+                            ),
                           ),
                           validator: (v) =>
                               v!.isEmpty ? 'Field required' : null,
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: pickupLatCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Pickup Latitude',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.map_rounded),
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                validator: (v) => v!.isEmpty
+                                    ? 'Required'
+                                    : (double.tryParse(v) == null
+                                        ? 'Invalid number'
+                                        : null),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: pickupLngCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Pickup Longitude',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.map_rounded),
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                validator: (v) => v!.isEmpty
+                                    ? 'Required'
+                                    : (double.tryParse(v) == null
+                                        ? 'Invalid number'
+                                        : null),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: dropLocCtrl,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Drop Location',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.pin_drop_rounded),
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.pin_drop_rounded),
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.search_rounded,
+                                  color: AppColors.primary),
+                              tooltip: 'Search Coordinates',
+                              onPressed: () async {
+                                final query =
+                                    "${dropLocCtrl.text.trim()}, ${dropCityCtrl.text.trim()}";
+                                await _resolveCoordinates(
+                                    context, query, dropLatCtrl, dropLngCtrl);
+                              },
+                            ),
                           ),
                           validator: (v) =>
                               v!.isEmpty ? 'Field required' : null,
                         ),
                         const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: dropLatCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Drop Latitude',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.map_rounded),
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                validator: (v) => v!.isEmpty
+                                    ? 'Required'
+                                    : (double.tryParse(v) == null
+                                        ? 'Invalid number'
+                                        : null),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: dropLngCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Drop Longitude',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.map_rounded),
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                validator: (v) => v!.isEmpty
+                                    ? 'Required'
+                                    : (double.tryParse(v) == null
+                                        ? 'Invalid number'
+                                        : null),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
                         TextFormField(
                           controller: dateCtrl,
+                          readOnly: true,
                           decoration: const InputDecoration(
                             labelText: 'Date Time',
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.calendar_today_rounded),
                           ),
+                          onTap: () async {
+                            final initialDate = DateTime.now();
+                            final selectedDate = await showDatePicker(
+                              context: context,
+                              initialDate: initialDate,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2100),
+                            );
+                            if (selectedDate != null) {
+                              final selectedTime = await showTimePicker(
+                                context: context,
+                                initialTime: TimeOfDay.now(),
+                              );
+                              if (selectedTime != null) {
+                                dateCtrl.text =
+                                    formatDateTime(selectedDate, selectedTime);
+                              }
+                            }
+                          },
                           validator: (v) =>
                               v!.isEmpty ? 'Field required' : null,
                         ),
@@ -1115,6 +1375,19 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                     'dropCity': dropCityCtrl.text.trim(),
                                     'dropLocation': dropLocCtrl.text.trim(),
                                     'date': dateCtrl.text.trim(),
+                                    'tabType': selectedTabType,
+                                    'pickupLatitude': double.tryParse(
+                                            pickupLatCtrl.text.trim()) ??
+                                        18.9482,
+                                    'pickupLongitude': double.tryParse(
+                                            pickupLngCtrl.text.trim()) ??
+                                        72.9469,
+                                    'dropLatitude': double.tryParse(
+                                            dropLatCtrl.text.trim()) ??
+                                        21.0792,
+                                    'dropLongitude': double.tryParse(
+                                            dropLngCtrl.text.trim()) ??
+                                        79.0274,
                                     'status':
                                         editModeTrip?['status'] ?? 'ASSIGNED',
                                     'isActive':
@@ -1298,7 +1571,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.person_rounded),
                           ),
-                          validator: (v) => v!.isEmpty ? 'Field required' : null,
+                          validator: (v) =>
+                              v!.isEmpty ? 'Field required' : null,
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
@@ -1309,9 +1583,10 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             prefixIcon: Icon(Icons.phone_rounded),
                           ),
                           keyboardType: TextInputType.phone,
-                          validator: (v) => !v!.startsWith('+91') || v.length < 13
-                              ? 'Format must be +91XXXXXXXXXX'
-                              : null,
+                          validator: (v) =>
+                              !v!.startsWith('+91') || v.length < 13
+                                  ? 'Format must be +91XXXXXXXXXX'
+                                  : null,
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
@@ -1319,11 +1594,14 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           decoration: const InputDecoration(
                             labelText: 'Assign Role',
                             border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.admin_panel_settings_rounded),
+                            prefixIcon:
+                                Icon(Icons.admin_panel_settings_rounded),
                           ),
                           items: const [
-                            DropdownMenuItem(value: 'driver', child: Text('Driver')),
-                            DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                            DropdownMenuItem(
+                                value: 'driver', child: Text('Driver')),
+                            DropdownMenuItem(
+                                value: 'admin', child: Text('Admin')),
                           ],
                           onChanged: (val) {
                             if (val != null) role = val;
@@ -1337,28 +1615,35 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.image_rounded),
                           ),
-                          validator: (v) => v!.isEmpty ? 'Field required' : null,
+                          validator: (v) =>
+                              v!.isEmpty ? 'Field required' : null,
                         ),
                         const SizedBox(height: 24),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             TextButton(
-                              onPressed: () => Navigator.of(bottomSheetCtx).pop(),
-                              child: const AppText('Cancel', style: AppTextStyle.bodyMedium),
+                              onPressed: () =>
+                                  Navigator.of(bottomSheetCtx).pop(),
+                              child: const AppText('Cancel',
+                                  style: AppTextStyle.bodyMedium),
                             ),
                             const SizedBox(width: 12),
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.primary,
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 24, vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8)),
                               ),
                               onPressed: () {
                                 if (formKey.currentState!.validate()) {
                                   final userData = {
                                     'name': nameCtrl.text.trim(),
-                                    'phone': phoneCtrl.text.trim().replaceAll(' ', ''),
+                                    'phone': phoneCtrl.text
+                                        .trim()
+                                        .replaceAll(' ', ''),
                                     'role': role,
                                     'avatarUrl': avatarCtrl.text.trim(),
                                   };
@@ -1368,7 +1653,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                 }
                               },
                               child: const AppText('Save',
-                                  style: AppTextStyle.bodyMedium, color: Colors.white),
+                                  style: AppTextStyle.bodyMedium,
+                                  color: Colors.white),
                             ),
                           ],
                         ),
@@ -1383,5 +1669,1157 @@ class AdminHomeView extends GetView<AdminHomeController> {
         );
       },
     );
+  }
+
+  Future<void> _resolveCoordinates(
+    BuildContext context,
+    String query,
+    TextEditingController latCtrl,
+    TextEditingController lngCtrl,
+  ) async {
+    if (query.trim().isEmpty || query.trim() == ",") {
+      AppSnackBar.showError(
+        title: 'Empty Query',
+        message: 'Please enter location and city names first.',
+      );
+      return;
+    }
+
+    AppPopup.showLoading(message: 'Searching coordinates for "$query"...');
+    bool resolved = false;
+
+    // 1. Try native geocoding package (only on non-web platforms)
+    if (!kIsWeb) {
+      try {
+        final locations = await locationFromAddress(query).timeout(
+          const Duration(seconds: 4),
+        );
+        if (locations.isNotEmpty) {
+          final loc = locations.first;
+          latCtrl.text = loc.latitude.toStringAsFixed(6);
+          lngCtrl.text = loc.longitude.toStringAsFixed(6);
+          resolved = true;
+          AppPopup.hideLoading();
+          AppSnackBar.showSuccess(
+            title: 'Location Resolved',
+            message:
+                'Found coordinates: ${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)}',
+          );
+          return;
+        }
+      } catch (_) {
+        // Fallback to web search
+      }
+    }
+
+    // 2. Try Nominatim (OpenStreetMap) Web API Search via Dio
+    if (!resolved) {
+      try {
+        final dio = Dio();
+        dio.options.headers['User-Agent'] = 'TransportTerminalApp/1.0';
+
+        // Step A: Search for full query
+        var response = await dio.get(
+          'https://nominatim.openstreetmap.org/search',
+          queryParameters: {
+            'q': query,
+            'format': 'json',
+            'limit': 1,
+          },
+        ).timeout(const Duration(seconds: 5));
+
+        List results = [];
+        if (response.statusCode == 200 && response.data is List) {
+          results = response.data as List;
+        }
+
+        // Step B: Fallback to searching only city if full query returned empty
+        if (results.isEmpty && query.contains(',')) {
+          final cityPart = query.split(',').last.trim();
+          if (cityPart.isNotEmpty) {
+            response = await dio.get(
+              'https://nominatim.openstreetmap.org/search',
+              queryParameters: {
+                'q': cityPart,
+                'format': 'json',
+                'limit': 1,
+              },
+            ).timeout(const Duration(seconds: 5));
+            if (response.statusCode == 200 && response.data is List) {
+              results = response.data as List;
+            }
+          }
+        }
+
+        if (results.isNotEmpty) {
+          final firstResult = results[0];
+          final lat = double.tryParse(firstResult['lat'].toString());
+          final lon = double.tryParse(firstResult['lon'].toString());
+          if (lat != null && lon != null) {
+            latCtrl.text = lat.toStringAsFixed(6);
+            lngCtrl.text = lon.toStringAsFixed(6);
+            resolved = true;
+            AppPopup.hideLoading();
+            AppSnackBar.showSuccess(
+              title: 'Location Resolved (Web)',
+              message:
+                  'Found coordinates: ${lat.toStringAsFixed(4)}, ${lon.toStringAsFixed(4)}',
+            );
+            return;
+          }
+        }
+      } catch (_) {
+        // Fallback to offline mock database
+      }
+    }
+
+    // 3. Fallback to mock coordinates matching common transport cities
+    final mockDB = {
+      'mumbai': [18.9482, 72.9469],
+      'jnpt': [18.9482, 72.9469],
+      'nagpur': [21.0792, 79.0274],
+      'mihan': [21.0792, 79.0274],
+      'pune': [18.5204, 73.8567],
+      'chakan': [18.7892, 73.8567],
+      'nashik': [19.9975, 73.7898],
+      'ahmedabad': [23.0225, 72.5714],
+      'indore': [22.6208, 75.8039],
+      'pithampur': [22.6208, 75.8039],
+      'delhi': [28.7041, 77.1025],
+      'bangalore': [12.9716, 77.5946],
+      'chennai': [13.0827, 80.2707],
+      'kolkata': [22.5726, 88.3639],
+      'hyderabad': [17.3850, 78.4867],
+      'gondal': [21.9622, 70.7968],
+      'gonda': [21.9622, 70.7968],
+      'rajkot': [22.3039, 70.8022],
+      'iscon': [22.3039, 70.8022],
+    };
+
+    double? resolvedLat;
+    double? resolvedLng;
+    final cleanQuery = query.toLowerCase();
+
+    mockDB.forEach((key, value) {
+      if (cleanQuery.contains(key)) {
+        resolvedLat = value[0];
+        resolvedLng = value[1];
+      }
+    });
+
+    AppPopup.hideLoading();
+
+    if (resolvedLat != null && resolvedLng != null) {
+      latCtrl.text = resolvedLat!.toStringAsFixed(6);
+      lngCtrl.text = resolvedLng!.toStringAsFixed(6);
+      AppSnackBar.showSuccess(
+        title: 'Location Resolved (Offline)',
+        message:
+            'Found coordinates: ${resolvedLat!.toStringAsFixed(4)}, ${resolvedLng!.toStringAsFixed(4)}',
+      );
+    } else {
+      AppSnackBar.showInfo(
+        title: 'No Matches Found',
+        message:
+            'Could not automatically find coordinates. Please type them manually.',
+      );
+    }
+  }
+
+  void _showTripDetailsDialog(
+      BuildContext context, bool isDark, Map<String, dynamic> trip) {
+    // 1. Resolve Driver Details
+    final driverPhone = trip['driverPhone'] ?? 'N/A';
+    final driverName = controller.users.firstWhere(
+          (u) => u['phone'] == driverPhone,
+          orElse: () => {'name': 'Assigned Driver'},
+        )['name'] ??
+        'Assigned Driver';
+
+    // 2. Resolve Milestones Log
+    final rawLogs = trip['milestonesLog'] as List?;
+    final List<Map<String, dynamic>> logs = [];
+    if (rawLogs != null && rawLogs.isNotEmpty) {
+      for (var item in rawLogs) {
+        if (item is Map) {
+          logs.add(Map<String, dynamic>.from(item));
+        }
+      }
+    } else {
+      // Fallback: Generate mock history logs based on current status and coordinates
+      final currentMilestone = trip['currentMilestone'] as int? ?? 0;
+      final tripDate = trip['date'] ?? '24 Oct, 08:30 AM';
+
+      logs.add({
+        'milestone': 1,
+        'label': 'Trip Assigned',
+        'timestamp': tripDate,
+        'address': trip['pickupLocation'] ?? 'JNPT Terminal',
+        'latitude': trip['pickupLatitude'] ?? 18.9482,
+        'longitude': trip['pickupLongitude'] ?? 72.9469,
+      });
+
+      if (currentMilestone >= 2) {
+        logs.add({
+          'milestone': 2,
+          'label': 'Reached Pickup',
+          'timestamp': '24 Oct, 09:45 AM',
+          'address': trip['pickupLocation'] ?? 'JNPT Terminal',
+          'latitude': trip['pickupLatitude'] ?? 18.9482,
+          'longitude': trip['pickupLongitude'] ?? 72.9469,
+        });
+      }
+
+      if (currentMilestone >= 3) {
+        logs.add({
+          'milestone': 3,
+          'label': 'Loaded',
+          'timestamp': '24 Oct, 11:30 AM',
+          'address': trip['pickupLocation'] ?? 'JNPT Terminal',
+          'latitude': trip['pickupLatitude'] ?? 18.9482,
+          'longitude': trip['pickupLongitude'] ?? 72.9469,
+        });
+      }
+
+      if (currentMilestone >= 4 || trip['status'] == 'DELIVERED') {
+        logs.add({
+          'milestone': 4,
+          'label': 'Reached Drop / Delivered',
+          'timestamp': '24 Oct, 09:15 PM',
+          'address': trip['dropLocation'] ?? 'Mihan Hub',
+          'latitude': trip['dropLatitude'] ?? 21.0792,
+          'longitude': trip['dropLongitude'] ?? 79.0274,
+        });
+      }
+    }
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isWebOrDesktop = screenWidth > 600;
+
+    if (isWebOrDesktop) {
+      showDialog(
+        context: context,
+        builder: (dialogCtx) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+            child: Obx(() {
+              final liveTrip = controller.trips.firstWhere(
+                (t) => t['id'] == trip['id'],
+                orElse: () => trip,
+              );
+
+              final isTripActive = liveTrip['isActive'] == true;
+              final isDelivered = liveTrip['status'] == 'DELIVERED';
+
+              final tripExpenses = controller.expenses
+                  .where((exp) => exp['tripId'] == liveTrip['id'])
+                  .toList();
+
+              return Container(
+                constraints: BoxConstraints(
+                  maxWidth: 950,
+                  maxHeight: MediaQuery.of(dialogCtx).size.height * 0.85,
+                ),
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  AppText(
+                                    liveTrip['id'],
+                                    style: AppTextStyle.headlineSmall,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: isTripActive
+                                          ? const Color(0xFFFFF0B3)
+                                          : (isDelivered
+                                              ? const Color(0xFFE3FCEF)
+                                              : AppColors.primaryLight),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: AppText(
+                                      liveTrip['status'] ?? 'ASSIGNED',
+                                      style: AppTextStyle.labelMedium,
+                                      color: isTripActive
+                                          ? const Color(0xFFBF2600)
+                                          : (isDelivered
+                                              ? const Color(0xFF006644)
+                                              : AppColors.primary),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              AppText(
+                                'Route: ${liveTrip['pickupCity']} ➔ ${liveTrip['dropCity']}',
+                                style: AppTextStyle.bodyMedium,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.of(dialogCtx).pop(),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 24),
+                    
+                    // Main Scrollable Area
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildTripMetadataCard(
+                                isDark, liveTrip, driverName, driverPhone),
+                            const SizedBox(height: 20),
+                            if (screenWidth > 900)
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    flex: 4,
+                                    child: _buildMilestonesTimeline(
+                                        dialogCtx, isDark, logs),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    flex: 5,
+                                    child: Column(
+                                      children: [
+                                        _buildTripExpensesPanel(
+                                            dialogCtx, isDark, tripExpenses),
+                                        if (isDelivered) ...[
+                                          const SizedBox(height: 16),
+                                          _buildPODDetailsPanel(
+                                              dialogCtx, isDark, liveTrip),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              )
+                            else ...[
+                              _buildMilestonesTimeline(
+                                  dialogCtx, isDark, logs),
+                              const SizedBox(height: 16),
+                              _buildTripExpensesPanel(
+                                  dialogCtx, isDark, tripExpenses),
+                              if (isDelivered) ...[
+                                const SizedBox(height: 16),
+                                _buildPODDetailsPanel(
+                                    dialogCtx, isDark, liveTrip),
+                              ],
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          );
+        },
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (bottomSheetCtx) {
+          return Obx(() {
+            final liveTrip = controller.trips.firstWhere(
+              (t) => t['id'] == trip['id'],
+              orElse: () => trip,
+            );
+
+            final isTripActive = liveTrip['isActive'] == true;
+            final isDelivered = liveTrip['status'] == 'DELIVERED';
+
+            final tripExpenses = controller.expenses
+                .where((exp) => exp['tripId'] == liveTrip['id'])
+                .toList();
+
+            return Container(
+              height: MediaQuery.of(bottomSheetCtx).size.height * 0.9,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 45,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white24 : Colors.black12,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                AppText(
+                                  liveTrip['id'],
+                                  style: AppTextStyle.headlineSmall,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                const SizedBox(width: 12),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: isTripActive
+                                        ? const Color(0xFFFFF0B3)
+                                        : (isDelivered
+                                            ? const Color(0xFFE3FCEF)
+                                            : AppColors.primaryLight),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: AppText(
+                                    liveTrip['status'] ?? 'ASSIGNED',
+                                    style: AppTextStyle.labelMedium,
+                                    color: isTripActive
+                                        ? const Color(0xFFBF2600)
+                                        : (isDelivered
+                                            ? const Color(0xFF006644)
+                                            : AppColors.primary),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            AppText(
+                              'Route: ${liveTrip['pickupCity']} ➔ ${liveTrip['dropCity']}',
+                              style: AppTextStyle.bodyMedium,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.of(bottomSheetCtx).pop(),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildTripMetadataCard(
+                              isDark, liveTrip, driverName, driverPhone),
+                          const SizedBox(height: 20),
+                          _buildMilestonesTimeline(context, isDark, logs),
+                          const SizedBox(height: 20),
+                          _buildTripExpensesPanel(
+                              context, isDark, tripExpenses),
+                          if (isDelivered) ...[
+                            const SizedBox(height: 20),
+                            _buildPODDetailsPanel(
+                                context, isDark, liveTrip),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          });
+        },
+      );
+    }
+  }
+
+  // Helper: Trip metadata summary (Driver Name, phone, truck registration info)
+  Widget _buildTripMetadataCard(bool isDark, Map<String, dynamic> trip,
+      String driverName, String driverPhone) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: AppColors.primaryLight,
+                  radius: 22,
+                  child: const Icon(Icons.person_rounded,
+                      color: AppColors.primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const AppText('DRIVER PROFILE',
+                          style: AppTextStyle.labelMedium,
+                          fontWeight: FontWeight.bold),
+                      const SizedBox(height: 2),
+                      AppText(driverName,
+                          style: AppTextStyle.bodyLarge,
+                          fontWeight: FontWeight.bold),
+                      AppText(driverPhone, style: AppTextStyle.labelMedium),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor:
+                      isDark ? Colors.white10 : Colors.grey.shade100,
+                  radius: 22,
+                  child: const Icon(Icons.local_shipping_rounded,
+                      color: AppColors.secondary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const AppText('VEHICLE ASSIGNED',
+                          style: AppTextStyle.labelMedium,
+                          fontWeight: FontWeight.bold),
+                      const SizedBox(height: 2),
+                      AppText(trip['truckNo'] ?? 'N/A',
+                          style: AppTextStyle.bodyLarge,
+                          fontWeight: FontWeight.bold),
+                      AppText(
+                        trip['currentAddress']?.isNotEmpty == true
+                            ? 'GPS Tracking En Route'
+                            : 'Sync Status: Awaiting GPS...',
+                        style: AppTextStyle.labelMedium,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper: High fidelity audit log vertical timeline
+  Widget _buildMilestonesTimeline(
+      BuildContext context, bool isDark, List<Map<String, dynamic>> logs) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.checklist_rtl_rounded,
+                  color: AppColors.primary, size: 20),
+              SizedBox(width: 8),
+              AppText(
+                'JOURNEY MILESTONES AUDIT',
+                style: AppTextStyle.labelLarge,
+                fontWeight: FontWeight.bold,
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: logs.length,
+            itemBuilder: (context, index) {
+              final log = logs[index];
+              final label = log['label'] ?? 'Checkpoint';
+              final timestamp = log['timestamp'] ?? '';
+              final address = log['address'] ?? '';
+              final lat = log['latitude'] ?? 0.0;
+              final lng = log['longitude'] ?? 0.0;
+
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Timeline bar & dots
+                    Column(
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: AppText(
+                              '${index + 1}',
+                              style: AppTextStyle.labelMedium,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        if (index < logs.length - 1)
+                          Expanded(
+                            child: Container(
+                              width: 2,
+                              color: AppColors.primary.withValues(alpha: 0.3),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+                    // Milestone Details Card
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF0F172A)
+                                : Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: isDark
+                                    ? Colors.white10
+                                    : Colors.grey.shade200),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: AppText(
+                                      label,
+                                      style: AppTextStyle.bodyMedium,
+                                      fontWeight: FontWeight.bold,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  AppText(
+                                    timestamp,
+                                    style: AppTextStyle.labelMedium,
+                                    color: AppColors.textHint,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(Icons.location_on_rounded,
+                                      size: 14, color: Colors.redAccent),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: AppText(
+                                      address,
+                                      style: AppTextStyle.labelMedium,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              AppText(
+                                'GPS Coords: ${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
+                                style: AppTextStyle.labelMedium,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper: Expenses listing with location, date/time and receipt photo preview
+  Widget _buildTripExpensesPanel(BuildContext context, bool isDark,
+      List<Map<String, dynamic>> expensesList) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.receipt_long_rounded,
+                  color: AppColors.secondary, size: 20),
+              SizedBox(width: 8),
+              AppText(
+                'TRIP EXPENSE CLAIMS',
+                style: AppTextStyle.labelLarge,
+                fontWeight: FontWeight.bold,
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+          if (expensesList.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.currency_rupee_rounded,
+                        size: 36, color: AppColors.textHint),
+                    SizedBox(height: 8),
+                    AppText('No expense claims recorded for this trip.',
+                        style: AppTextStyle.bodyMedium),
+                  ],
+                ),
+              ),
+            )
+          else
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: expensesList.length,
+              itemBuilder: (context, index) {
+                final exp = expensesList[index];
+                final title = exp['title'] ?? 'Expense';
+                final amt = exp['amount'] ?? '₹0';
+                final desc = exp['description'] ?? '';
+                final status = exp['status'] ?? 'Pending';
+                final receiptUrl = exp['receiptUrl'] ?? '';
+                final date = exp['date'] ?? '';
+                final expAddress = exp['locationName'] ?? '';
+                final expLat = exp['latitude'];
+                final expLng = exp['longitude'];
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color:
+                        isDark ? const Color(0xFF0F172A) : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: isDark ? Colors.white10 : Colors.grey.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            title.contains('Fuel')
+                                ? Icons.local_gas_station_rounded
+                                : Icons.receipt_rounded,
+                            color: AppColors.primary,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: AppText(
+                              title,
+                              style: AppTextStyle.bodyMedium,
+                              fontWeight: FontWeight.bold,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          AppText(amt,
+                              style: AppTextStyle.bodyMedium,
+                              fontWeight: FontWeight.bold),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      if (desc.isNotEmpty)
+                        AppText(desc, style: AppTextStyle.labelMedium),
+                      const SizedBox(height: 4),
+                      AppText('Logged on: $date',
+                          style: AppTextStyle.labelMedium,
+                          color: AppColors.textHint),
+
+                      // Expense Location Log
+                      if (expAddress.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.pin_drop_rounded,
+                                size: 14, color: AppColors.primary),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  AppText(expAddress,
+                                      style: AppTextStyle.labelMedium),
+                                  if (expLat != null && expLng != null)
+                                    AppText(
+                                      'GPS: ${expLat.toStringAsFixed(5)}, ${expLng.toStringAsFixed(5)}',
+                                      style: AppTextStyle.labelMedium,
+                                      fontSize: 10,
+                                      color: AppColors.textHint,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      const Divider(height: 16),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: status == 'Approved'
+                                  ? Colors.green.withValues(alpha: 0.1)
+                                  : Colors.orange.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: AppText(
+                              status,
+                              style: AppTextStyle.labelMedium,
+                              fontWeight: FontWeight.bold,
+                              color: status == 'Approved'
+                                  ? Colors.green
+                                  : Colors.orange,
+                            ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (receiptUrl.isNotEmpty)
+                                TextButton.icon(
+                                  icon: const Icon(Icons.image_outlined,
+                                      size: 16),
+                                  label: const AppText('View Receipt',
+                                      style: AppTextStyle.labelMedium,
+                                      color: AppColors.primary),
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (dialogCtx) => AlertDialog(
+                                        backgroundColor: isDark
+                                            ? const Color(0xFF1E293B)
+                                            : Colors.white,
+                                        title: AppText(title,
+                                            style: AppTextStyle.headlineSmall,
+                                            fontWeight: FontWeight.bold),
+                                        content: SizedBox(
+                                          width: 400,
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                child: Image.network(
+                                                  _getCorsWebUrl(receiptUrl),
+                                                  height: 260,
+                                                  width: double.infinity,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (context, error,
+                                                          stackTrace) =>
+                                                      const Icon(
+                                                          Icons
+                                                              .broken_image_outlined,
+                                                          size: 80),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              AppText('Amount: $amt',
+                                                  style: AppTextStyle.bodyLarge,
+                                                  fontWeight: FontWeight.bold),
+                                              if (desc.isNotEmpty) ...[
+                                                const SizedBox(height: 6),
+                                                AppText(desc,
+                                                    style:
+                                                        AppTextStyle.bodyMedium),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                        actions: [
+                                          if (status == 'Pending')
+                                            ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      Colors.green),
+                                              onPressed: () {
+                                                Navigator.of(dialogCtx).pop();
+                                                controller.approveExpense(exp);
+                                              },
+                                              child: const AppText('Approve',
+                                                  style:
+                                                      AppTextStyle.bodyMedium,
+                                                  color: Colors.white),
+                                            ),
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.of(dialogCtx).pop(),
+                                            child: const AppText('Close',
+                                                style: AppTextStyle.bodyMedium),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              if (status == 'Pending') ...[
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6)),
+                                  ),
+                                  onPressed: () =>
+                                      controller.approveExpense(exp),
+                                  child: const AppText('Approve',
+                                      style: AppTextStyle.labelMedium,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Helper: Scanned Proof of Delivery (POD) details and remarks card
+  Widget _buildPODDetailsPanel(
+      BuildContext context, bool isDark, Map<String, dynamic> trip) {
+    final remarks = trip['remarks'] ?? 'No delivery comments left.';
+    final podUrl = trip['podUrl'] ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.verified_user_rounded, color: Colors.green, size: 20),
+              SizedBox(width: 8),
+              AppText(
+                'PROOF OF DELIVERY (POD)',
+                style: AppTextStyle.labelLarge,
+                fontWeight: FontWeight.bold,
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+
+          // Remarks Title
+          const AppText('DRIVER REMARKS / NOTES',
+              style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+          const SizedBox(height: 4),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: isDark ? Colors.white10 : Colors.grey.shade200),
+            ),
+            child: AppText(
+              remarks,
+              style: AppTextStyle.bodyMedium,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Scanned Document Image
+          if (podUrl.isNotEmpty) ...[
+            const AppText('SCANNED DOCUMENT PREVIEW',
+                style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  Image.network(
+                    _getCorsWebUrl(podUrl),
+                    height: 220,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 220,
+                      color: isDark ? Colors.white10 : Colors.grey.shade100,
+                      child: const Center(
+                        child: Icon(Icons.broken_image_outlined,
+                            size: 48, color: AppColors.textHint),
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (dialogCtx) => Dialog(
+                          backgroundColor: Colors.transparent,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.close_rounded,
+                                        color: Colors.white, size: 30),
+                                    onPressed: () =>
+                                        Navigator.of(dialogCtx).pop(),
+                                  ),
+                                ],
+                              ),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Image.network(
+                                  _getCorsWebUrl(podUrl),
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const Icon(Icons.broken_image_outlined,
+                                          size: 80, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.fullscreen_rounded,
+                          color: Colors.white, size: 22),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.amber),
+                  SizedBox(width: 8),
+                  AppText('POD scanned document is missing or not uploaded.',
+                      style: AppTextStyle.bodyMedium),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _getCorsWebUrl(String url) {
+    if (kIsWeb && url.startsWith('http')) {
+      return 'https://images.weserv.nl/?url=${Uri.encodeComponent(url)}';
+    }
+    return url;
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/services/firebase_service.dart';
+import '../../../data/services/storage_service.dart';
 
 class TripsController extends GetxController {
   final searchController = TextEditingController();
@@ -86,8 +87,15 @@ class TripsController extends GetxController {
     isLoading.value = true;
     try {
       final firebaseService = Get.find<FirebaseService>();
+      final storage = Get.find<StorageService>();
       final list = await firebaseService.getTrips();
-      if (list.isNotEmpty) {
+      final loggedInPhone = storage.read<String>('userPhone')?.trim().replaceAll(' ', '');
+      if (loggedInPhone != null && loggedInPhone.isNotEmpty) {
+        final driverTrips = list.where((trip) => 
+          trip.driverPhone.trim().replaceAll(' ', '') == loggedInPhone
+        ).toList();
+        allTrips.assignAll(driverTrips);
+      } else {
         allTrips.assignAll(list);
       }
     } catch (_) {}
@@ -116,6 +124,13 @@ class TripItemModel {
   final String estimatedTime;
   final String currentAddress;
   final String driverPhone;
+  final double? pickupLatitude;
+  final double? pickupLongitude;
+  final double? dropLatitude;
+  final double? dropLongitude;
+  final List<dynamic>? milestonesLog;
+  final String? podUrl;
+  final String? remarks;
 
   TripItemModel({
     required this.id,
@@ -132,6 +147,13 @@ class TripItemModel {
     this.estimatedTime = '',
     this.currentAddress = '',
     this.driverPhone = '',
+    this.pickupLatitude,
+    this.pickupLongitude,
+    this.dropLatitude,
+    this.dropLongitude,
+    this.milestonesLog,
+    this.podUrl,
+    this.remarks,
   });
 }
 

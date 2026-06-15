@@ -59,9 +59,17 @@ class AdminHomeController extends GetxController {
         'dropLocation': trip.dropLocation,
         'date': trip.date,
         'isActive': trip.isActive,
+        'tabType': trip.tabType,
         'remainingDistance': trip.remainingDistance,
         'estimatedTime': trip.estimatedTime,
         'currentAddress': trip.currentAddress,
+        'pickupLatitude': trip.pickupLatitude,
+        'pickupLongitude': trip.pickupLongitude,
+        'dropLatitude': trip.dropLatitude,
+        'dropLongitude': trip.dropLongitude,
+        'milestonesLog': trip.milestonesLog,
+        'podUrl': trip.podUrl,
+        'remarks': trip.remarks,
       }).toList();
       trips.assignAll(mappedTrips);
     } catch (e) {

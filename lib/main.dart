@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -18,7 +19,20 @@ Future<void> initServices() async {
   debugPrint('Initializing critical GetX services...');
   // Initialize Firebase Core
   try {
-    await Firebase.initializeApp();
+    if (kIsWeb) {
+      await Firebase.initializeApp(
+        options: const FirebaseOptions(
+          apiKey: "AIzaSyCFte8SaEM25uQNis6B7-Ls0T3nE9uN7W0",
+          authDomain: "transport-1faf4.firebaseapp.com",
+          projectId: "transport-1faf4",
+          storageBucket: "transport-1faf4.firebasestorage.app",
+          messagingSenderId: "1048359203148",
+          appId: "1:1048359203148:web:5e3d6694adb35a22765fe9",
+        ),
+      );
+    } else {
+      await Firebase.initializeApp();
+    }
     // Set locale to suppress "X-Firebase-Locale was null" warning
     FirebaseAuth.instance.setLanguageCode('en');
     debugPrint('Firebase initialized successfully.');

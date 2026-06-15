@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../controllers/expenses_controller.dart';
 import '../../trips/controllers/trips_controller.dart';
 import '../../../data/services/storage_service.dart';
+import '../../../data/services/location_service.dart';
 
 class ExpensesView extends GetView<ExpensesController> {
   const ExpensesView({super.key});
@@ -358,6 +359,18 @@ class ExpensesView extends GetView<ExpensesController> {
                               onPressed: () async {
                                 if (formKey.currentState!.validate()) {
                                   final phone = Get.find<StorageService>().read<String>('userPhone') ?? '+919876543210';
+                                  
+                                  double currentLat = LocationService.fallbackLatitude;
+                                  double currentLng = LocationService.fallbackLongitude;
+                                  String locationName = "JNPT Port Terminal, Navi Mumbai, Maharashtra";
+                                  try {
+                                    final locationService = Get.find<LocationService>();
+                                    final pos = await locationService.getCurrentPosition();
+                                    currentLat = pos.latitude;
+                                    currentLng = pos.longitude;
+                                    locationName = await locationService.getAddressFromCoordinates(currentLat, currentLng);
+                                  } catch (_) {}
+
                                   final expenseData = {
                                     'tripId': tripIdCtrl.text.trim(),
                                     'driverPhone': phone.replaceAll(' ', ''),
@@ -367,6 +380,9 @@ class ExpensesView extends GetView<ExpensesController> {
                                     'date': 'Today, 08:30 AM',
                                     'status': 'Pending',
                                     'receiptUrl': 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=600',
+                                    'latitude': currentLat,
+                                    'longitude': currentLng,
+                                    'locationName': locationName,
                                   };
                                   Navigator.of(bottomSheetCtx).pop();
                                   await controller.submitExpense(expenseData);

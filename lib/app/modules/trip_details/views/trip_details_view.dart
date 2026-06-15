@@ -758,7 +758,8 @@ class TripDetailsView extends GetView<TripDetailsController> {
     required String label,
   }) {
     return Obx(() {
-      final activeMilestone = controller.currentMilestone.value;
+      final dbMilestone = controller.currentMilestone.value;
+      final activeMilestone = dbMilestone == 0 ? 1 : dbMilestone;
       final isCompleted = index < activeMilestone;
       final isActive = index == activeMilestone;
 

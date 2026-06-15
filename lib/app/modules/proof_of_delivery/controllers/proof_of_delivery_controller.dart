@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:transport/app/core/utils/image_picker_helper.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import '../../../data/services/firebase_service.dart';
+import '../../../data/services/location_service.dart';
 import '../../trips/controllers/trips_controller.dart';
 
 class ProofOfDeliveryController extends GetxController {
@@ -85,9 +86,28 @@ class ProofOfDeliveryController extends GetxController {
     String finalUrl = '';
     try {
       final firebaseService = Get.find<FirebaseService>();
+      
+      double currentLat = LocationService.fallbackLatitude;
+      double currentLng = LocationService.fallbackLongitude;
+      String currentAddr = "JNPT Port Terminal, Navi Mumbai, Maharashtra";
+      try {
+        final locationService = Get.find<LocationService>();
+        final pos = await locationService.getCurrentPosition();
+        currentLat = pos.latitude;
+        currentLng = pos.longitude;
+        currentAddr = await locationService.getAddressFromCoordinates(currentLat, currentLng);
+      } catch (_) {}
+
       finalUrl = await firebaseService.uploadProofOfDelivery(tripId.value, pickedImagePath.value);
       uploadProgress.value = 0.9;
-      await firebaseService.saveProofOfDeliveryDetails(tripId.value, finalUrl, remarksController.text);
+      await firebaseService.saveProofOfDeliveryDetails(
+        tripId.value, 
+        finalUrl, 
+        remarksController.text,
+        locationName: currentAddr,
+        latitude: currentLat,
+        longitude: currentLng,
+      );
       
       // Update local state in TripsController
       try {
