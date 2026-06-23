@@ -219,6 +219,9 @@ class TripDetailsController extends GetxController {
   };
 
   Timer? _locationTimer;
+  // How often the driver app saves its position while a trip is active. Kept at
+  // 10 minutes (not seconds) so it's a cheap periodic ping, not live tracking.
+  static const Duration _locationSyncInterval = Duration(minutes: 10);
   double simulatedLat = 18.9482;
   double simulatedLng = 72.9469;
   bool isSimulatingMovement = false;
@@ -255,8 +258,12 @@ class TripDetailsController extends GetxController {
     simulatedLng = depLng;
 
     _locationTimer?.cancel();
+    // Save once immediately so the admin has a location the moment the trip
+    // starts, then refresh every 10 minutes. This is deliberately NOT a
+    // continuous live feed — periodic saves keep battery + Firestore writes low
+    // while still letting the admin pull the latest position on demand.
     updateCurrentLocationDetails();
-    _locationTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+    _locationTimer = Timer.periodic(_locationSyncInterval, (timer) {
       if (isJourneyStarted.value && currentMilestone.value < 4) {
         updateCurrentLocationDetails();
       } else {

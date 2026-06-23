@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/routes/app_pages.dart';
-import 'package:transport/app/data/services/storage_service.dart';
+import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 
 class LoginController extends GetxController {
@@ -109,18 +109,23 @@ class LoginController extends GetxController {
       final user = userCredential.user;
       
       if (user != null) {
-        final phone = user.phoneNumber ?? phoneController.text.trim();
-        final storage = Get.find<StorageService>();
+        final phone = SessionService.normalizePhone(
+            user.phoneNumber ?? phoneController.text.trim());
+        final session = Get.find<SessionService>();
         final firebaseService = Get.find<FirebaseService>();
-        
+
         // Lookup user role from Firestore
         final userData = await firebaseService.getUserData(phone);
-        final role = userData?['role'] ?? 'driver';
-        
-        await storage.write('isLoggedIn', true);
-        await storage.write('userPhone', phone);
-        await storage.write('userRole', role);
-        
+        final role = userData?['role'] ?? 'owner';
+
+        await session.setSession(
+          phone: phone,
+          uid: user.uid,
+          name: userData?['name'],
+          role: role,
+          avatarUrl: userData?['avatarUrl'],
+        );
+
         if (role == 'admin') {
           Get.offAllNamed(Routes.ADMIN_HOME);
         } else {
@@ -142,6 +147,3 @@ class LoginController extends GetxController {
     super.onClose();
   }
 }
-
-// Support lazy loading of StorageService inside signIn helper
-class StorageServicePlaceholder {}

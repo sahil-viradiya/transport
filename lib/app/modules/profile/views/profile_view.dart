@@ -79,7 +79,7 @@ class ProfileView extends GetView<ProfileController> {
       margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFDEEBFF).withValues(alpha: 0.5),
+        color: isDark ? const Color(0xFF1E293B) : AppColors.primaryLight.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(28),
       ),
       child: Obx(() {
@@ -169,7 +169,7 @@ class ProfileView extends GetView<ProfileController> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
             gradient: const LinearGradient(
-              colors: [Color(0xFF0747A6), Color(0xFF0052CC), Color(0xFF42526E)],
+              colors: [AppColors.primaryDark, AppColors.primary, Color(0xFF42526E)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -521,7 +521,7 @@ class ProfileView extends GetView<ProfileController> {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF0052CC), Color(0xFF0747A6)],
+                colors: [AppColors.primary, AppColors.primaryDark],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -593,7 +593,7 @@ class ProfileView extends GetView<ProfileController> {
     Color statusBgColor = Colors.grey;
     Color statusTextColor = Colors.white;
     if (doc.status == 'Valid') {
-      statusBgColor = const Color(0xFFDEEBFF);
+      statusBgColor = AppColors.primaryLight;
       statusTextColor = AppColors.primary;
     } else if (doc.status == 'Expired') {
       statusBgColor = const Color(0xFFFFE380).withValues(alpha: 0.4);
@@ -633,7 +633,7 @@ class ProfileView extends GetView<ProfileController> {
                 decoration: BoxDecoration(
                   color: doc.status == 'Expired' 
                       ? const Color(0xFFFFEBE6) 
-                      : (isDark ? const Color(0xFF0F172A) : const Color(0xFFDEEBFF)),
+                      : (isDark ? const Color(0xFF0F172A) : AppColors.primaryLight),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -748,7 +748,7 @@ class ProfileView extends GetView<ProfileController> {
                               icon: Icon(Icons.badge_outlined, color: isDark ? Colors.white : AppColors.primary, size: 18),
                               label: AppText('Digital ID', style: AppTextStyle.labelLarge, color: isDark ? Colors.white : AppColors.primary, fontWeight: FontWeight.bold),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFDEEBFF),
+                                backgroundColor: isDark ? const Color(0xFF334155) : AppColors.primaryLight,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -772,7 +772,7 @@ class ProfileView extends GetView<ProfileController> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-                    color: isDark ? const Color(0xFF334155).withValues(alpha: 0.2) : const Color(0xFFDEEBFF).withValues(alpha: 0.2),
+                    color: isDark ? const Color(0xFF334155).withValues(alpha: 0.2) : AppColors.primaryLight.withValues(alpha: 0.2),
                   ),
                   child: Icon(
                     doc.status == 'Expired' ? Icons.edit_outlined : Icons.share_outlined, 

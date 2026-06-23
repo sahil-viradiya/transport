@@ -303,7 +303,7 @@ class TripsView extends GetView<TripsController> {
   // Side-by-side stats cards inside list view matching the design reference
   Widget _buildStatsRow(bool isDark) {
     const Color statsBlueBg = Color(0xFFE9F2FF);
-    const Color statsBlueText = Color(0xFF0052CC);
+    const Color statsBlueText = AppColors.primary;
     const Color statsGreyBg = Color(0xFFF0F3FA);
     const Color statsGreyText = Color(0xFF42526E);
 

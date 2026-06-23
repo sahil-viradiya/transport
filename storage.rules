@@ -1,0 +1,36 @@
+rules_version = '2';
+
+// Storage paths mirror the Firestore ownership model.
+// Avatars:  avatars/{phone}.jpg
+// POD:       proof_of_delivery/{ownerPhone}/{tripId}.jpg
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.phone_number != null;
+    }
+
+    function phone() {
+      return request.auth.token.phone_number;
+    }
+
+    function isImageUnder(maxMb) {
+      return request.resource.size < maxMb * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /avatars/{fileName} {
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn()
+        && fileName == phone() + '.jpg'
+        && isImageUnder(5);
+    }
+
+    match /proof_of_delivery/{ownerId}/{fileName} {
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn()
+        && ownerId == phone()
+        && isImageUnder(10);
+    }
+  }
+}

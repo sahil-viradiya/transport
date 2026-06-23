@@ -1,0 +1,75 @@
+rules_version = '2';
+
+// Security model for the individual-truck-owner app.
+//
+// Identity = the phone number issued by Firebase Phone Auth
+// (request.auth.token.phone_number, E.164 e.g. +919876543210). This is the same
+// value the app uses as `ownerKey`, so every owner can only touch documents that
+// carry their own phone as the id (drivers/users) or as the `ownerId` field
+// (trips/trucks/expenses). An optional `admin` role can see everything.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.phone_number != null;
+    }
+
+    function phone() {
+      return request.auth.token.phone_number;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(phone()))
+        && get(/databases/$(database)/documents/users/$(phone())).data.role == 'admin';
+    }
+
+    function ownsIncoming() {
+      return request.resource.data.ownerId == phone();
+    }
+
+    function ownsExisting() {
+      return resource.data.ownerId == phone();
+    }
+
+    // Login directory — each user owns only their own row; admin can read all.
+    match /users/{phoneId} {
+      allow read:          if isSignedIn() && (phoneId == phone() || isAdmin());
+      allow create, update: if isSignedIn() && phoneId == phone();
+      allow delete:        if isAdmin();
+    }
+
+    // Owner profile (license, vehicle, emergency contact, documents, location).
+    match /drivers/{ownerId} {
+      allow read, write: if isSignedIn() && (ownerId == phone() || isAdmin());
+    }
+
+    // Trips, trucks, expenses — private to the owner named in `ownerId`.
+    match /trips/{tripId} {
+      allow read:   if isSignedIn() && (ownsExisting() || isAdmin());
+      allow create: if isSignedIn() && (ownsIncoming() || isAdmin());
+      allow update: if isSignedIn() && (ownsExisting() || isAdmin());
+      allow delete: if isSignedIn() && (ownsExisting() || isAdmin());
+    }
+
+    match /trucks/{truckId} {
+      allow read:   if isSignedIn() && (ownsExisting() || isAdmin());
+      allow create: if isSignedIn() && (ownsIncoming() || isAdmin());
+      allow update: if isSignedIn() && (ownsExisting() || isAdmin());
+      allow delete: if isSignedIn() && (ownsExisting() || isAdmin());
+    }
+
+    match /expenses/{expenseId} {
+      allow read:   if isSignedIn() && (ownsExisting() || isAdmin());
+      allow create: if isSignedIn() && (ownsIncoming() || isAdmin());
+      allow update: if isSignedIn() && (ownsExisting() || isAdmin());
+      allow delete: if isSignedIn() && (ownsExisting() || isAdmin());
+    }
+
+    // App-wide config — readable by any signed-in user, writable by admin only.
+    match /system/{doc} {
+      allow read:  if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}

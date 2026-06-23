@@ -1,9 +1,9 @@
 import 'package:get/get.dart';
-import 'package:transport/app/data/services/storage_service.dart';
+import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/app/routes/app_pages.dart';
 
 class SplashController extends GetxController {
-  final _storage = Get.find<StorageService>();
+  final _session = Get.find<SessionService>();
 
   final RxDouble loadingProgress = 0.0.obs;
 
@@ -35,11 +35,8 @@ class SplashController extends GetxController {
   }
 
   void _checkLoginStatus() {
-    final isLoggedIn = _storage.read<bool>('isLoggedIn') ?? false;
-
-    if (isLoggedIn) {
-      final role = _storage.read<String>('userRole') ?? 'driver';
-      if (role == 'admin') {
+    if (_session.isLoggedIn) {
+      if (_session.isAdmin) {
         Get.offAllNamed(Routes.ADMIN_HOME);
       } else {
         Get.offAllNamed(Routes.HOME);

@@ -7,6 +7,7 @@ import 'app/core/theme/app_theme.dart';
 import 'app/data/services/storage_service.dart';
 import 'app/data/services/connectivity_service.dart';
 import 'app/data/services/firebase_service.dart';
+import 'app/data/services/session_service.dart';
 import 'app/routes/app_pages.dart';
 
 void main() async {
@@ -45,7 +46,9 @@ Future<void> initServices() async {
   await Get.putAsync(() => StorageService().init());
   // Initialize Live Connectivity Checker
   await Get.putAsync(() => ConnectivityService().init());
-  // Initialize Firebase Service (Firestore CRUD)
+  // Initialize Session (current logged-in owner identity) — depends on storage
+  await Get.putAsync(() => SessionService().init());
+  // Initialize Firebase Service (Firestore CRUD) — resolves owner via session
   await Get.putAsync(() => FirebaseService().init());
   debugPrint('All services successfully registered.');
 }

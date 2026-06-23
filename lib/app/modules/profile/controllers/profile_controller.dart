@@ -5,6 +5,7 @@ import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/modules/dashboard/controllers/dashboard_controller.dart';
 import '../../../data/services/firebase_service.dart';
+import '../../../core/theme/app_colors.dart';
 
 class ProfileController extends GetxController {
   // Tab control: 0 = Profile Details, 1 = Documents
@@ -166,7 +167,7 @@ class ProfileController extends GetxController {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0052CC),
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
@@ -290,7 +291,7 @@ class ProfileController extends GetxController {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0052CC),
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
@@ -355,7 +356,7 @@ class ProfileController extends GetxController {
                 await _pickAvatarFromPicker(ImageSource.gallery);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0052CC),
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
@@ -515,7 +516,7 @@ class ProfileController extends GetxController {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0052CC),
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),

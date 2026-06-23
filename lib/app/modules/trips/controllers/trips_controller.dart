@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/services/firebase_service.dart';
-import '../../../data/services/storage_service.dart';
+import '../../../data/services/session_service.dart';
 
 class TripsController extends GetxController {
   final searchController = TextEditingController();
@@ -14,48 +14,8 @@ class TripsController extends GetxController {
 
   final RxBool isLoading = false.obs;
 
-  // List of trips matching reference layout (Right Screen)
-  final RxList<TripItemModel> allTrips = <TripItemModel>[
-    TripItemModel(
-      id: 'TRP-9021-X',
-      truckNo: 'MH-12-BV-0045',
-      status: 'ACTIVE NOW',
-      pickupCity: 'Mumbai',
-      pickupLocation: 'JNPT Terminal',
-      dropCity: 'Nagpur',
-      dropLocation: 'Mihan Hub',
-      date: '24 Oct, 08:30 AM',
-      tabType: 'Today',
-      isActive: true,
-      driverPhone: '+919876543210',
-    ),
-    TripItemModel(
-      id: 'TRP-8842-B',
-      truckNo: 'HR-55-AN-9912',
-      status: 'ASSIGNED',
-      pickupCity: 'Pune',
-      pickupLocation: 'Chakan Plant',
-      dropCity: 'Mumbai',
-      dropLocation: 'Customs Gate 4',
-      date: '24 Oct, 02:00 PM',
-      tabType: 'Today',
-      isActive: false,
-      driverPhone: '+919876543210',
-    ),
-    TripItemModel(
-      id: 'TRP-7761-Z',
-      truckNo: 'MH-04-ET-1188',
-      status: 'ASSIGNED',
-      pickupCity: 'Nashik',
-      pickupLocation: 'Industrial Area',
-      dropCity: 'Ahmedabad',
-      dropLocation: 'Transport Nagar',
-      date: '25 Oct, 06:00 AM',
-      tabType: 'Upcoming',
-      isActive: false,
-      driverPhone: '+919876543210',
-    ),
-  ].obs;
+  // Live owner-scoped trips, populated from Firestore in [fetchTripsFromFirebase].
+  final RxList<TripItemModel> allTrips = <TripItemModel>[].obs;
 
   // Filtered trips list getter
   List<TripItemModel> get filteredTrips {
@@ -87,17 +47,9 @@ class TripsController extends GetxController {
     isLoading.value = true;
     try {
       final firebaseService = Get.find<FirebaseService>();
-      final storage = Get.find<StorageService>();
-      final list = await firebaseService.getTrips();
-      final loggedInPhone = storage.read<String>('userPhone')?.trim().replaceAll(' ', '');
-      if (loggedInPhone != null && loggedInPhone.isNotEmpty) {
-        final driverTrips = list.where((trip) => 
-          trip.driverPhone.trim().replaceAll(' ', '') == loggedInPhone
-        ).toList();
-        allTrips.assignAll(driverTrips);
-      } else {
-        allTrips.assignAll(list);
-      }
+      final session = Get.find<SessionService>();
+      final list = await firebaseService.getTripsForOwner(session.ownerKey);
+      allTrips.assignAll(list);
     } catch (_) {}
     isLoading.value = false;
   }
@@ -120,6 +72,7 @@ class TripItemModel {
   final String date;
   final String tabType;
   final bool isActive;
+  final int currentMilestone;
   final String remainingDistance;
   final String estimatedTime;
   final String currentAddress;
@@ -143,6 +96,7 @@ class TripItemModel {
     required this.date,
     required this.tabType,
     required this.isActive,
+    this.currentMilestone = 0,
     this.remainingDistance = '',
     this.estimatedTime = '',
     this.currentAddress = '',

@@ -89,10 +89,14 @@ class AppButton extends StatelessWidget {
           ),
           const SizedBox(width: 8),
         ],
-        AppText(
-          text,
-          style: AppTextStyle.labelLarge,
-          color: isButtonDisabled ? theme.disabledColor : textColor,
+        Flexible(
+          child: AppText(
+            text,
+            style: AppTextStyle.labelLarge,
+            color: isButtonDisabled ? theme.disabledColor : textColor,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );

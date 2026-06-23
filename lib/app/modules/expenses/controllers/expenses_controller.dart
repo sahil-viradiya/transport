@@ -1,13 +1,12 @@
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:transport/app/data/services/storage_service.dart';
+import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 
 class ExpensesController extends GetxController {
   final _firebaseService = Get.find<FirebaseService>();
-  final _storage = Get.find<StorageService>();
+  final _session = Get.find<SessionService>();
 
   final RxList<Map<String, dynamic>> expenses = <Map<String, dynamic>>[].obs;
   final RxBool isLoading = false.obs;
@@ -25,7 +24,8 @@ class ExpensesController extends GetxController {
   Future<void> loadExpenses() async {
     isLoading.value = true;
     try {
-      final phone = _storage.read<String>('userPhone') ?? '+919876543210';
+      final phone = _session.ownerKey;
+      if (phone.isEmpty) return;
       final fetchedExpenses = await _firebaseService.getExpensesForDriver(phone);
       expenses.assignAll(fetchedExpenses);
       _calculateStats();

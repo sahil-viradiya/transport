@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:transport/app/data/services/storage_service.dart';
+import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/routes/app_pages.dart';
@@ -9,7 +9,7 @@ import 'package:transport/app/data/services/firebase_service.dart';
 import '../../trips/controllers/trips_controller.dart';
 
 class DashboardController extends GetxController {
-  final _storage = Get.find<StorageService>();
+  final _session = Get.find<SessionService>();
   final _connectivity = Get.find<ConnectivityService>();
 
   RxBool get isOnline => _connectivity.isConnected;
@@ -67,10 +67,15 @@ class DashboardController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Retrieve phone number if saved
-    final phone = _storage.read<String>('userPhone');
-    if (phone != null) {
-      driverPhone.value = phone;
+    // Seed initial values from the live session
+    if (_session.phone.value.isNotEmpty) {
+      driverPhone.value = _session.phone.value;
+    }
+    if (_session.name.value.isNotEmpty) {
+      driverName.value = _session.name.value;
+    }
+    if (_session.avatarUrl.value.isNotEmpty) {
+      avatarUrl.value = _session.avatarUrl.value;
     }
     loadProfileFromFirebase();
 
@@ -86,20 +91,20 @@ class DashboardController extends GetxController {
   Future<void> loadProfileFromFirebase() async {
     try {
       final firebaseService = Get.find<FirebaseService>();
-      final phone = driverPhone.value.trim().replaceAll(' ', '');
+      final phone = _session.ownerKey;
       if (phone.isEmpty) return;
 
-      // 1. Fetch driver profile details from users collection
+      // 1. Fetch profile details (users directory + owner profile doc)
       final userData = await firebaseService.getUserData(phone);
       if (userData != null) {
-        driverName.value = userData['name'] ?? 'Driver';
+        driverName.value = userData['name'] ?? driverName.value;
         driverPhone.value = userData['phone'] ?? phone;
-        avatarUrl.value = userData['avatarUrl'] ?? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop';
+        final url = userData['avatarUrl'] ?? '';
+        if (url.toString().isNotEmpty) avatarUrl.value = url;
       }
 
-      // 2. Fetch trips to count assigned ones and retrieve active/latest truck number
-      final allTrips = await firebaseService.getTrips();
-      final driverTrips = allTrips.where((t) => t.driverPhone.trim().replaceAll(' ', '') == phone).toList();
+      // 2. Owner-scoped trips: count + active/latest truck number
+      final driverTrips = await firebaseService.getTripsForOwner(phone);
 
       todayTripsCount.value = driverTrips.length;
 
@@ -123,8 +128,8 @@ class DashboardController extends GetxController {
         final truckNoVal = activeOrLatestTrip.truckNo;
         vehicleNo.value = truckNoVal;
 
-        // Lookup truck details from trucks collection to get truck model info
-        final allTrucks = await firebaseService.getTrucks();
+        // Lookup truck details (owner-scoped) to get truck model info
+        final allTrucks = await firebaseService.getTrucksForOwner(_session.ownerKey);
         final truck = allTrucks.firstWhere(
           (t) => t['truckNo'] == truckNoVal,
           orElse: () => <String, dynamic>{},
@@ -167,10 +172,8 @@ class DashboardController extends GetxController {
         try {
           await FirebaseAuth.instance.signOut();
         } catch (_) {}
-        
-        _storage.remove('isLoggedIn');
-        _storage.remove('userPhone');
-        _storage.remove('userRole');
+
+        await _session.clear();
         Get.offAllNamed(Routes.LOGIN);
         AppSnackBar.showSuccess(title: 'Logged Out', message: 'Session closed successfully.');
       },

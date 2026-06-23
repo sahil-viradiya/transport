@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -20,11 +21,58 @@ class AdminHomeController extends GetxController {
   final RxList<Map<String, dynamic>> users = <Map<String, dynamic>>[].obs;
   final RxList<Map<String, dynamic>> expenses = <Map<String, dynamic>>[].obs;
 
+  StreamSubscription? _tripsSub;
+  StreamSubscription? _expensesSub;
+
   @override
   void onInit() {
     super.onInit();
     loadData();
+    _startLiveUpdates();
   }
+
+  @override
+  void onClose() {
+    _tripsSub?.cancel();
+    _expensesSub?.cancel();
+    super.onClose();
+  }
+
+  // Live admin dashboard: trips + expenses stay current as drivers report
+  // milestones and push periodic location pings — no manual refresh needed.
+  void _startLiveUpdates() {
+    _tripsSub = _firebaseService.watchAllTrips().listen((list) {
+      trips.assignAll(list.map(_mapTrip).toList());
+    });
+    _expensesSub = _firebaseService.watchAllExpenses().listen((list) {
+      expenses.assignAll(list);
+    });
+  }
+
+  Map<String, dynamic> _mapTrip(dynamic trip) => {
+        'id': trip.id,
+        'truckNo': trip.truckNo,
+        'driverPhone': trip.driverPhone,
+        'status': trip.status,
+        'pickupCity': trip.pickupCity,
+        'pickupLocation': trip.pickupLocation,
+        'dropCity': trip.dropCity,
+        'dropLocation': trip.dropLocation,
+        'date': trip.date,
+        'isActive': trip.isActive,
+        'currentMilestone': trip.currentMilestone,
+        'tabType': trip.tabType,
+        'remainingDistance': trip.remainingDistance,
+        'estimatedTime': trip.estimatedTime,
+        'currentAddress': trip.currentAddress,
+        'pickupLatitude': trip.pickupLatitude,
+        'pickupLongitude': trip.pickupLongitude,
+        'dropLatitude': trip.dropLatitude,
+        'dropLongitude': trip.dropLongitude,
+        'milestonesLog': trip.milestonesLog,
+        'podUrl': trip.podUrl,
+        'remarks': trip.remarks,
+      };
 
   void changeTabIndex(int index) {
     currentTabIndex.value = index;
@@ -48,35 +96,20 @@ class AdminHomeController extends GetxController {
 
       // Fetch trips
       final fetchedTrips = await _firebaseService.getTrips();
-      final mappedTrips = fetchedTrips.map((trip) => {
-        'id': trip.id,
-        'truckNo': trip.truckNo,
-        'driverPhone': trip.driverPhone,
-        'status': trip.status,
-        'pickupCity': trip.pickupCity,
-        'pickupLocation': trip.pickupLocation,
-        'dropCity': trip.dropCity,
-        'dropLocation': trip.dropLocation,
-        'date': trip.date,
-        'isActive': trip.isActive,
-        'tabType': trip.tabType,
-        'remainingDistance': trip.remainingDistance,
-        'estimatedTime': trip.estimatedTime,
-        'currentAddress': trip.currentAddress,
-        'pickupLatitude': trip.pickupLatitude,
-        'pickupLongitude': trip.pickupLongitude,
-        'dropLatitude': trip.dropLatitude,
-        'dropLongitude': trip.dropLongitude,
-        'milestonesLog': trip.milestonesLog,
-        'podUrl': trip.podUrl,
-        'remarks': trip.remarks,
-      }).toList();
-      trips.assignAll(mappedTrips);
+      trips.assignAll(fetchedTrips.map(_mapTrip).toList());
     } catch (e) {
       debugPrint('Error loading admin dashboard: $e');
     } finally {
       isLoading.value = false;
     }
+  }
+
+  // On-demand: pull the latest saved position for a trip (the driver app saves
+  // it roughly every 10 minutes while the trip is active). This is a fresh read,
+  // not a live subscription, so the admin gets the truck's last-known location
+  // only when they ask for it.
+  Future<Map<String, dynamic>?> fetchTripLocation(String tripId) async {
+    return _firebaseService.getTripData(tripId);
   }
 
   // --- TRIP CRUD ACTIONS ---

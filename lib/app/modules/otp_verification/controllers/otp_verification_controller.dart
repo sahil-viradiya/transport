@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:transport/app/data/services/storage_service.dart';
+import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/routes/app_pages.dart';
@@ -11,7 +11,7 @@ import 'package:transport/app/core/theme/app_colors.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 
 class OtpVerificationController extends GetxController {
-  final _storage = Get.find<StorageService>();
+  final _session = Get.find<SessionService>();
 
   // Inputs
   final otpController = TextEditingController();
@@ -99,19 +99,23 @@ class OtpVerificationController extends GetxController {
   }
 
   Future<void> _handleUserLoginOrSignup(String phone) async {
-    // Normalize phone: remove spaces so '+91 9999999999' becomes '+919999999999'
-    phone = phone.replaceAll(' ', '');
+    // Normalize phone: '+91 9999999999' becomes '+919999999999'
+    phone = SessionService.normalizePhone(phone);
     try {
       final firebaseService = Get.find<FirebaseService>();
       final userData = await firebaseService.getUserData(phone);
-      
+
       if (userData != null) {
         // User exists, log them in immediately
-        final role = userData['role'] ?? 'driver';
-        await _storage.write('isLoggedIn', true);
-        await _storage.write('userPhone', phone);
-        await _storage.write('userRole', role);
-        
+        final role = userData['role'] ?? 'owner';
+        await _session.setSession(
+          phone: phone,
+          uid: FirebaseAuth.instance.currentUser?.uid,
+          name: userData['name'],
+          role: role,
+          avatarUrl: userData['avatarUrl'],
+        );
+
         if (role == 'admin') {
           Get.offAllNamed(Routes.ADMIN_HOME);
         } else {
@@ -128,7 +132,7 @@ class OtpVerificationController extends GetxController {
   }
 
   void _showRoleSelectionSignupDialog(String phone) {
-    String selectedRole = 'driver';
+    String selectedRole = 'owner';
     final nameController = TextEditingController();
 
     Get.dialog(
@@ -157,8 +161,8 @@ class OtpVerificationController extends GetxController {
                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               items: const [
-                DropdownMenuItem(value: 'driver', child: AppText('Driver', style: AppTextStyle.bodyMedium)),
-                DropdownMenuItem(value: 'admin', child: AppText('Admin', style: AppTextStyle.bodyMedium)),
+                DropdownMenuItem(value: 'owner', child: AppText('Truck Owner', style: AppTextStyle.bodyMedium)),
+                DropdownMenuItem(value: 'admin', child: AppText('Admin / Fleet', style: AppTextStyle.bodyMedium)),
               ],
               onChanged: (val) {
                 if (val != null) selectedRole = val;
@@ -185,10 +189,8 @@ class OtpVerificationController extends GetxController {
 
               try {
                 final firebaseService = Get.find<FirebaseService>();
-                final avatarUrl = selectedRole == 'admin' 
-                    ? 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop'
-                    : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop';
-                
+                const avatarUrl = '';
+
                 final userData = {
                   'name': name,
                   'phone': phone,
@@ -198,9 +200,19 @@ class OtpVerificationController extends GetxController {
 
                 await firebaseService.saveUser(phone, userData);
 
-                await _storage.write('isLoggedIn', true);
-                await _storage.write('userPhone', phone);
-                await _storage.write('userRole', selectedRole);
+                await _session.setSession(
+                  phone: phone,
+                  uid: FirebaseAuth.instance.currentUser?.uid,
+                  name: name,
+                  role: selectedRole,
+                  avatarUrl: avatarUrl,
+                );
+
+                // New truck owner: seed a starter profile + demo trips so their
+                // app isn't empty on first launch (all scoped to their phone).
+                if (selectedRole != 'admin') {
+                  await firebaseService.seedDemoDataForOwner(phone, name: name);
+                }
 
                 AppPopup.hideLoading();
 

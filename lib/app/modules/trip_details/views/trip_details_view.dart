@@ -42,7 +42,7 @@ class TripDetailsView extends GetView<TripDetailsController> {
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFDEEBFF),
+              color: isDark ? const Color(0xFF1E293B) : AppColors.primaryLight,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(

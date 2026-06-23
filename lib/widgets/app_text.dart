@@ -4,6 +4,7 @@ enum AppTextStyle {
   headlineLarge,
   headlineMedium,
   headlineSmall,
+  titleLarge,
   bodyLarge,
   bodyMedium,
   labelLarge,
@@ -46,6 +47,9 @@ class AppText extends StatelessWidget {
         break;
       case AppTextStyle.headlineSmall:
         textStyle = theme.textTheme.headlineSmall!;
+        break;
+      case AppTextStyle.titleLarge:
+        textStyle = theme.textTheme.titleLarge!;
         break;
       case AppTextStyle.bodyLarge:
         textStyle = theme.textTheme.bodyLarge!;
