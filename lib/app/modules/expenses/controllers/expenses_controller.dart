@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:get/get.dart';
 import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
@@ -61,12 +62,26 @@ class ExpensesController extends GetxController {
     pendingExpenses.value = format(pending);
   }
 
-  Future<void> submitExpense(Map<String, dynamic> expenseData) async {
+  /// Driver files an expense with a receipt proof. If [receiptBytes] are given
+  /// they're uploaded first; then the claim is saved as Pending and every admin
+  /// is notified to approve/reject.
+  Future<void> submitExpense(Map<String, dynamic> expenseData,
+      {Uint8List? receiptBytes}) async {
     AppPopup.showLoading(message: 'Submitting Claim...');
     try {
-      await _firebaseService.saveExpense(expenseData);
+      final id =
+          expenseData['id'] ?? 'EXP-${DateTime.now().millisecondsSinceEpoch}';
+      expenseData['id'] = id;
+      if (receiptBytes != null && receiptBytes.isNotEmpty) {
+        expenseData['receiptUrl'] =
+            await _firebaseService.uploadExpenseReceipt(id, receiptBytes);
+      }
+      await _firebaseService.submitTripExpense(expenseData,
+          driverName: _session.name.value);
       AppPopup.hideLoading();
-      AppSnackBar.showSuccess(title: 'Claim Submitted', message: 'Your expense claim has been logged.');
+      AppSnackBar.showSuccess(
+          title: 'Claim Submitted',
+          message: 'Expense sent to admin for approval.');
       await loadExpenses();
     } catch (e) {
       AppPopup.hideLoading();

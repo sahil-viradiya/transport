@@ -163,6 +163,27 @@ class TripsView extends GetView<TripsController> {
 
   Widget _buildTripCard(BuildContext context, TripItemModel trip, bool isDark) {
     final isTripActive = trip.isActive;
+    final isPending = trip.status == 'PENDING';
+    final isRejected = trip.status == 'REJECTED';
+
+    Color pillBg, pillFg, accent;
+    if (isTripActive) {
+      pillBg = const Color(0xFFFFF0B3);
+      pillFg = const Color(0xFFBF2600);
+      accent = AppColors.success;
+    } else if (isPending) {
+      pillBg = AppColors.tertiaryLight;
+      pillFg = AppColors.tertiaryDark;
+      accent = AppColors.tertiaryDark;
+    } else if (isRejected) {
+      pillBg = AppColors.error.withValues(alpha: 0.12);
+      pillFg = AppColors.error;
+      accent = AppColors.error;
+    } else {
+      pillBg = AppColors.primaryLight;
+      pillFg = AppColors.primary;
+      accent = AppColors.primary;
+    }
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -177,10 +198,7 @@ class TripsView extends GetView<TripsController> {
           ),
         ],
         border: Border(
-          left: BorderSide(
-            color: isTripActive ? AppColors.success : AppColors.primary,
-            width: 4,
-          ),
+          left: BorderSide(color: accent, width: 4),
         ),
       ),
       child: Padding(
@@ -190,28 +208,57 @@ class TripsView extends GetView<TripsController> {
           children: [
             // Top Details ID & Truck Info
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isTripActive
-                        ? const Color(0xFFFFF0B3) // Gold bg
-                        : AppColors.primaryLight, // Blue bg
-                    borderRadius: BorderRadius.circular(4),
+                if (trip.priority) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.bolt_rounded, size: 13, color: Colors.white),
+                        SizedBox(width: 2),
+                        AppText('PRIORITY',
+                            style: AppTextStyle.labelMedium,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold),
+                      ],
+                    ),
                   ),
-                  child: AppText(
-                    trip.status,
-                    style: AppTextStyle.labelMedium,
-                    color: isTripActive ? const Color(0xFFBF2600) : AppColors.primary,
-                    fontWeight: FontWeight.bold,
+                  const SizedBox(width: 6),
+                ],
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: pillBg,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: AppText(
+                      trip.status,
+                      style: AppTextStyle.labelMedium,
+                      color: pillFg,
+                      fontWeight: FontWeight.bold,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
-                Row(
-                  children: [
-                    const AppText('Truck #  ', style: AppTextStyle.labelMedium),
-                    AppText(trip.truckNo, style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
-                  ],
+                const SizedBox(width: 8),
+                const AppText('Truck', style: AppTextStyle.labelMedium),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: AppText(trip.truckNo,
+                      style: AppTextStyle.bodyMedium,
+                      fontWeight: FontWeight.bold,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end),
                 ),
               ],
             ),
@@ -274,26 +321,90 @@ class TripsView extends GetView<TripsController> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.calendar_today_rounded, size: 14, color: AppColors.textHint),
+                    const Icon(Icons.calendar_today_rounded,
+                        size: 14, color: AppColors.textHint),
                     const SizedBox(width: 6),
                     AppText(trip.date, style: AppTextStyle.labelMedium),
                   ],
                 ),
-                AppButton(
-                  text: isTripActive ? 'Track Live' : 'Details',
-                  type: isTripActive ? AppButtonType.primary : AppButtonType.secondary,
-                  isFullWidth: false,
-                  height: 36,
-                  onPressed: () => Navigator.of(context, rootNavigator: true).pushNamed(
-                    Routes.TRIP_DETAILS,
-                    arguments: {
-                      'tripId': trip.id,
-                      'isAlreadyActive': isTripActive,
-                    },
+                if (!isPending)
+                  AppButton(
+                    text: isTripActive
+                        ? 'Track Live'
+                        : (isRejected ? 'View' : 'Details'),
+                    type: isTripActive
+                        ? AppButtonType.primary
+                        : AppButtonType.secondary,
+                    isFullWidth: false,
+                    height: 36,
+                    onPressed: () =>
+                        Navigator.of(context, rootNavigator: true).pushNamed(
+                      Routes.TRIP_DETAILS,
+                      arguments: {
+                        'tripId': trip.id,
+                        'isAlreadyActive': isTripActive,
+                      },
+                    ),
                   ),
-                ),
               ],
             ),
+
+            // PENDING → driver must Accept or Reject before it goes active.
+            if (isPending) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.tertiaryLight.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_rounded,
+                        size: 16, color: AppColors.tertiaryDark),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: AppText(
+                        'Ye trip aapko assign hui hai. Accept karein tabhi start kar payenge.',
+                        style: AppTextStyle.labelMedium,
+                        color: AppColors.tertiaryDark,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => controller.confirmRejectTrip(trip.id),
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      label: const Text('Reject'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        side: const BorderSide(color: AppColors.error),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => controller.acceptTrip(trip.id),
+                      icon: const Icon(Icons.check_rounded, size: 18),
+                      label: const Text('Accept'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

@@ -243,4 +243,380 @@ void main() {
       expect(bTrips, isEmpty);
     });
   });
+
+  group('Trip confirmation workflow', () {
+    const admin = '+919999999999';
+
+    test('assignTripToDriver writes PENDING + notifies the driver', () async {
+      owner = admin; // admin is signed in
+      final svc = service();
+      await svc.assignTripToDriver('TRP-1', {
+        'driverPhone': ownerA,
+        'pickupCity': 'Surat',
+        'dropCity': 'Rajkot',
+      });
+
+      final trip = (await firestore.collection('trips').doc('TRP-1').get()).data()!;
+      expect(trip['status'], 'PENDING');
+      expect(trip['ownerId'], ownerA);
+      expect(trip['assignedBy'], admin);
+
+      final driverNotes = await svc.getNotifications(ownerA);
+      expect(driverNotes.length, 1);
+      expect(driverNotes.first['type'], 'trip_assigned');
+      expect(driverNotes.first['read'], false);
+    });
+
+    test('acceptTrip marks ASSIGNED and notifies the admin who assigned it',
+        () async {
+      owner = admin;
+      final svc = service();
+      await svc.assignTripToDriver('TRP-1', {'driverPhone': ownerA});
+
+      owner = ownerA; // driver acts
+      await svc.acceptTrip('TRP-1', driverName: 'Rajesh');
+
+      final trip = (await firestore.collection('trips').doc('TRP-1').get()).data()!;
+      expect(trip['status'], 'ASSIGNED');
+      expect(trip['confirmedByDriver'], true);
+
+      final adminNotes = await svc.getNotifications(admin);
+      expect(adminNotes.any((n) => n['type'] == 'trip_accepted'), true);
+    });
+
+    test('rejectTrip marks REJECTED and notifies the admin with a reason',
+        () async {
+      owner = admin;
+      final svc = service();
+      await svc.assignTripToDriver('TRP-1', {'driverPhone': ownerA});
+
+      owner = ownerA;
+      await svc.rejectTrip('TRP-1', reason: 'Truck breakdown', driverName: 'Rajesh');
+
+      final trip = (await firestore.collection('trips').doc('TRP-1').get()).data()!;
+      expect(trip['status'], 'REJECTED');
+
+      final adminNotes = await svc.getNotifications(admin);
+      final rej = adminNotes.firstWhere((n) => n['type'] == 'trip_rejected');
+      expect(rej['body'].toString().contains('Truck breakdown'), true);
+    });
+  });
+
+  group('Load approval gate', () {
+    const admin = '+919999999999';
+
+    test('requestLoadApproval → LOAD_REQUESTED (not active) + notifies admin',
+        () async {
+      owner = admin;
+      final svc = service();
+      await svc.assignTripToDriver('TRP-1',
+          {'driverPhone': ownerA, 'pickupLocation': 'Aslali'});
+      owner = ownerA;
+      await svc.acceptTrip('TRP-1', driverName: 'Rajesh');
+
+      await svc.requestLoadApproval('TRP-1',
+          pickupLocation: 'Aslali', driverName: 'Rajesh');
+
+      final trip = (await firestore.collection('trips').doc('TRP-1').get()).data()!;
+      expect(trip['status'], 'LOAD_REQUESTED');
+      expect(trip['isActive'], false);
+
+      final adminNotes = await svc.getNotifications(admin);
+      expect(adminNotes.any((n) => n['type'] == 'load_request'), true);
+    });
+
+    test('approveLoad → ACTIVE NOW + notifies the driver', () async {
+      owner = admin;
+      final svc = service();
+      await svc.assignTripToDriver('TRP-1', {'driverPhone': ownerA});
+      owner = ownerA;
+      await svc.acceptTrip('TRP-1');
+      await svc.requestLoadApproval('TRP-1', driverName: 'Rajesh');
+
+      await svc.approveLoad('TRP-1', adminName: 'Admin');
+
+      final trip = (await firestore.collection('trips').doc('TRP-1').get()).data()!;
+      expect(trip['status'], 'ACTIVE NOW');
+      expect(trip['isActive'], true);
+
+      final driverNotes = await svc.getNotifications(ownerA);
+      expect(driverNotes.any((n) => n['type'] == 'trip_activated'), true);
+    });
+
+    test('approve is one-time — a second approveLoad is a no-op', () async {
+      owner = admin;
+      final svc = service();
+      await svc.assignTripToDriver('TRP-1', {'driverPhone': ownerA});
+      owner = ownerA;
+      await svc.acceptTrip('TRP-1');
+      await svc.requestLoadApproval('TRP-1');
+
+      await svc.approveLoad('TRP-1');
+      final firstCount = (await svc.getNotifications(ownerA))
+          .where((n) => n['type'] == 'trip_activated')
+          .length;
+
+      // Trip is ACTIVE NOW → the guard makes this a no-op (no duplicate notify).
+      await svc.approveLoad('TRP-1');
+      final secondCount = (await svc.getNotifications(ownerA))
+          .where((n) => n['type'] == 'trip_activated')
+          .length;
+
+      expect(secondCount, firstCount);
+    });
+
+    test('rejectLoad → back to ASSIGNED + notifies the driver', () async {
+      owner = admin;
+      final svc = service();
+      await svc.assignTripToDriver('TRP-1', {'driverPhone': ownerA});
+      owner = ownerA;
+      await svc.acceptTrip('TRP-1');
+      await svc.requestLoadApproval('TRP-1');
+
+      await svc.rejectLoad('TRP-1', reason: 'Wrong goods');
+
+      final trip = (await firestore.collection('trips').doc('TRP-1').get()).data()!;
+      expect(trip['status'], 'ASSIGNED');
+      expect(trip['isActive'], false);
+
+      final driverNotes = await svc.getNotifications(ownerA);
+      final rej = driverNotes.firstWhere((n) => n['type'] == 'load_rejected');
+      expect(rej['body'].toString().contains('Wrong goods'), true);
+    });
+  });
+
+  group('Delivery approval gate', () {
+    const admin = '+919999999999';
+
+    test('requestDelivery → DELIVERY_REQUESTED + notifies admin with location',
+        () async {
+      owner = admin;
+      final svc = service();
+      await svc.assignTripToDriver('TRP-1', {'driverPhone': ownerA});
+      owner = ownerA;
+
+      await svc.requestDelivery('TRP-1',
+          location: 'Mavdi Chowkdi', latitude: 22.28, longitude: 70.79,
+          driverName: 'Rajesh');
+
+      final trip = (await firestore.collection('trips').doc('TRP-1').get()).data()!;
+      expect(trip['status'], 'DELIVERY_REQUESTED');
+      expect(trip['currentAddress'], 'Mavdi Chowkdi');
+
+      final adminNotes = await svc.getNotifications(admin);
+      final n = adminNotes.firstWhere((n) => n['type'] == 'delivery_request');
+      expect(n['body'].toString().contains('Mavdi Chowkdi'), true);
+    });
+
+    test('approveDelivery → DELIVERED + notifies driver', () async {
+      owner = admin;
+      final svc = service();
+      await svc.assignTripToDriver('TRP-1', {'driverPhone': ownerA});
+      owner = ownerA;
+      await svc.requestDelivery('TRP-1', location: 'Drop');
+
+      await svc.approveDelivery('TRP-1');
+
+      final trip = (await firestore.collection('trips').doc('TRP-1').get()).data()!;
+      expect(trip['status'], 'DELIVERED');
+      expect(trip['isActive'], false);
+
+      final driverNotes = await svc.getNotifications(ownerA);
+      expect(driverNotes.any((n) => n['type'] == 'delivery_approved'), true);
+    });
+
+    test('rejectDelivery → back to ACTIVE NOW', () async {
+      owner = admin;
+      final svc = service();
+      await svc.assignTripToDriver('TRP-1', {'driverPhone': ownerA});
+      owner = ownerA;
+      await svc.requestDelivery('TRP-1');
+
+      await svc.rejectDelivery('TRP-1', reason: 'POD missing');
+
+      final trip = (await firestore.collection('trips').doc('TRP-1').get()).data()!;
+      expect(trip['status'], 'ACTIVE NOW');
+      final driverNotes = await svc.getNotifications(ownerA);
+      expect(driverNotes.any((n) => n['type'] == 'delivery_rejected'), true);
+    });
+  });
+
+  group('Trip expenses with proof + approval', () {
+    const admin = '+919999999999';
+    Future<void> seedAdmin() =>
+        firestore.collection('users').doc(admin).set({'role': 'admin'});
+
+    test('submitTripExpense saves Pending + notifies admins', () async {
+      await seedAdmin();
+      owner = ownerA;
+      final svc = service();
+
+      await svc.submitTripExpense({
+        'id': 'EXP-1',
+        'tripId': 'TRP-1',
+        'title': 'Diesel',
+        'amount': '₹8,500',
+        'receiptUrl': 'https://x/y.jpg',
+      }, driverName: 'Rajesh');
+
+      final e = (await firestore.collection('expenses').doc('EXP-1').get()).data()!;
+      expect(e['status'], 'Pending');
+      expect(e['ownerId'], ownerA);
+      expect(e['driverPhone'], ownerA);
+
+      final adminNotes = await svc.getNotifications(admin);
+      final note = adminNotes.firstWhere((n) => n['type'] == 'expense_submitted');
+      // refId carries the expense id so the detail page can approve/reject it.
+      expect(note['refId'], 'EXP-1');
+    });
+
+    test('approveExpenseById / rejectExpenseById notify the driver', () async {
+      owner = ownerA;
+      final svc = service();
+      await svc.submitTripExpense(
+          {'id': 'EXP-1', 'title': 'Toll', 'amount': '₹200', 'driverPhone': ownerA});
+
+      await svc.approveExpenseById('EXP-1');
+      var e = (await firestore.collection('expenses').doc('EXP-1').get()).data()!;
+      expect(e['status'], 'Approved');
+      expect((await svc.getNotifications(ownerA))
+          .any((n) => n['type'] == 'expense_approved'), true);
+
+      await svc.submitTripExpense(
+          {'id': 'EXP-2', 'title': 'Puncture', 'amount': '₹500', 'driverPhone': ownerA});
+      await svc.rejectExpenseById('EXP-2', reason: 'No bill');
+      e = (await firestore.collection('expenses').doc('EXP-2').get()).data()!;
+      expect(e['status'], 'Rejected');
+      expect((await svc.getNotifications(ownerA))
+          .any((n) => n['type'] == 'expense_rejected'), true);
+    });
+  });
+
+  group('Priority trips', () {
+    test('priority flag persists and is parsed back', () async {
+      final svc = service();
+      await svc.saveTrip('TRP-1', {'driverPhone': ownerA, 'priority': true});
+      await svc.saveTrip('TRP-2', {'driverPhone': ownerA});
+
+      final trips = await svc.getTripsForOwner(ownerA);
+      expect(trips.firstWhere((t) => t.id == 'TRP-1').priority, true);
+      expect(trips.firstWhere((t) => t.id == 'TRP-2').priority, false);
+    });
+  });
+
+  group('Notifications', () {
+    test('are recipient-scoped by phone', () async {
+      final svc = service();
+      await svc.createNotification(
+          toPhone: ownerA, title: 'A', body: 'for A', type: 'info');
+      await svc.createNotification(
+          toPhone: ownerB, title: 'B', body: 'for B', type: 'info');
+
+      final a = await svc.getNotifications(ownerA);
+      final b = await svc.getNotifications(ownerB);
+      expect(a.length, 1);
+      expect(a.first['title'], 'A');
+      expect(b.length, 1);
+      expect(b.first['title'], 'B');
+    });
+
+    test('markNotificationRead / markAllNotificationsRead flip the flag',
+        () async {
+      final svc = service();
+      await svc.createNotification(toPhone: ownerA, title: '1', body: 'x');
+      await svc.createNotification(toPhone: ownerA, title: '2', body: 'y');
+
+      var notes = await svc.getNotifications(ownerA);
+      expect(notes.where((n) => n['read'] == false).length, 2);
+
+      await svc.markNotificationRead(notes.first['id']);
+      notes = await svc.getNotifications(ownerA);
+      expect(notes.where((n) => n['read'] == false).length, 1);
+
+      await svc.markAllNotificationsRead(ownerA);
+      notes = await svc.getNotifications(ownerA);
+      expect(notes.where((n) => n['read'] == false).length, 0);
+    });
+
+    test('watchNotifications streams only the recipient\'s notes', () async {
+      final svc = service();
+      await svc.createNotification(toPhone: ownerA, title: 'A1', body: 'x');
+      await svc.createNotification(toPhone: ownerB, title: 'B1', body: 'y');
+
+      final list = await svc.watchNotifications(ownerA).first;
+      expect(list.length, 1);
+      expect(list.first['title'], 'A1');
+    });
+  });
+
+  group('Driver check-in / check-out', () {
+    const admin = '+919999999999';
+
+    Future<void> seedAdmin() =>
+        firestore.collection('users').doc(admin).set({'role': 'admin'});
+
+    test('checkIn marks the driver Available with location + notifies admin',
+        () async {
+      await seedAdmin();
+      final svc = service();
+
+      await svc.checkIn(ownerA,
+          latitude: 21.17, longitude: 72.83, address: 'Surat Depot',
+          driverName: 'Rajesh');
+
+      final u = (await firestore.collection('users').doc(ownerA).get()).data()!;
+      expect(u['availability'], 'available');
+      expect(u['checkedIn'], true);
+      expect(u['checkInAddress'], 'Surat Depot');
+      expect(u['checkInLatitude'], 21.17);
+
+      // Mirrored onto the driver profile doc too.
+      final d = (await firestore.collection('drivers').doc(ownerA).get()).data()!;
+      expect(d['availability'], 'available');
+
+      // Admin was notified.
+      final adminNotes = await svc.getNotifications(admin);
+      expect(adminNotes.any((n) => n['type'] == 'check_in'), true);
+    });
+
+    test('checkOut marks the driver Off Duty + notifies admin', () async {
+      await seedAdmin();
+      final svc = service();
+      await svc.checkIn(ownerA,
+          latitude: 1, longitude: 2, address: 'X', driverName: 'Rajesh');
+
+      await svc.checkOut(ownerA, driverName: 'Rajesh');
+
+      final u = (await firestore.collection('users').doc(ownerA).get()).data()!;
+      expect(u['availability'], 'off_duty');
+      expect(u['checkedIn'], false);
+
+      final adminNotes = await svc.getNotifications(admin);
+      expect(adminNotes.any((n) => n['type'] == 'check_out'), true);
+    });
+
+    test('notifyAdmins reaches every admin, not drivers', () async {
+      await seedAdmin();
+      await firestore.collection('users').doc('+918111111111').set({'role': 'admin'});
+      await firestore.collection('users').doc(ownerA).set({'role': 'driver'});
+      final svc = service();
+
+      await svc.notifyAdmins(title: 'T', body: 'B', type: 'info');
+
+      expect((await svc.getNotifications(admin)).length, 1);
+      expect((await svc.getNotifications('+918111111111')).length, 1);
+      expect((await svc.getNotifications(ownerA)).length, 0);
+    });
+
+    test('watchAllUsers streams the live user directory', () async {
+      await seedAdmin();
+      await firestore.collection('users').doc(ownerA).set(
+          {'role': 'driver', 'availability': 'available'});
+      final svc = service();
+
+      final users = await svc.watchAllUsers().first;
+      final driver = users.firstWhere((u) => u['phone'] == ownerA);
+      expect(driver['availability'], 'available');
+    });
+  });
 }

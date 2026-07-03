@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../widgets/app_text.dart';
@@ -13,14 +14,13 @@ class ProfileView extends GetView<ProfileController> {
   ImageProvider _getImageProvider(String path) {
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return NetworkImage(path);
-    } else {
-      final file = File(path);
-      if (file.existsSync()) {
-        return FileImage(file);
-      } else {
-        return const NetworkImage('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150');
-      }
     }
+    // File() is unsupported on web — only touch it on mobile/desktop.
+    if (!kIsWeb && path.isNotEmpty && File(path).existsSync()) {
+      return FileImage(File(path));
+    }
+    return const NetworkImage(
+        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150');
   }
 
   @override

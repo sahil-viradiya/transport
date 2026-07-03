@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:transport/app/core/utils/image_picker_helper.dart';
@@ -9,10 +10,13 @@ import '../../trips/controllers/trips_controller.dart';
 class ProofOfDeliveryController extends GetxController {
   final remarksController = TextEditingController();
 
-  final RxString pickedImagePath = ''.obs;
+  // Picked image kept as bytes so preview + upload work on web and mobile.
+  final Rx<Uint8List?> pickedBytes = Rx<Uint8List?>(null);
+  bool get hasImage => pickedBytes.value != null;
+
   final RxBool isUploading = false.obs;
   final RxDouble uploadProgress = 0.0.obs;
-  
+
   final RxString tripId = 'IND-99281'.obs;
 
   @override
@@ -28,44 +32,40 @@ class ProofOfDeliveryController extends GetxController {
 
   // Action to pick photo using Camera
   Future<void> takePhoto() async {
-    final path = await ImagePickerHelper.captureImageFromCamera();
-    if (path != null) {
-      pickedImagePath.value = path;
+    final img = await ImagePickerHelper.captureFromCamera();
+    if (img != null) {
+      pickedBytes.value = img.bytes;
     } else {
-      // Simulation mode fallback for emulators
-      pickedImagePath.value = 'receipt_scan_042.jpg';
       AppSnackBar.showInfo(
-        title: 'Simulation Mode',
-        message: 'No camera photo captured. Mock document loaded for preview.',
+        title: 'No Photo',
+        message: 'No camera photo captured.',
       );
     }
   }
 
   // Action to pick photo from Gallery
   Future<void> fromGallery() async {
-    final path = await ImagePickerHelper.pickImageFromGallery();
-    if (path != null) {
-      pickedImagePath.value = path;
+    final img = await ImagePickerHelper.pickFromGallery();
+    if (img != null) {
+      pickedBytes.value = img.bytes;
     } else {
-      // Simulation mode fallback for emulators
-      pickedImagePath.value = 'receipt_scan_042.jpg';
       AppSnackBar.showInfo(
-        title: 'Simulation Mode',
-        message: 'No gallery photo selected. Mock document loaded for preview.',
+        title: 'No Photo',
+        message: 'No gallery photo selected.',
       );
     }
   }
 
   // Delete/Clear picked photo
   void deletePhoto() {
-    pickedImagePath.value = '';
+    pickedBytes.value = null;
     uploadProgress.value = 0.0;
     isUploading.value = false;
   }
 
   // Server upload logic linked with Firebase Storage & Firestore
   Future<void> submitProof() async {
-    if (pickedImagePath.value.isEmpty) {
+    if (!hasImage) {
       AppSnackBar.showWarning(
         title: 'No Document Found',
         message: 'Please take a photo or choose a document scan first.',
@@ -98,7 +98,7 @@ class ProofOfDeliveryController extends GetxController {
         currentAddr = await locationService.getAddressFromCoordinates(currentLat, currentLng);
       } catch (_) {}
 
-      finalUrl = await firebaseService.uploadProofOfDelivery(tripId.value, pickedImagePath.value);
+      finalUrl = await firebaseService.uploadProofOfDelivery(tripId.value, pickedBytes.value);
       uploadProgress.value = 0.9;
       await firebaseService.saveProofOfDeliveryDetails(
         tripId.value, 

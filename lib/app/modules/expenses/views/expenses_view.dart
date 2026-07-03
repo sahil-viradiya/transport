@@ -1,11 +1,14 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../../widgets/app_button.dart';
+import '../../../../widgets/dialogs/app_snackbar.dart';
 import '../../../core/theme/app_colors.dart';
 import '../controllers/expenses_controller.dart';
 import '../../trips/controllers/trips_controller.dart';
-import '../../../data/services/storage_service.dart';
+import '../../../data/services/session_service.dart';
 import '../../../data/services/location_service.dart';
 
 class ExpensesView extends GetView<ExpensesController> {
@@ -244,6 +247,7 @@ class ExpensesView extends GetView<ExpensesController> {
     } catch (_) {}
     
     final tripIdCtrl = TextEditingController(text: activeTripId);
+    final receiptBytes = Rx<Uint8List?>(null);
 
     showModalBottomSheet(
       context: context,
@@ -341,6 +345,53 @@ class ExpensesView extends GetView<ExpensesController> {
                           maxLines: 2,
                           validator: (v) => v!.isEmpty ? 'Field required' : null,
                         ),
+                        const SizedBox(height: 16),
+                        // Receipt proof — required (photo of bill / receipt).
+                        const AppText('RECEIPT PROOF',
+                            style: AppTextStyle.labelMedium,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textSecondary),
+                        const SizedBox(height: 6),
+                        Obx(() => receiptBytes.value == null
+                            ? OutlinedButton.icon(
+                                onPressed: () async {
+                                  final x = await ImagePicker().pickImage(
+                                    source: ImageSource.camera,
+                                    imageQuality: 70,
+                                  );
+                                  if (x != null) {
+                                    receiptBytes.value = await x.readAsBytes();
+                                  }
+                                },
+                                icon: const Icon(Icons.photo_camera_rounded),
+                                label: const Text('Attach Receipt Photo'),
+                                style: OutlinedButton.styleFrom(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 14),
+                                ),
+                              )
+                            : Row(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Image.memory(receiptBytes.value!,
+                                        width: 54,
+                                        height: 54,
+                                        fit: BoxFit.cover),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Expanded(
+                                    child: AppText('Receipt attached ✓',
+                                        style: AppTextStyle.bodyMedium,
+                                        color: AppColors.success,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => receiptBytes.value = null,
+                                    child: const Text('Change'),
+                                  ),
+                                ],
+                              )),
                         const SizedBox(height: 24),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
@@ -357,36 +408,48 @@ class ExpensesView extends GetView<ExpensesController> {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                               onPressed: () async {
-                                if (formKey.currentState!.validate()) {
-                                  final phone = Get.find<StorageService>().read<String>('userPhone') ?? '+919876543210';
-                                  
-                                  double currentLat = LocationService.fallbackLatitude;
-                                  double currentLng = LocationService.fallbackLongitude;
-                                  String locationName = "JNPT Port Terminal, Navi Mumbai, Maharashtra";
-                                  try {
-                                    final locationService = Get.find<LocationService>();
-                                    final pos = await locationService.getCurrentPosition();
-                                    currentLat = pos.latitude;
-                                    currentLng = pos.longitude;
-                                    locationName = await locationService.getAddressFromCoordinates(currentLat, currentLng);
-                                  } catch (_) {}
-
-                                  final expenseData = {
-                                    'tripId': tripIdCtrl.text.trim(),
-                                    'driverPhone': phone.replaceAll(' ', ''),
-                                    'title': titleCtrl.text,
-                                    'description': descCtrl.text.trim(),
-                                    'amount': '₹${amountCtrl.text.trim()}',
-                                    'date': 'Today, 08:30 AM',
-                                    'status': 'Pending',
-                                    'receiptUrl': 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=600',
-                                    'latitude': currentLat,
-                                    'longitude': currentLng,
-                                    'locationName': locationName,
-                                  };
-                                  Navigator.of(bottomSheetCtx).pop();
-                                  await controller.submitExpense(expenseData);
+                                if (!formKey.currentState!.validate()) return;
+                                if (receiptBytes.value == null) {
+                                  AppSnackBar.showWarning(
+                                      title: 'Proof Required',
+                                      message:
+                                          'Please attach a receipt photo as proof.');
+                                  return;
                                 }
+                                final phone =
+                                    Get.find<SessionService>().ownerKey;
+
+                                double currentLat =
+                                    LocationService.fallbackLatitude;
+                                double currentLng =
+                                    LocationService.fallbackLongitude;
+                                String locationName = '';
+                                try {
+                                  final locationService =
+                                      Get.find<LocationService>();
+                                  final pos = await locationService
+                                      .getCurrentPosition();
+                                  currentLat = pos.latitude;
+                                  currentLng = pos.longitude;
+                                  locationName = await locationService
+                                      .getAddressFromCoordinates(
+                                          currentLat, currentLng);
+                                } catch (_) {}
+
+                                final expenseData = {
+                                  'tripId': tripIdCtrl.text.trim(),
+                                  'driverPhone': phone,
+                                  'title': titleCtrl.text,
+                                  'description': descCtrl.text.trim(),
+                                  'amount': '₹${amountCtrl.text.trim()}',
+                                  'date': 'Today',
+                                  'latitude': currentLat,
+                                  'longitude': currentLng,
+                                  'locationName': locationName,
+                                };
+                                Navigator.of(bottomSheetCtx).pop();
+                                await controller.submitExpense(expenseData,
+                                    receiptBytes: receiptBytes.value);
                               },
                               child: const AppText('Submit Claim',
                                   style: AppTextStyle.bodyMedium, color: Colors.white),

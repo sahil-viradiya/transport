@@ -390,19 +390,21 @@ class ProfileController extends GetxController {
       if (pickedFile != null) {
         AppPopup.showLoading(message: 'Uploading photo...');
         final firebaseService = Get.find<FirebaseService>();
-        final downloadUrl = await firebaseService.uploadDriverAvatar(pickedFile.path);
-        await _saveAvatarUrl(downloadUrl);
+        final bytes = await pickedFile.readAsBytes();
+        final downloadUrl = await firebaseService.uploadDriverAvatar(bytes);
         AppPopup.hideLoading();
-        
+
         if (downloadUrl.startsWith('http')) {
+          await _saveAvatarUrl(downloadUrl);
           AppSnackBar.showSuccess(
             title: 'Avatar Updated',
             message: 'Profile picture has been uploaded successfully.',
           );
         } else {
           AppSnackBar.showWarning(
-            title: 'Avatar Updated (Local Fallback)',
-            message: 'Firebase Storage bucket not initialized. Picture saved locally on device.',
+            title: 'Upload Failed',
+            message:
+                'Could not upload the picture. Check Firebase Storage is enabled.',
           );
         }
       }

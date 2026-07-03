@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/trip_details_controller.dart';
@@ -541,13 +542,11 @@ class TripDetailsView extends GetView<TripDetailsController> {
       if (imgPath.isNotEmpty) {
         if (imgPath.startsWith('http://') || imgPath.startsWith('https://')) {
           imgProvider = NetworkImage(imgPath);
+        } else if (!kIsWeb && File(imgPath).existsSync()) {
+          imgProvider = FileImage(File(imgPath));
         } else {
-          final file = File(imgPath);
-          if (file.existsSync()) {
-            imgProvider = FileImage(file);
-          } else {
-            imgProvider = const NetworkImage('https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=600');
-          }
+          imgProvider = const NetworkImage(
+              'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=600');
         }
       }
 

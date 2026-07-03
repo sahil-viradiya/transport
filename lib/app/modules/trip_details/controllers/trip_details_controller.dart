@@ -6,6 +6,7 @@ import 'package:transport/app/routes/app_pages.dart';
 import '../../trips/controllers/trips_controller.dart';
 import '../../../data/services/firebase_service.dart';
 import '../../../data/services/location_service.dart';
+import '../../../data/services/session_service.dart';
 
 class TripDetailsController extends GetxController {
   // Journey state toggles
@@ -155,7 +156,38 @@ class TripDetailsController extends GetxController {
       startLocationUpdates();
     }
     _loadLiveTripData();
+
+    // Auto-activate the moment the admin approves the load (status → ACTIVE NOW).
+    try {
+      _tripStatusSub =
+          Get.find<FirebaseService>().watchTripData(tripId).listen((data) {
+        if (data == null) return;
+        final status = data['status'];
+        if (status == 'ACTIVE NOW' && !isJourneyStarted.value) {
+          isJourneyStarted.value = true;
+          if (currentMilestone.value < 3) currentMilestone.value = 3;
+          startLocationUpdates();
+          AppSnackBar.showSuccess(
+            title: 'Trip Activated ✅',
+            message: 'Admin approved your load. Trip is now active!',
+          );
+        }
+        if (status == 'DELIVERED' && currentMilestone.value < 4) {
+          currentMilestone.value = 4;
+          remainingDistance.value = '0 KM';
+          estimatedTime.value = 'Delivered';
+          speed.value = 0;
+          _locationTimer?.cancel();
+          AppSnackBar.showSuccess(
+            title: 'Delivery Approved ✅',
+            message: 'Admin approved the delivery. Trip complete!',
+          );
+        }
+      });
+    } catch (_) {}
   }
+
+  StreamSubscription? _tripStatusSub;
 
   Future<void> _loadLiveTripData() async {
     try {
@@ -395,87 +427,58 @@ class TripDetailsController extends GetxController {
     } catch (_) {}
   }
 
-  // Action to start the journey
+  // Driver reached pickup + loaded goods → request admin approval to activate.
+  // The trip does NOT go active until the admin approves.
   void startJourney() {
     final tripsController = Get.find<TripsController>();
-    
-    // Prevent starting/resuming a completed trip
+
     try {
       final trip = tripsController.allTrips.firstWhere((t) => t.id == tripId);
       if (trip.status == 'DELIVERED') {
         AppSnackBar.showError(
           title: 'Trip Completed',
-          message: 'This trip is already completed and cannot be restarted.',
+          message: 'This trip is already completed.',
+        );
+        return;
+      }
+      if (trip.status == 'LOAD_REQUESTED') {
+        AppSnackBar.showInfo(
+          title: 'Awaiting Approval',
+          message: 'Load approval request pehle hi admin ko bheja gaya hai.',
         );
         return;
       }
     } catch (_) {}
 
-    final hasActiveTrip = tripsController.allTrips.any((t) => t.isActive && t.id != tripId);
-    
-    String descriptionText = 'Are you ready to initiate your trip $tripId and start GPS route sync?';
-    if (hasActiveTrip) {
-      final activeTrip = tripsController.allTrips.firstWhere((t) => t.isActive);
-      descriptionText = 'Warning: Trip ${activeTrip.id} is currently active. Starting this journey will automatically suspend/deactivate it. Proceed?';
-    }
-
     AppPopup.showConfirmation(
-      title: 'START JOURNEY',
-      description: descriptionText,
-      confirmText: 'Start',
+      title: 'REQUEST LOAD APPROVAL',
+      description:
+          'Maal load ho gaya? Admin ko approval ke liye request bhejein. '
+          'Admin approve karega tabhi trip active hogi.',
+      confirmText: 'Send Request',
       cancelText: 'Cancel',
       onConfirm: () async {
-        isJourneyStarted.value = true;
-        currentMilestone.value = 2;
-        startLocationUpdates();
+        String driverName = '';
+        try {
+          driverName = Get.find<SessionService>().name.value;
+        } catch (_) {}
         try {
           final firebaseService = Get.find<FirebaseService>();
-          await firebaseService.updateTripMilestone(
-            tripId, 
-            2, 
-            status: 'ACTIVE NOW',
-            locationName: currentAddress.value == 'Locating...' ? departureTitle : currentAddress.value,
+          await firebaseService.requestLoadApproval(
+            tripId,
+            pickupLocation: currentAddress.value == 'Locating...'
+                ? departureTitle
+                : currentAddress.value,
+            driverName: driverName,
             latitude: simulatedLat,
             longitude: simulatedLng,
           );
-          
-          // Update local TripsController state so that only this trip is active
-          final updatedTrips = tripsController.allTrips.map((trip) {
-            if (trip.id == tripId) {
-              return TripItemModel(
-                id: trip.id,
-                truckNo: trip.truckNo,
-                status: 'ACTIVE NOW',
-                pickupCity: trip.pickupCity,
-                pickupLocation: trip.pickupLocation,
-                dropCity: trip.dropCity,
-                dropLocation: trip.dropLocation,
-                date: trip.date,
-                tabType: trip.tabType,
-                isActive: true,
-                driverPhone: trip.driverPhone,
-              );
-            } else {
-              return TripItemModel(
-                id: trip.id,
-                truckNo: trip.truckNo,
-                status: trip.status == 'ACTIVE NOW' ? 'ASSIGNED' : trip.status,
-                pickupCity: trip.pickupCity,
-                pickupLocation: trip.pickupLocation,
-                dropCity: trip.dropCity,
-                dropLocation: trip.dropLocation,
-                date: trip.date,
-                tabType: trip.tabType,
-                isActive: false,
-                driverPhone: trip.driverPhone,
-              );
-            }
-          }).toList();
-          tripsController.allTrips.assignAll(updatedTrips);
         } catch (_) {}
         AppSnackBar.showSuccess(
-          title: 'Journey Started',
-          message: 'GPS tracking is now active. Drive safely!',
+          title: 'Request Sent 📦',
+          message:
+              'Admin ko load approval ke liye bhej diya. Approve hone par '
+              'trip apne aap active ho jayegi.',
         );
       },
     );
@@ -497,18 +500,31 @@ class TripDetailsController extends GetxController {
     if (milestoneIndex == 3) milestoneName = 'Reached Drop';
 
     if (milestoneIndex == 3) {
-      // Reaching the drop point triggers the Proof of Delivery flow
+      // Reached drop → upload Proof of Delivery, then request admin approval to
+      // complete. The trip only becomes DELIVERED after the admin approves.
       Get.toNamed(Routes.PROOF_OF_DELIVERY, arguments: {'tripId': tripId})?.then((result) async {
         if (result == true) {
-          currentMilestone.value = 4;
-          remainingDistance.value = '0 KM';
-          speed.value = 0;
-          estimatedTime.value = 'Delivered';
-          _locationTimer?.cancel();
-
-          // Automatically return to the Home/Dashboard screen after showing the completed state for a brief moment
-          await Future.delayed(const Duration(milliseconds: 1500));
-          Get.back();
+          String driverName = '';
+          try {
+            driverName = Get.find<SessionService>().name.value;
+          } catch (_) {}
+          try {
+            final fb = Get.find<FirebaseService>();
+            await fb.requestDelivery(
+              tripId,
+              location: currentAddress.value == 'Locating...'
+                  ? destinationTitle
+                  : currentAddress.value,
+              latitude: simulatedLat,
+              longitude: simulatedLng,
+              driverName: driverName,
+            );
+          } catch (_) {}
+          AppSnackBar.showSuccess(
+            title: 'Delivery Sent 📍',
+            message: 'Admin ko approval ke liye bhej diya. Approve hone par '
+                'trip complete ho jayegi.',
+          );
         }
       });
       return;
@@ -542,6 +558,7 @@ class TripDetailsController extends GetxController {
   @override
   void onClose() {
     _locationTimer?.cancel();
+    _tripStatusSub?.cancel();
     super.onClose();
   }
 }

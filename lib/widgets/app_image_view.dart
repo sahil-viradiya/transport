@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -61,21 +62,18 @@ class AppImageView extends StatelessWidget {
           errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
         );
       }
+    } else if (!kIsWeb && File(imagePath).existsSync()) {
+      // Local File Image (mobile/desktop only — File is unsupported on web)
+      imageWidget = Image.file(
+        File(imagePath),
+        width: width,
+        height: height,
+        fit: fit,
+        color: color,
+        errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
+      );
     } else {
-      // Local File Image (for picked images)
-      final file = File(imagePath);
-      if (file.existsSync()) {
-        imageWidget = Image.file(
-          file,
-          width: width,
-          height: height,
-          fit: fit,
-          color: color,
-          errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
-        );
-      } else {
-        imageWidget = _buildPlaceholder();
-      }
+      imageWidget = _buildPlaceholder();
     }
 
     if (borderRadius > 0) {

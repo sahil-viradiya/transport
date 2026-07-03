@@ -8,6 +8,8 @@ import 'app/data/services/storage_service.dart';
 import 'app/data/services/connectivity_service.dart';
 import 'app/data/services/firebase_service.dart';
 import 'app/data/services/session_service.dart';
+import 'app/data/services/push_service.dart';
+import 'app/data/notifications_controller.dart';
 import 'app/routes/app_pages.dart';
 
 void main() async {
@@ -50,6 +52,11 @@ Future<void> initServices() async {
   await Get.putAsync(() => SessionService().init());
   // Initialize Firebase Service (Firestore CRUD) — resolves owner via session
   await Get.putAsync(() => FirebaseService().init());
+  // App-wide notifications feed (bell badge for driver + admin)
+  Get.put(NotificationsController(), permanent: true);
+  // FCM push (permission, token save, foreground handler) — degrades to no-op
+  // where FCM isn't configured, so it never blocks startup.
+  await Get.putAsync(() => PushService().init());
   debugPrint('All services successfully registered.');
 }
 

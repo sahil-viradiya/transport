@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/dashboard_controller.dart';
@@ -7,6 +8,8 @@ import '../../../../widgets/app_text.dart';
 import '../../../../widgets/app_button.dart';
 import '../../../../widgets/premium_widgets.dart';
 import '../../../../widgets/trip_progress_tracker.dart';
+import '../../../../widgets/notification_bell.dart';
+import '../../../data/notifications_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../routes/app_pages.dart';
 
@@ -16,7 +19,8 @@ class DashboardView extends GetView<DashboardController> {
   ImageProvider _getImageProvider(String path) {
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return NetworkImage(path);
-    } else if (path.isNotEmpty && File(path).existsSync()) {
+    } else if (!kIsWeb && path.isNotEmpty && File(path).existsSync()) {
+      // File() is unsupported on web — only touch it on mobile/desktop.
       return FileImage(File(path));
     }
     return const NetworkImage(
@@ -47,6 +51,8 @@ class DashboardView extends GetView<DashboardController> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      _buildDutyCard(context),
+                      const SizedBox(height: 16),
                       _buildActiveTripCard(context),
                       const SizedBox(height: 24),
                       const SectionHeader('Quick Actions'),
@@ -122,6 +128,7 @@ class DashboardView extends GetView<DashboardController> {
                       ],
                     ),
                   ),
+                  const NotificationBell(color: Colors.white),
                   _circleIcon(Icons.sos_rounded, controller.triggerEmergencySos,
                       bg: Colors.white.withValues(alpha: 0.18)),
                 ],
@@ -167,6 +174,101 @@ class DashboardView extends GetView<DashboardController> {
         child: Icon(icon, color: Colors.white, size: 22),
       ),
     );
+  }
+
+  // ---- Duty / Check-in card ----
+  Widget _buildDutyCard(BuildContext context) {
+    return Obx(() {
+      final onDuty = controller.isOnDuty;
+      final accent = onDuty ? AppColors.success : AppColors.textSecondary;
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: _cardDecoration(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Icon(
+                    onDuty
+                        ? Icons.check_circle_rounded
+                        : Icons.nightlight_round,
+                    color: accent,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration:
+                                BoxDecoration(color: accent, shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 6),
+                          AppText(onDuty ? 'On Duty • Available' : 'Off Duty',
+                              style: AppTextStyle.titleLarge,
+                              fontWeight: FontWeight.w700,
+                              color: accent),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      AppText(
+                        onDuty
+                            ? (controller.checkInAddress.value.isNotEmpty
+                                ? '📍 ${controller.checkInAddress.value}'
+                                : 'You are marked available to admin.')
+                            : 'Check in to mark yourself available for trips.',
+                        style: AppTextStyle.labelMedium,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: onDuty
+                  ? OutlinedButton.icon(
+                      onPressed: controller.checkOut,
+                      icon: const Icon(Icons.logout_rounded, size: 18),
+                      label: const Text('Check Out'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        side: const BorderSide(color: AppColors.error),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    )
+                  : ElevatedButton.icon(
+                      onPressed: controller.checkIn,
+                      icon: const Icon(Icons.my_location_rounded, size: 18),
+                      label: const Text('Check In'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   // ---- Active trip card (white, with progress tracker) ----
@@ -332,57 +434,74 @@ class DashboardView extends GetView<DashboardController> {
   }
 
   Widget _buildNotifications() {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: controller.notifications.length,
-      itemBuilder: (context, index) {
-        final notif = controller.notifications[index];
+    final notifs = Get.find<NotificationsController>();
+    return Obx(() {
+      final items = notifs.items.take(4).toList();
+      if (items.isEmpty) {
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(14),
-          decoration: _cardDecoration(context),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.all(18),
+          decoration: _cardDecoration(Get.context!),
+          child: const Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.notifications_rounded,
-                    color: AppColors.primary, size: 20),
-              ),
-              const SizedBox(width: 12),
+              Icon(Icons.notifications_none_rounded,
+                  color: AppColors.textHint, size: 22),
+              SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: AppText(notif.title,
-                              style: AppTextStyle.bodyLarge,
-                              fontWeight: FontWeight.w700),
-                        ),
-                        AppText(notif.time,
-                            style: AppTextStyle.labelMedium,
-                            color: AppColors.textHint),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    AppText(notif.body, style: AppTextStyle.bodyMedium),
-                  ],
-                ),
+                child: AppText('No notifications yet',
+                    style: AppTextStyle.bodyMedium),
               ),
             ],
           ),
         );
-      },
-    );
+      }
+      return Column(
+        children: items.map((n) {
+          final read = n['read'] == true;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(14),
+            decoration: _cardDecoration(Get.context!),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.notifications_rounded,
+                      color: AppColors.primary, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppText(n['title']?.toString() ?? '',
+                          style: AppTextStyle.bodyLarge,
+                          fontWeight: FontWeight.w700),
+                      const SizedBox(height: 2),
+                      AppText(n['body']?.toString() ?? '',
+                          style: AppTextStyle.bodyMedium),
+                    ],
+                  ),
+                ),
+                if (!read)
+                  Container(
+                    margin: const EdgeInsets.only(left: 6, top: 4),
+                    width: 9,
+                    height: 9,
+                    decoration: const BoxDecoration(
+                        color: AppColors.primary, shape: BoxShape.circle),
+                  ),
+              ],
+            ),
+          );
+        }).toList(),
+      );
+    });
   }
 
   BoxDecoration _cardDecoration(BuildContext context) {

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/proof_of_delivery_controller.dart';
@@ -123,8 +122,8 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
 
             // Reactive Preview Card (Dotted Border container)
             Obx(() {
-              final imgPath = controller.pickedImagePath.value;
-              if (imgPath.isEmpty) return const SizedBox.shrink();
+              final bytes = controller.pickedBytes.value;
+              if (bytes == null) return const SizedBox.shrink();
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 24),
@@ -171,10 +170,11 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
                         color: Colors.grey.shade100,
                         child: Stack(
                           children: [
-                            // If actually picked image, render it, otherwise show simulated document vector
-                            !imgPath.startsWith('receipt_') && File(imgPath).existsSync()
-                                ? Image.file(File(imgPath), width: double.infinity, height: double.infinity, fit: BoxFit.cover)
-                                : _buildMockReceiptGraphic(isDark),
+                            // Render the picked image bytes (web + mobile safe)
+                            Image.memory(bytes,
+                                width: double.infinity,
+                                height: double.infinity,
+                                fit: BoxFit.cover),
                             
                             // Bottom Info Overlay Bar
                             Positioned(
@@ -191,8 +191,8 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          AppText(
-                                            imgPath.split('/').last,
+                                          const AppText(
+                                            'proof_of_delivery.jpg',
                                             style: AppTextStyle.bodyMedium,
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold,
@@ -309,58 +309,4 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
   }
 
   // Draw a beautiful mock receipt vector graphic using container lines
-  Widget _buildMockReceiptGraphic(bool isDark) {
-    return Center(
-      child: Container(
-        width: 140,
-        height: 180,
-        margin: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: const [
-            BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2))
-          ],
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Receipt Header lines
-            Container(width: 80, height: 6, color: Colors.grey.shade300),
-            const SizedBox(height: 6),
-            Container(width: 50, height: 4, color: Colors.grey.shade200),
-            const SizedBox(height: 12),
-            const Divider(height: 1, thickness: 1),
-            const SizedBox(height: 12),
-
-            // Middle Stamp silhouette profile
-            Center(
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFAB00).withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.person_pin_rounded, color: Color(0xFFFFAB00), size: 28),
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Divider(height: 1, thickness: 1),
-            const SizedBox(height: 12),
-
-            // Bottom Signature lines
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(width: 40, height: 4, color: Colors.grey.shade300),
-                const Icon(Icons.edit_outlined, color: Colors.grey, size: 12),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

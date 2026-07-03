@@ -11,6 +11,7 @@ abstract class Routes {
   static const TRIP_DETAILS = _Paths.TRIP_DETAILS;
   static const PROOF_OF_DELIVERY = _Paths.PROOF_OF_DELIVERY;
   static const ADMIN_HOME = _Paths.ADMIN_HOME;
+  static const NOTIFICATION_DETAIL = _Paths.NOTIFICATION_DETAIL;
 }
 
 abstract class _Paths {
@@ -24,4 +25,5 @@ abstract class _Paths {
   static const TRIP_DETAILS = '/trip-details';
   static const PROOF_OF_DELIVERY = '/proof-of-delivery';
   static const ADMIN_HOME = '/admin-home';
+  static const NOTIFICATION_DETAIL = '/notification-detail';
 }

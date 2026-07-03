@@ -8,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:transport/widgets/app_text.dart';
 import 'package:transport/widgets/trip_progress_tracker.dart';
+import 'package:transport/widgets/notification_bell.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 import '../controllers/admin_home_controller.dart';
@@ -106,6 +107,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
         title: const AppText('Highway Terminal Admin',
             style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
         actions: [
+          const NotificationBell(color: AppColors.textPrimary),
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: AppColors.error),
             tooltip: 'Logout Session',
@@ -175,6 +177,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             const Color(0xFFE0F2FE),
                             const Color(0xFF0369A1),
                             isDark,
+                            onTap: () => controller.changeTabIndex(1),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -186,6 +189,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             const Color(0xFFDCFCE7),
                             const Color(0xFF15803D),
                             isDark,
+                            onTap: () => controller.changeTabIndex(2),
                           ),
                         ),
                       ],
@@ -201,6 +205,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             const Color(0xFFFEF9C3),
                             const Color(0xFFA16207),
                             isDark,
+                            onTap: () => controller.changeTabIndex(3),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -212,6 +217,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             const Color(0xFFF3E8FF),
                             const Color(0xFF7E22CE),
                             isDark,
+                            onTap: () => controller.changeTabIndex(1),
                           ),
                         ),
                       ],
@@ -536,7 +542,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                                   ),
                                                 ),
                                                 actions: [
-                                                  if (status == 'Pending')
+                                                  if (status == 'Pending') ...[
                                                     ElevatedButton(
                                                       style: ElevatedButton.styleFrom(
                                                           backgroundColor:
@@ -550,6 +556,16 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                                               AppTextStyle.bodyMedium,
                                                           color: Colors.white),
                                                     ),
+                                                    TextButton(
+                                                      onPressed: () {
+                                                        Navigator.of(dialogCtx).pop();
+                                                        controller.rejectExpense(exp);
+                                                      },
+                                                      child: const AppText('Reject',
+                                                          style: AppTextStyle.bodyMedium,
+                                                          color: AppColors.error),
+                                                    ),
+                                                  ],
                                                   TextButton(
                                                     onPressed: () =>
                                                         Navigator.of(dialogCtx).pop(),
@@ -582,34 +598,54 @@ class AdminHomeView extends GetView<AdminHomeController> {
   }
 
   Widget _buildStatCard(String label, String value, IconData icon, Color bg,
-      Color textCol, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : bg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? Colors.white10 : Colors.transparent),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                  child: AppText(label,
+      Color textCol, bool isDark,
+      {VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : bg,
+          borderRadius: BorderRadius.circular(16),
+          border:
+              Border.all(color: isDark ? Colors.white10 : Colors.transparent),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                    child: AppText(label,
+                        style: AppTextStyle.labelMedium,
+                        color: isDark ? Colors.white70 : textCol,
+                        fontWeight: FontWeight.bold)),
+                Icon(icon,
+                    color: isDark ? AppColors.primary : textCol, size: 18),
+              ],
+            ),
+            const SizedBox(height: 12),
+            AppText(value,
+                style: AppTextStyle.headlineLarge,
+                color: isDark ? Colors.white : textCol,
+                fontWeight: FontWeight.bold),
+            if (onTap != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  AppText('View',
                       style: AppTextStyle.labelMedium,
-                      color: isDark ? Colors.white70 : textCol,
-                      fontWeight: FontWeight.bold)),
-              Icon(icon, color: isDark ? AppColors.primary : textCol, size: 18),
+                      color: isDark ? Colors.white54 : textCol,
+                      fontWeight: FontWeight.w600),
+                  Icon(Icons.chevron_right_rounded,
+                      size: 16, color: isDark ? Colors.white54 : textCol),
+                ],
+              ),
             ],
-          ),
-          const SizedBox(height: 12),
-          AppText(value,
-              style: AppTextStyle.headlineLarge,
-              color: isDark ? Colors.white : textCol,
-              fontWeight: FontWeight.bold),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -933,6 +969,51 @@ class AdminHomeView extends GetView<AdminHomeController> {
   }
 
   // --- TAB 4: ROLES & USERS MANAGEMENT ---
+  Widget _availabilityBadge(Map<String, dynamic> user) {
+    final available = (user['availability'] ?? 'off_duty') == 'available';
+    final color = available ? AppColors.success : AppColors.textSecondary;
+    final address = (user['checkInAddress'] ?? '').toString();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(available ? Icons.circle : Icons.circle_outlined,
+                  size: 9, color: color),
+              const SizedBox(width: 5),
+              AppText(available ? 'Available' : 'Off Duty',
+                  style: AppTextStyle.labelMedium,
+                  color: color,
+                  fontWeight: FontWeight.bold),
+            ],
+          ),
+        ),
+        if (available && address.isNotEmpty) ...[
+          const SizedBox(height: 3),
+          Row(
+            children: [
+              const Icon(Icons.place_rounded, size: 12, color: AppColors.error),
+              const SizedBox(width: 3),
+              Expanded(
+                child: AppText(address,
+                    style: AppTextStyle.labelMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildUsersTab(BuildContext context, bool isDark) {
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -999,6 +1080,10 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           const SizedBox(height: 2),
                           AppText(user['phone'] ?? '',
                               style: AppTextStyle.labelMedium),
+                          if ((user['role'] ?? 'driver') != 'admin') ...[
+                            const SizedBox(height: 6),
+                            _availabilityBadge(user),
+                          ],
                           const SizedBox(height: 4),
                           // Dropdown to toggle role in UI
                           Row(
@@ -1109,6 +1194,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
 
     final availableTabs = ['Today', 'Upcoming', 'Active', 'Past'];
     String selectedTabType = editModeTrip?['tabType'] ?? 'Today';
+    bool priority = editModeTrip?['priority'] ?? false;
     if (!availableTabs.contains(selectedTabType)) {
       selectedTabType = 'Today';
     }
@@ -1254,6 +1340,23 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           onChanged: (val) {
                             if (val != null) selectedTabType = val;
                           },
+                        ),
+                        const SizedBox(height: 8),
+                        StatefulBuilder(
+                          builder: (ctx, setSB) => SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            activeThumbColor: AppColors.primary,
+                            value: priority,
+                            onChanged: (v) => setSB(() => priority = v),
+                            secondary: const Icon(Icons.bolt_rounded,
+                                color: AppColors.primary),
+                            title: const AppText('Priority Trip',
+                                style: AppTextStyle.bodyLarge,
+                                fontWeight: FontWeight.w600),
+                            subtitle: const AppText(
+                                'Driver ko sabse upar "PRIORITY" tag ke saath dikhegi',
+                                style: AppTextStyle.labelMedium),
+                          ),
                         ),
                         const SizedBox(height: 16),
                         Row(
@@ -1475,6 +1578,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                     'dropLocation': dropLocCtrl.text.trim(),
                                     'date': dateCtrl.text.trim(),
                                     'tabType': selectedTabType,
+                                    'priority': priority,
                                     'pickupLatitude': double.tryParse(
                                             pickupLatCtrl.text.trim()) ??
                                         18.9482,
@@ -2912,7 +3016,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                           ),
                                         ),
                                         actions: [
-                                          if (status == 'Pending')
+                                          if (status == 'Pending') ...[
                                             ElevatedButton(
                                               style: ElevatedButton.styleFrom(
                                                   backgroundColor:
@@ -2926,6 +3030,16 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                                       AppTextStyle.bodyMedium,
                                                   color: Colors.white),
                                             ),
+                                            TextButton(
+                                              onPressed: () {
+                                                Navigator.of(dialogCtx).pop();
+                                                controller.rejectExpense(exp);
+                                              },
+                                              child: const AppText('Reject',
+                                                  style: AppTextStyle.bodyMedium,
+                                                  color: AppColors.error),
+                                            ),
+                                          ],
                                           TextButton(
                                             onPressed: () =>
                                                 Navigator.of(dialogCtx).pop(),
@@ -2952,6 +3066,21 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                   child: const AppText('Approve',
                                       style: AppTextStyle.labelMedium,
                                       color: Colors.white,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(width: 6),
+                                OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.error,
+                                    side: const BorderSide(color: AppColors.error),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6)),
+                                  ),
+                                  onPressed: () => controller.rejectExpense(exp),
+                                  child: const AppText('Reject',
+                                      style: AppTextStyle.labelMedium,
                                       fontWeight: FontWeight.bold),
                                 ),
                               ],

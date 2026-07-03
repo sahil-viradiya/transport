@@ -66,6 +66,16 @@ service cloud.firestore {
       allow delete: if isSignedIn() && (ownsExisting() || isAdmin());
     }
 
+    // Notifications — a user reads only their own (toPhone == their phone) and
+    // may mark them read. Any signed-in user can create one addressed to
+    // someone else (e.g. driver ⇄ admin trip updates).
+    match /notifications/{noteId} {
+      allow read:   if isSignedIn() && resource.data.toPhone == phone();
+      allow create: if isSignedIn() && request.resource.data.toPhone is string;
+      allow update: if isSignedIn() && resource.data.toPhone == phone();
+      allow delete: if isSignedIn() && resource.data.toPhone == phone();
+    }
+
     // App-wide config — readable by any signed-in user, writable by admin only.
     match /system/{doc} {
       allow read:  if isSignedIn();

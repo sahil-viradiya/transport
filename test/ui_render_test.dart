@@ -20,10 +20,14 @@ import 'package:transport/app/modules/splash/controllers/splash_controller.dart'
 import 'package:transport/app/modules/splash/views/splash_view.dart';
 import 'package:transport/app/modules/home/controllers/home_controller.dart';
 import 'package:transport/app/modules/trips/controllers/trips_controller.dart';
+import 'package:transport/app/modules/trips/views/trips_view.dart';
 import 'package:transport/app/modules/dashboard/controllers/dashboard_controller.dart';
 import 'package:transport/app/modules/dashboard/views/dashboard_view.dart';
 import 'package:transport/app/modules/admin_home/controllers/admin_home_controller.dart';
 import 'package:transport/app/modules/admin_home/views/admin_home_view.dart';
+import 'package:transport/app/data/notifications_controller.dart';
+import 'package:transport/app/modules/notification_detail/views/notification_detail_view.dart';
+import 'package:transport/app/modules/notification_detail/bindings/notification_detail_binding.dart';
 
 /// Connectivity stub that reports "online" without touching the platform.
 class _OnlineConnectivity extends ConnectivityService {
@@ -235,6 +239,7 @@ void main() {
     Get.put(HomeController());
     Get.put(TripsController());
     Get.put(DashboardController());
+    Get.put(NotificationsController());
 
     await mockNetworkImagesFor(() async {
       await tester.pumpWidget(_app(const DashboardView()));
@@ -285,6 +290,7 @@ void main() {
 
     Get.put(FirebaseService(
         firestore: firestore, ownerKeyResolver: () => '+919999999999'));
+    Get.put(NotificationsController());
     Get.put(AdminHomeController());
   }
 
@@ -347,5 +353,120 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('JOURNEY MILESTONES AUDIT'), findsOneWidget);
+  });
+
+  testWidgets('Notification detail page shows Approve/Reject for a load request',
+      (tester) async {
+    final storage = await StorageService().init();
+    Get.put<StorageService>(storage);
+    final session = SessionService(storage: storage);
+    await session.init();
+    await session.setSession(phone: '+919999999999', role: 'admin', name: 'Admin');
+    Get.put<SessionService>(session);
+
+    final firestore = FakeFirebaseFirestore();
+    await firestore.collection('trips').doc('TRP-1').set({
+      'status': 'LOAD_REQUESTED',
+      'pickupCity': 'Surat',
+      'dropCity': 'Rajkot',
+      'currentMilestone': 3,
+      'ownerId': '+919876543210',
+      'driverPhone': '+919876543210',
+    });
+    Get.put(FirebaseService(
+        firestore: firestore, ownerKeyResolver: () => '+919999999999'));
+
+    await tester.pumpWidget(_app(
+      const Scaffold(),
+      pages: [
+        GetPage(
+          name: Routes.NOTIFICATION_DETAIL,
+          page: () => const NotificationDetailView(),
+          binding: NotificationDetailBinding(),
+        ),
+      ],
+    ));
+    Get.toNamed(Routes.NOTIFICATION_DETAIL,
+        arguments: {'type': 'load_request', 'tripId': 'TRP-1', 'id': 'n1'});
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Approve'), findsOneWidget);
+    expect(find.text('Reject'), findsOneWidget);
+  });
+
+  testWidgets('Notification detail renders a non-actionable note without Obx error',
+      (tester) async {
+    final storage = await StorageService().init();
+    Get.put<StorageService>(storage);
+    final session = SessionService(storage: storage);
+    await session.init();
+    Get.put<SessionService>(session);
+    Get.put(FirebaseService(
+        firestore: FakeFirebaseFirestore(),
+        ownerKeyResolver: () => '+919876543210'));
+
+    await tester.pumpWidget(_app(
+      const Scaffold(),
+      pages: [
+        GetPage(
+          name: Routes.NOTIFICATION_DETAIL,
+          page: () => const NotificationDetailView(),
+          binding: NotificationDetailBinding(),
+        ),
+      ],
+    ));
+    // Informational notification: no tripId, no action available.
+    Get.toNamed(Routes.NOTIFICATION_DETAIL, arguments: {
+      'type': 'check_in',
+      'title': 'Driver On Duty',
+      'body': 'Rajesh is available.',
+      'id': 'n2',
+    });
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('No action needed'), findsOneWidget);
+  });
+
+  testWidgets('Trips card renders priority + long status + long truck without overflow',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 720));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final storage = await StorageService().init();
+    Get.put<StorageService>(storage);
+    final session = SessionService(storage: storage);
+    await session.init();
+    await session.setSession(
+        phone: '+919876543210', name: 'Rajesh', role: 'owner');
+    Get.put<SessionService>(session);
+
+    final firestore = FakeFirebaseFirestore();
+    await firestore.collection('trips').doc('TRP-LONG').set({
+      'ownerId': '+919876543210',
+      'driverPhone': '+919876543210',
+      'truckNo': 'GJ-01-AB-1234-XY',
+      'status': 'DELIVERY_REQUESTED',
+      'priority': true,
+      'tabType': 'Today',
+      'pickupCity': 'Ahmedabad',
+      'dropCity': 'Surat',
+      'pickupLocation': 'Aslali',
+      'dropLocation': 'Sachin',
+      'date': 'Today',
+    });
+    Get.put(FirebaseService(
+        firestore: firestore, ownerKeyResolver: () => '+919876543210'));
+    Get.put(TripsController());
+
+    await mockNetworkImagesFor(() async {
+      await tester.pumpWidget(_app(const TripsView()));
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 120));
+      }
+    });
+    expect(tester.takeException(), isNull);
+    expect(find.text('PRIORITY'), findsOneWidget);
   });
 }

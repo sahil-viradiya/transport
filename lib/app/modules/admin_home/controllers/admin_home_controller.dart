@@ -23,6 +23,7 @@ class AdminHomeController extends GetxController {
 
   StreamSubscription? _tripsSub;
   StreamSubscription? _expensesSub;
+  StreamSubscription? _usersSub;
 
   @override
   void onInit() {
@@ -35,11 +36,12 @@ class AdminHomeController extends GetxController {
   void onClose() {
     _tripsSub?.cancel();
     _expensesSub?.cancel();
+    _usersSub?.cancel();
     super.onClose();
   }
 
-  // Live admin dashboard: trips + expenses stay current as drivers report
-  // milestones and push periodic location pings — no manual refresh needed.
+  // Live admin dashboard: trips + expenses + users (driver availability) stay
+  // current — no manual refresh needed.
   void _startLiveUpdates() {
     _tripsSub = _firebaseService.watchAllTrips().listen((list) {
       trips.assignAll(list.map(_mapTrip).toList());
@@ -47,6 +49,7 @@ class AdminHomeController extends GetxController {
     _expensesSub = _firebaseService.watchAllExpenses().listen((list) {
       expenses.assignAll(list);
     });
+    _usersSub = _firebaseService.watchAllUsers().listen(users.assignAll);
   }
 
   Map<String, dynamic> _mapTrip(dynamic trip) => {
@@ -60,6 +63,7 @@ class AdminHomeController extends GetxController {
         'dropLocation': trip.dropLocation,
         'date': trip.date,
         'isActive': trip.isActive,
+        'priority': trip.priority,
         'currentMilestone': trip.currentMilestone,
         'tabType': trip.tabType,
         'remainingDistance': trip.remainingDistance,
@@ -115,11 +119,15 @@ class AdminHomeController extends GetxController {
   // --- TRIP CRUD ACTIONS ---
   Future<void> createTrip(Map<String, dynamic> tripData) async {
     final tripId = tripData['id'] as String;
-    AppPopup.showLoading(message: 'Creating Trip $tripId...');
+    AppPopup.showLoading(message: 'Assigning Trip $tripId...');
     try {
-      await _firebaseService.saveTrip(tripId, tripData);
+      // Assign as PENDING and notify the driver to accept/reject — the trip only
+      // becomes active after the driver confirms.
+      await _firebaseService.assignTripToDriver(tripId, tripData);
       AppPopup.hideLoading();
-      AppSnackBar.showSuccess(title: 'Trip Created', message: 'Trip $tripId added successfully.');
+      AppSnackBar.showSuccess(
+          title: 'Trip Assigned',
+          message: 'Trip $tripId sent to the driver for confirmation.');
       await loadData();
     } catch (e) {
       AppPopup.hideLoading();
@@ -258,18 +266,42 @@ class AdminHomeController extends GetxController {
 
   // --- EXPENSE ACTIONS ---
   Future<void> approveExpense(Map<String, dynamic> expenseData) async {
-    final updatedExp = Map<String, dynamic>.from(expenseData);
-    updatedExp['status'] = 'Approved';
+    final id = expenseData['id']?.toString() ?? '';
+    if (id.isEmpty) return;
     AppPopup.showLoading(message: 'Approving expense...');
     try {
-      await _firebaseService.saveExpense(updatedExp);
+      await _firebaseService.approveExpenseById(id);
       AppPopup.hideLoading();
-      AppSnackBar.showSuccess(title: 'Expense Approved', message: 'The claim has been approved.');
-      await loadData();
+      AppSnackBar.showSuccess(
+          title: 'Expense Approved', message: 'The driver has been notified.');
     } catch (e) {
       AppPopup.hideLoading();
       AppSnackBar.showError(title: 'Error', message: e.toString());
     }
+  }
+
+  Future<void> rejectExpense(Map<String, dynamic> expenseData) async {
+    final id = expenseData['id']?.toString() ?? '';
+    if (id.isEmpty) return;
+    final reasonCtrl = TextEditingController();
+    AppPopup.showConfirmation(
+      title: 'Reject Expense?',
+      description: 'This claim will be marked rejected and the driver notified.',
+      confirmText: 'Reject',
+      onConfirm: () async {
+        AppPopup.showLoading(message: 'Rejecting...');
+        try {
+          await _firebaseService.rejectExpenseById(id,
+              reason: reasonCtrl.text.trim());
+          AppPopup.hideLoading();
+          AppSnackBar.showInfo(
+              title: 'Expense Rejected', message: 'The driver has been notified.');
+        } catch (e) {
+          AppPopup.hideLoading();
+          AppSnackBar.showError(title: 'Error', message: e.toString());
+        }
+      },
+    );
   }
 
   // --- LOGOUT TERMINAL ---

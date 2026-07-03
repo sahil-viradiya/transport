@@ -46,11 +46,11 @@ class ShowcaseController extends GetxController {
 
   // Pick Image Helper
   Future<void> pickImage(bool fromCamera) async {
-    final path = fromCamera 
-        ? await ImagePickerHelper.captureImageFromCamera()
-        : await ImagePickerHelper.pickImageFromGallery();
-    if (path != null) {
-      pickedImagePath.value = path;
+    final img = fromCamera
+        ? await ImagePickerHelper.captureFromCamera()
+        : await ImagePickerHelper.pickFromGallery();
+    if (img != null) {
+      pickedImagePath.value = img.name;
       AppSnackBar.showSuccess(title: 'Success', message: 'Image loaded successfully!');
     }
   }

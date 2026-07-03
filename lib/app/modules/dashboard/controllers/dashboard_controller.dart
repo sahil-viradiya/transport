@@ -6,6 +6,7 @@ import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/routes/app_pages.dart';
 import 'package:transport/app/data/services/connectivity_service.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
+import 'package:transport/app/data/services/location_service.dart';
 import '../../trips/controllers/trips_controller.dart';
 
 class DashboardController extends GetxController {
@@ -39,6 +40,12 @@ class DashboardController extends GetxController {
   final RxString vehicleModel = 'Tata Signa 5530.S'.obs;
   final RxString avatarUrl = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop'.obs;
   final RxInt todayTripsCount = 4.obs;
+
+  // Duty / check-in state
+  final RxString dutyStatus = 'off_duty'.obs; // 'available' | 'off_duty'
+  final RxString checkInAddress = ''.obs;
+  final RxBool isCheckingDuty = false.obs;
+  bool get isOnDuty => dutyStatus.value == 'available';
 
   // Active Trip Getter
   TripItemModel? get activeTrip {
@@ -101,6 +108,8 @@ class DashboardController extends GetxController {
         driverPhone.value = userData['phone'] ?? phone;
         final url = userData['avatarUrl'] ?? '';
         if (url.toString().isNotEmpty) avatarUrl.value = url;
+        dutyStatus.value = userData['availability'] ?? 'off_duty';
+        checkInAddress.value = userData['checkInAddress'] ?? '';
       }
 
       // 2. Owner-scoped trips: count + active/latest truck number
@@ -144,6 +153,66 @@ class DashboardController extends GetxController {
         vehicleModel.value = 'N/A';
       }
     } catch (_) {}
+  }
+
+  /// Driver goes on duty: capture GPS, mark Available, notify admin.
+  Future<void> checkIn() async {
+    if (isCheckingDuty.value) return;
+    isCheckingDuty.value = true;
+    AppPopup.showLoading(message: 'Checking in — capturing location...');
+    try {
+      final location = Get.find<LocationService>();
+      final fb = Get.find<FirebaseService>();
+      final pos = await location.getCurrentPosition();
+      final address =
+          await location.getAddressFromCoordinates(pos.latitude, pos.longitude);
+      await fb.checkIn(
+        _session.ownerKey,
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        address: address,
+        driverName: driverName.value,
+      );
+      dutyStatus.value = 'available';
+      checkInAddress.value = address;
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(
+        title: 'Checked In ✅',
+        message: 'You are now Available.\n$address',
+      );
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(
+          title: 'Check-In Failed', message: 'Could not check in. Try again.');
+    } finally {
+      isCheckingDuty.value = false;
+    }
+  }
+
+  /// Driver goes off duty.
+  void checkOut() {
+    AppPopup.showConfirmation(
+      title: 'Check Out?',
+      description: 'Aap Off Duty ho jayenge aur admin ko pata chal jayega.',
+      confirmText: 'Check Out',
+      onConfirm: () async {
+        isCheckingDuty.value = true;
+        AppPopup.showLoading(message: 'Checking out...');
+        try {
+          final fb = Get.find<FirebaseService>();
+          await fb.checkOut(_session.ownerKey, driverName: driverName.value);
+          dutyStatus.value = 'off_duty';
+          AppPopup.hideLoading();
+          AppSnackBar.showInfo(
+              title: 'Checked Out', message: 'You are now Off Duty.');
+        } catch (e) {
+          AppPopup.hideLoading();
+          AppSnackBar.showError(title: 'Error', message: e.toString());
+        } finally {
+          isCheckingDuty.value = false;
+        }
+      },
+    );
   }
 
   // SOS button trigger
