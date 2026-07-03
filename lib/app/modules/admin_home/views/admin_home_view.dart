@@ -212,12 +212,12 @@ class AdminHomeView extends GetView<AdminHomeController> {
                         Expanded(
                           child: _buildStatCard(
                             'ACTIVE DRIVERS',
-                            '${controller.trips.where((t) => t['isActive'] == true).length}',
+                            '${controller.activeDrivers.length}',
                             Icons.my_location_rounded,
                             const Color(0xFFF3E8FF),
                             const Color(0xFF7E22CE),
                             isDark,
-                            onTap: () => controller.changeTabIndex(1),
+                            onTap: controller.openActiveDrivers,
                           ),
                         ),
                       ],

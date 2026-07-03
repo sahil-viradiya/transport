@@ -19,6 +19,9 @@ import '../modules/admin_home/bindings/admin_home_binding.dart';
 import '../modules/admin_home/views/admin_home_view.dart';
 import '../modules/notification_detail/bindings/notification_detail_binding.dart';
 import '../modules/notification_detail/views/notification_detail_view.dart';
+import '../modules/active_drivers/views/active_drivers_view.dart';
+import '../modules/driver_detail/bindings/driver_detail_binding.dart';
+import '../modules/driver_detail/views/driver_detail_view.dart';
 
 part 'app_routes.dart';
 
@@ -77,6 +80,15 @@ class AppPages {
       name: _Paths.NOTIFICATION_DETAIL,
       page: () => const NotificationDetailView(),
       binding: NotificationDetailBinding(),
+    ),
+    GetPage(
+      name: _Paths.ACTIVE_DRIVERS,
+      page: () => const ActiveDriversView(),
+    ),
+    GetPage(
+      name: _Paths.DRIVER_DETAIL,
+      page: () => const DriverDetailView(),
+      binding: DriverDetailBinding(),
     ),
   ];
 }

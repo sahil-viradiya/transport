@@ -82,6 +82,35 @@ class AdminHomeController extends GetxController {
     currentTabIndex.value = index;
   }
 
+  /// Drivers who are currently on duty (checked-in Available) OR running an
+  /// active trip. Used by the "Active Drivers" stat + the Active Drivers screen.
+  List<Map<String, dynamic>> get activeDrivers {
+    final activePhones = trips
+        .where((t) => t['isActive'] == true)
+        .map((t) => (t['driverPhone'] ?? '').toString())
+        .where((p) => p.isNotEmpty)
+        .toSet();
+    return users.where((u) {
+      if ((u['role'] ?? 'driver') == 'admin') return false;
+      final phone = (u['phone'] ?? '').toString();
+      return u['availability'] == 'available' || activePhones.contains(phone);
+    }).toList();
+  }
+
+  Map<String, dynamic>? activeTripForDriver(String phone) {
+    try {
+      return trips.firstWhere(
+          (t) => t['isActive'] == true && (t['driverPhone'] ?? '').toString() == phone);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void openActiveDrivers() => Get.toNamed(Routes.ACTIVE_DRIVERS);
+
+  void openDriverDetail(String phone) =>
+      Get.toNamed(Routes.DRIVER_DETAIL, arguments: {'phone': phone});
+
   // Load all admin collections from Firestore
   Future<void> loadData() async {
     isLoading.value = true;

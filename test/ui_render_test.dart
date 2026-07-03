@@ -28,6 +28,9 @@ import 'package:transport/app/modules/admin_home/views/admin_home_view.dart';
 import 'package:transport/app/data/notifications_controller.dart';
 import 'package:transport/app/modules/notification_detail/views/notification_detail_view.dart';
 import 'package:transport/app/modules/notification_detail/bindings/notification_detail_binding.dart';
+import 'package:transport/app/modules/active_drivers/views/active_drivers_view.dart';
+import 'package:transport/app/modules/driver_detail/views/driver_detail_view.dart';
+import 'package:transport/app/modules/driver_detail/bindings/driver_detail_binding.dart';
 
 /// Connectivity stub that reports "online" without touching the platform.
 class _OnlineConnectivity extends ConnectivityService {
@@ -468,5 +471,79 @@ void main() {
     });
     expect(tester.takeException(), isNull);
     expect(find.text('PRIORITY'), findsOneWidget);
+  });
+
+  testWidgets('Active Drivers list shows an on-duty driver', (tester) async {
+    final storage = await StorageService().init();
+    Get.put<StorageService>(storage);
+    final session = SessionService(storage: storage);
+    await session.init();
+    await session.setSession(phone: '+919999999999', role: 'admin', name: 'Admin');
+    Get.put<SessionService>(session);
+    await Get.putAsync<ConnectivityService>(() => _OnlineConnectivity().init());
+
+    final firestore = FakeFirebaseFirestore();
+    await firestore.collection('users').doc('+919876543210').set({
+      'name': 'Rajesh Kumar',
+      'phone': '+919876543210',
+      'role': 'driver',
+      'availability': 'available',
+      'checkInAddress': 'Surat Depot',
+    });
+    Get.put(FirebaseService(
+        firestore: firestore, ownerKeyResolver: () => '+919999999999'));
+    Get.put(AdminHomeController());
+
+    await mockNetworkImagesFor(() async {
+      await tester.pumpWidget(_app(const Scaffold(), pages: [
+        GetPage(
+            name: Routes.ACTIVE_DRIVERS,
+            page: () => const ActiveDriversView()),
+      ]));
+      Get.toNamed(Routes.ACTIVE_DRIVERS);
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 120));
+      }
+    });
+    expect(tester.takeException(), isNull);
+    expect(find.text('Rajesh Kumar'), findsOneWidget);
+  });
+
+  testWidgets('Driver detail page shows the profile + vehicle', (tester) async {
+    final storage = await StorageService().init();
+    Get.put<StorageService>(storage);
+    final session = SessionService(storage: storage);
+    await session.init();
+    Get.put<SessionService>(session);
+
+    final firestore = FakeFirebaseFirestore();
+    await firestore.collection('users').doc('+919876543210').set({
+      'name': 'Rajesh Kumar',
+      'phone': '+919876543210',
+      'role': 'driver',
+      'availability': 'available',
+    });
+    await firestore.collection('drivers').doc('+919876543210').set({
+      'vehicleNo': 'GJ-01-AB-1234',
+      'vehicleModel': 'Tata Signa',
+    });
+    Get.put(FirebaseService(
+        firestore: firestore, ownerKeyResolver: () => '+919876543210'));
+
+    await mockNetworkImagesFor(() async {
+      await tester.pumpWidget(_app(const Scaffold(), pages: [
+        GetPage(
+            name: Routes.DRIVER_DETAIL,
+            page: () => const DriverDetailView(),
+            binding: DriverDetailBinding()),
+      ]));
+      Get.toNamed(Routes.DRIVER_DETAIL, arguments: {'phone': '+919876543210'});
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 120));
+      }
+    });
+    expect(tester.takeException(), isNull);
+    expect(find.text('Rajesh Kumar'), findsOneWidget);
+    expect(find.text('GJ-01-AB-1234'), findsOneWidget);
   });
 }

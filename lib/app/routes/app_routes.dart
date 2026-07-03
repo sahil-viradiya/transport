@@ -12,6 +12,8 @@ abstract class Routes {
   static const PROOF_OF_DELIVERY = _Paths.PROOF_OF_DELIVERY;
   static const ADMIN_HOME = _Paths.ADMIN_HOME;
   static const NOTIFICATION_DETAIL = _Paths.NOTIFICATION_DETAIL;
+  static const ACTIVE_DRIVERS = _Paths.ACTIVE_DRIVERS;
+  static const DRIVER_DETAIL = _Paths.DRIVER_DETAIL;
 }
 
 abstract class _Paths {
@@ -26,4 +28,6 @@ abstract class _Paths {
   static const PROOF_OF_DELIVERY = '/proof-of-delivery';
   static const ADMIN_HOME = '/admin-home';
   static const NOTIFICATION_DETAIL = '/notification-detail';
+  static const ACTIVE_DRIVERS = '/active-drivers';
+  static const DRIVER_DETAIL = '/driver-detail';
 }
