@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/routes/app_pages.dart';
@@ -31,17 +32,19 @@ class TripDetailsController extends GetxController {
 
   // Journey details matching reference layout (Left Screen)
   late String tripId;
-  late String vehicleNo;
-  late String consignmentNo;
+  // Reactive so they refresh when live Firestore data arrives (e.g. an admin
+  // opening a driver's trip that isn't in their local TripsController list).
+  final RxString vehicleNo = ''.obs;
+  final RxString consignmentNo = ''.obs;
   
   // Departure Info
-  late String departureTitle;
-  late String departureSubtitle;
-  late String departureTime;
+  final RxString departureTitle = ''.obs;
+  final RxString departureSubtitle = ''.obs;
+  final RxString departureTime = ''.obs;
 
   // Destination Info
-  late String destinationTitle;
-  late String destinationSubtitle;
+  final RxString destinationTitle = ''.obs;
+  final RxString destinationSubtitle = ''.obs;
 
   List<double> _getCoordinates(String title, String city) {
     double lat = 18.9482;
@@ -65,13 +68,13 @@ class TripDetailsController extends GetxController {
     
     // Set default values matching TRP-882910 fallback
     tripId = 'TRP-882910';
-    vehicleNo = 'HR-22-9012';
-    consignmentNo = '#9012';
-    departureTitle = 'JNPT Port Terminal';
-    departureSubtitle = 'Navi Mumbai, Maharashtra';
-    departureTime = 'Today, 06:30 AM';
-    destinationTitle = 'Indore Logistics Hub';
-    destinationSubtitle = 'Pithampur, Madhya Pradesh';
+    vehicleNo.value = 'HR-22-9012';
+    consignmentNo.value = '#9012';
+    departureTitle.value = 'JNPT Port Terminal';
+    departureSubtitle.value = 'Navi Mumbai, Maharashtra';
+    departureTime.value = 'Today, 06:30 AM';
+    destinationTitle.value = 'Indore Logistics Hub';
+    destinationSubtitle.value = 'Pithampur, Madhya Pradesh';
 
     String pickupCity = 'Mumbai';
     String dropCity = 'Indore';
@@ -88,21 +91,31 @@ class TripDetailsController extends GetxController {
       }
       
       final argTripId = args['tripId'];
-      if (argTripId != null) {
+      if (argTripId != null && argTripId.toString().isNotEmpty) {
+        // Always trust the argument id — even when the trip isn't in the local
+        // TripsController list (e.g. an admin opening a driver's trip), so the
+        // live Firestore load/watch below targets the right document.
+        tripId = argTripId.toString();
         try {
           final tripsController = Get.find<TripsController>();
           final trip = tripsController.allTrips.firstWhere((t) => t.id == argTripId);
-          tripId = trip.id;
-          vehicleNo = trip.truckNo;
+          vehicleNo.value = trip.truckNo;
           
           final cleanIdDigits = trip.id.replaceAll(RegExp(r'\D'), '');
-          consignmentNo = '#${cleanIdDigits.isNotEmpty ? cleanIdDigits : "9012"}';
+          consignmentNo.value = '#${cleanIdDigits.isNotEmpty ? cleanIdDigits : "9012"}';
           
-          departureTitle = trip.pickupLocation;
-          departureSubtitle = '${trip.pickupCity}, India';
-          departureTime = trip.date;
-          destinationTitle = trip.dropLocation;
-          destinationSubtitle = '${trip.dropCity}, India';
+          departureTitle.value = trip.pickupLocation;
+          departureSubtitle.value = '${trip.pickupCity}, India';
+          departureTime.value = trip.date;
+          tripStatus.value = trip.status;
+          if (_destinationRevealedStatuses.contains(trip.status)) {
+            destinationTitle.value = trip.dropLocation;
+            destinationSubtitle.value = '${trip.dropCity}, India';
+          } else {
+            destinationTitle.value = 'Destination pending';
+            destinationSubtitle.value =
+                'Load approve hone ke baad admin destination dikhayega';
+          }
           
           pickupCity = trip.pickupCity;
           dropCity = trip.dropCity;
@@ -133,11 +146,11 @@ class TripDetailsController extends GetxController {
 
     if (!hasCoords) {
       // Calculate initial distance and ETA from fallback
-      final startCoords = _getCoordinates(departureTitle, pickupCity);
+      final startCoords = _getCoordinates(departureTitle.value, pickupCity);
       startLat = startCoords[0];
       startLng = startCoords[1];
       
-      final endCoords = _getCoordinates(destinationTitle, dropCity);
+      final endCoords = _getCoordinates(destinationTitle.value, dropCity);
       endLat = endCoords[0];
       endLng = endCoords[1];
     }
@@ -162,6 +175,7 @@ class TripDetailsController extends GetxController {
       _tripStatusSub =
           Get.find<FirebaseService>().watchTripData(tripId).listen((data) {
         if (data == null) return;
+        _applyLiveStatus(data);
         final status = data['status'];
         if (status == 'ACTIVE NOW' && !isJourneyStarted.value) {
           isJourneyStarted.value = true;
@@ -189,6 +203,117 @@ class TripDetailsController extends GetxController {
 
   StreamSubscription? _tripStatusSub;
 
+  // Vendor-journey state: ASSIGNED → EN_ROUTE_VENDOR → LOADING →
+  // LOAD_REQUESTED → ACTIVE NOW → DELIVERY_REQUESTED → DELIVERED.
+  final RxString tripStatus = ''.obs;
+  final Rxn<Map<String, dynamic>> tripExtra = Rxn<Map<String, dynamic>>();
+  final RxBool showCallAdmin = false.obs;
+  Timer? _destReminderTimer;
+
+  String get adminPhone =>
+      (tripExtra.value?['assignedBy'] ?? '').toString();
+
+  /// Destination is revealed to the driver only once the load is approved.
+  static const _destinationRevealedStatuses = {
+    'ACTIVE NOW',
+    'DELIVERY_REQUESTED',
+    'DELIVERED',
+  };
+
+  bool get destinationRevealed =>
+      _destinationRevealedStatuses.contains(tripStatus.value);
+
+  /// Label for the single primary action button, driven by the trip status.
+  String get primaryActionLabel {
+    switch (tripStatus.value) {
+      case 'ASSIGNED':
+        return 'Start — Vendor ke liye niklo';
+      case 'EN_ROUTE_VENDOR':
+        return 'Vendor Pahunch Gaya — Loading Shuru';
+      case 'LOADING':
+        return 'Loading Done — Approval Bhejo';
+      case 'LOAD_REQUESTED':
+        return 'Admin approval ka intezaar...';
+      default:
+        return 'Start Journey';
+    }
+  }
+
+  void _applyLiveStatus(Map<String, dynamic> data) {
+    tripStatus.value = (data['status'] ?? '').toString();
+    tripExtra.value = data;
+
+    // Destination stays hidden until the load is approved.
+    if (destinationRevealed &&
+        ((data['dropLocation'] ?? '').toString().isNotEmpty ||
+            (data['dropCity'] ?? '').toString().isNotEmpty)) {
+      if ((data['dropLocation'] ?? '').toString().isNotEmpty) {
+        destinationTitle.value = data['dropLocation'].toString();
+      }
+      if ((data['dropCity'] ?? '').toString().isNotEmpty) {
+        destinationSubtitle.value = '${data['dropCity']}, India';
+      }
+    } else if (!destinationRevealed) {
+      destinationTitle.value = 'Destination pending';
+      destinationSubtitle.value =
+          'Load approve hone ke baad admin destination dikhayega';
+    }
+
+    _syncDestinationReminder(data);
+  }
+
+  /// While the load request waits without a destination, remind the admin once
+  /// after ~10 minutes and then surface a direct "Call Admin" option.
+  void _syncDestinationReminder(Map<String, dynamic> data) {
+    final waiting = data['status'] == 'LOAD_REQUESTED' &&
+        (data['dropCity'] ?? '').toString().trim().isEmpty;
+    if (!waiting) {
+      _destReminderTimer?.cancel();
+      _destReminderTimer = null;
+      showCallAdmin.value = false;
+      return;
+    }
+
+    DateTime? requestedAt;
+    final ts = data['loadRequestedAt'];
+    try {
+      requestedAt = ts is DateTime ? ts : ts?.toDate();
+    } catch (_) {}
+    requestedAt ??= DateTime.now();
+    final reqAt = requestedAt;
+
+    void check() {
+      final waited = DateTime.now().difference(reqAt);
+      if (waited >= const Duration(minutes: 10)) {
+        // One-time reminder to admin (server-side flag keeps it single).
+        try {
+          Get.find<FirebaseService>().remindSetDestination(tripId);
+        } catch (_) {}
+        showCallAdmin.value = true;
+      }
+    }
+
+    check();
+    _destReminderTimer ??=
+        Timer.periodic(const Duration(minutes: 1), (_) => check());
+  }
+
+  /// Direct call to the admin who assigned the trip (last resort when the
+  /// destination still isn't set).
+  Future<void> callAdmin() async {
+    final phone = adminPhone;
+    if (phone.isEmpty) {
+      AppSnackBar.showWarning(
+          title: 'No Number', message: 'Admin ka number nahi mila.');
+      return;
+    }
+    try {
+      await launchUrl(Uri.parse('tel:$phone'));
+    } catch (_) {
+      AppSnackBar.showInfo(title: 'Admin Number', message: phone);
+    }
+  }
+
   Future<void> _loadLiveTripData() async {
     try {
       final firebaseService = Get.find<FirebaseService>();
@@ -198,6 +323,27 @@ class TripDetailsController extends GetxController {
         final status = data['status'] as String?;
         final dbPodUrl = data['podUrl'] as String?;
         final dbRemarks = data['remarks'] as String?;
+
+        // Populate route/vehicle info straight from Firestore so the screen is
+        // correct even when the trip isn't in the local TripsController list
+        // (e.g. an admin viewing a driver's trip). Rx fields refresh the UI.
+        if ((data['truckNo'] ?? '').toString().isNotEmpty) {
+          vehicleNo.value = data['truckNo'].toString();
+        }
+        if ((data['pickupLocation'] ?? '').toString().isNotEmpty) {
+          departureTitle.value = data['pickupLocation'].toString();
+        }
+        if ((data['pickupCity'] ?? '').toString().isNotEmpty) {
+          departureSubtitle.value = '${data['pickupCity']}, India';
+        }
+        if ((data['date'] ?? '').toString().isNotEmpty) {
+          departureTime.value = data['date'].toString();
+        }
+        final idDigits = tripId.replaceAll(RegExp(r'\D'), '');
+        if (idDigits.isNotEmpty) consignmentNo.value = '#$idDigits';
+
+        // Status + destination reveal + reminder handling.
+        _applyLiveStatus(data);
 
         if (dbPodUrl != null) {
           podUrl.value = dbPodUrl;
@@ -281,7 +427,7 @@ class TripDetailsController extends GetxController {
         final trip = tripsController.allTrips.firstWhere((t) => t.id == tripId);
         pickupCity = trip.pickupCity;
       } catch (_) {}
-      final startCoords = _getCoordinates(departureTitle, pickupCity);
+      final startCoords = _getCoordinates(departureTitle.value, pickupCity);
       depLat = startCoords[0];
       depLng = startCoords[1];
     }
@@ -340,7 +486,7 @@ class TripDetailsController extends GetxController {
           final trip = tripsController.allTrips.firstWhere((t) => t.id == tripId);
           dropCity = trip.dropCity;
         } catch (_) {}
-        final endCoords = _getCoordinates(destinationTitle, dropCity);
+        final endCoords = _getCoordinates(destinationTitle.value, dropCity);
         destLat = endCoords[0];
         destLng = endCoords[1];
       }
@@ -427,61 +573,137 @@ class TripDetailsController extends GetxController {
     } catch (_) {}
   }
 
-  // Driver reached pickup + loaded goods → request admin approval to activate.
-  // The trip does NOT go active until the admin approves.
-  void startJourney() {
-    final tripsController = Get.find<TripsController>();
-
+  /// Fetches the device's real GPS fix + reverse-geocoded address for milestone
+  /// logging. Falls back to the last simulated position only if GPS fails, so
+  /// logs never end up with 0.0 coordinates.
+  Future<({double lat, double lng, String address})> _realFix() async {
     try {
-      final trip = tripsController.allTrips.firstWhere((t) => t.id == tripId);
-      if (trip.status == 'DELIVERED') {
+      final locationService = Get.find<LocationService>();
+      final pos = await locationService.getCurrentPosition();
+      final address = await locationService.getAddressFromCoordinates(
+          pos.latitude, pos.longitude);
+      currentAddress.value = address;
+      return (lat: pos.latitude, lng: pos.longitude, address: address);
+    } catch (_) {
+      return (
+        lat: simulatedLat,
+        lng: simulatedLng,
+        address: currentAddress.value == 'Locating...'
+            ? departureTitle.value
+            : currentAddress.value,
+      );
+    }
+  }
+
+  String get _driverName {
+    try {
+      return Get.find<SessionService>().name.value;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  // Staged vendor journey — one button, next step depends on the status:
+  // ASSIGNED → start to vendor; EN_ROUTE_VENDOR → reached, loading starts;
+  // LOADING → request load approval; LOAD_REQUESTED → wait (call admin option).
+  void startJourney() {
+    switch (tripStatus.value) {
+      case 'DELIVERED':
         AppSnackBar.showError(
-          title: 'Trip Completed',
-          message: 'This trip is already completed.',
-        );
+            title: 'Trip Completed',
+            message: 'This trip is already completed.');
         return;
-      }
-      if (trip.status == 'LOAD_REQUESTED') {
+
+      case 'LOAD_REQUESTED':
         AppSnackBar.showInfo(
           title: 'Awaiting Approval',
-          message: 'Load approval request pehle hi admin ko bheja gaya hai.',
+          message: 'Load approval request admin ko bheja ja chuka hai. '
+              'Approve hote hi trip active hogi.',
         );
         return;
-      }
-    } catch (_) {}
 
-    AppPopup.showConfirmation(
-      title: 'REQUEST LOAD APPROVAL',
-      description:
-          'Maal load ho gaya? Admin ko approval ke liye request bhejein. '
-          'Admin approve karega tabhi trip active hogi.',
-      confirmText: 'Send Request',
-      cancelText: 'Cancel',
-      onConfirm: () async {
-        String driverName = '';
-        try {
-          driverName = Get.find<SessionService>().name.value;
-        } catch (_) {}
-        try {
-          final firebaseService = Get.find<FirebaseService>();
-          await firebaseService.requestLoadApproval(
-            tripId,
-            pickupLocation: currentAddress.value == 'Locating...'
-                ? departureTitle
-                : currentAddress.value,
-            driverName: driverName,
-            latitude: simulatedLat,
-            longitude: simulatedLng,
-          );
-        } catch (_) {}
-        AppSnackBar.showSuccess(
-          title: 'Request Sent 📦',
-          message:
-              'Admin ko load approval ke liye bhej diya. Approve hone par '
-              'trip apne aap active ho jayegi.',
+      case 'EN_ROUTE_VENDOR':
+        AppPopup.showConfirmation(
+          title: 'VENDOR PAHUNCH GAYE?',
+          description: 'Vendor ko loading pass dikhakar truck ki loading '
+              'shuru ho gayi hai? Admin ko inform kiya jayega (aur wo '
+              'destination set karega).',
+          confirmText: 'Loading Shuru',
+          cancelText: 'Cancel',
+          onConfirm: () async {
+            AppPopup.showLoading(message: 'Capturing location...');
+            final fix = await _realFix();
+            try {
+              await Get.find<FirebaseService>().startLoading(
+                tripId,
+                location: fix.address,
+                latitude: fix.lat,
+                longitude: fix.lng,
+                driverName: _driverName,
+              );
+            } catch (_) {}
+            AppPopup.hideLoading();
+            AppSnackBar.showSuccess(
+              title: 'Loading Shuru 📦',
+              message: 'Admin ko bata diya — wo destination set karega.',
+            );
+          },
         );
-      },
-    );
+        return;
+
+      case 'LOADING':
+        AppPopup.showConfirmation(
+          title: 'LOADING COMPLETE?',
+          description:
+              'Maal load ho gaya? Admin ko approval ke liye request bhejein. '
+              'Admin approve karega tabhi trip active hogi aur destination '
+              'dikhega.',
+          confirmText: 'Send Request',
+          cancelText: 'Cancel',
+          onConfirm: () async {
+            AppPopup.showLoading(message: 'Capturing location...');
+            final fix = await _realFix();
+            try {
+              await Get.find<FirebaseService>().requestLoadApproval(
+                tripId,
+                pickupLocation: fix.address,
+                driverName: _driverName,
+                latitude: fix.lat,
+                longitude: fix.lng,
+              );
+            } catch (_) {}
+            AppPopup.hideLoading();
+            AppSnackBar.showSuccess(
+              title: 'Request Sent 📦',
+              message: 'Admin approve karega tabhi trip active hogi.',
+            );
+          },
+        );
+        return;
+
+      default:
+        // ASSIGNED (or legacy trips): driver leaves for the vendor.
+        AppPopup.showConfirmation(
+          title: 'VENDOR KE LIYE NIKLEIN?',
+          description:
+              'Aap vendor ke paas material lene nikal rahe hain? Admin ko '
+              '"on the way" status dikhega.',
+          confirmText: 'Start',
+          cancelText: 'Cancel',
+          onConfirm: () async {
+            AppPopup.showLoading(message: 'Starting...');
+            try {
+              await Get.find<FirebaseService>()
+                  .startToVendor(tripId, driverName: _driverName);
+            } catch (_) {}
+            AppPopup.hideLoading();
+            AppSnackBar.showSuccess(
+              title: 'On The Way 🛻',
+              message: 'Admin ko inform kar diya. Safe driving!',
+            );
+          },
+        );
+    }
   }
 
   // Update milestone checkpoint progress
@@ -508,15 +730,14 @@ class TripDetailsController extends GetxController {
           try {
             driverName = Get.find<SessionService>().name.value;
           } catch (_) {}
+          final fix = await _realFix();
           try {
             final fb = Get.find<FirebaseService>();
             await fb.requestDelivery(
               tripId,
-              location: currentAddress.value == 'Locating...'
-                  ? destinationTitle
-                  : currentAddress.value,
-              latitude: simulatedLat,
-              longitude: simulatedLng,
+              location: fix.address,
+              latitude: fix.lat,
+              longitude: fix.lng,
               driverName: driverName,
             );
           } catch (_) {}
@@ -537,14 +758,15 @@ class TripDetailsController extends GetxController {
       cancelText: 'Cancel',
       onConfirm: () async {
         currentMilestone.value = milestoneIndex + 1;
+        final fix = await _realFix();
         try {
           final firebaseService = Get.find<FirebaseService>();
           await firebaseService.updateTripMilestone(
-            tripId, 
+            tripId,
             milestoneIndex + 1,
-            locationName: currentAddress.value == 'Locating...' ? departureTitle : currentAddress.value,
-            latitude: simulatedLat,
-            longitude: simulatedLng,
+            locationName: fix.address,
+            latitude: fix.lat,
+            longitude: fix.lng,
           );
         } catch (_) {}
         AppSnackBar.showSuccess(
@@ -559,6 +781,7 @@ class TripDetailsController extends GetxController {
   void onClose() {
     _locationTimer?.cancel();
     _tripStatusSub?.cancel();
+    _destReminderTimer?.cancel();
     super.onClose();
   }
 }

@@ -14,6 +14,7 @@ abstract class Routes {
   static const NOTIFICATION_DETAIL = _Paths.NOTIFICATION_DETAIL;
   static const ACTIVE_DRIVERS = _Paths.ACTIVE_DRIVERS;
   static const DRIVER_DETAIL = _Paths.DRIVER_DETAIL;
+  static const EXPENSE_DETAIL = _Paths.EXPENSE_DETAIL;
 }
 
 abstract class _Paths {
@@ -30,4 +31,5 @@ abstract class _Paths {
   static const NOTIFICATION_DETAIL = '/notification-detail';
   static const ACTIVE_DRIVERS = '/active-drivers';
   static const DRIVER_DETAIL = '/driver-detail';
+  static const EXPENSE_DETAIL = '/expense-detail';
 }

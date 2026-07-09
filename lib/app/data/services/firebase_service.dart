@@ -73,6 +73,13 @@ class FirebaseService extends GetxService {
       isActive: data['isActive'] ?? false,
       priority: data['priority'] ?? false,
       currentMilestone: (data['currentMilestone'] as num?)?.toInt() ?? 0,
+      vendorName: data['vendorName'] ?? '',
+      vendorLocation: data['vendorLocation'] ?? '',
+      materialName: data['materialName'] ?? '',
+      passHolderName: data['passHolderName'] ?? '',
+      royaltyName: data['royaltyName'] ?? '',
+      loadingPassId: data['loadingPassId'] ?? '',
+      pickupDistrict: data['pickupDistrict'] ?? '',
       remainingDistance: data['remainingDistance'] ?? '',
       estimatedTime: data['estimatedTime'] ?? '',
       currentAddress: data['currentAddress'] ?? '',
@@ -254,6 +261,144 @@ class FirebaseService extends GetxService {
   // Statuses here: ASSIGNED -> LOAD_REQUESTED -> ACTIVE NOW.
   // ---------------------------------------------------------------------------
 
+  /// Driver accepted the trip and is leaving for the vendor to collect the
+  /// material — admin sees "on the way" and gets pinged.
+  Future<void> startToVendor(String tripId, {String? driverName}) async {
+    try {
+      final data =
+          (await _db.collection('trips').doc(tripId).get()).data() ?? {};
+      if (data['status'] != 'ASSIGNED') return; // wrong stage
+      await _db.collection('trips').doc(tripId).set({
+        'status': 'EN_ROUTE_VENDOR',
+        'milestonesLog': FieldValue.arrayUnion([
+          {
+            'milestone': 1,
+            'label': 'Vendor ke liye nikla (on the way)',
+            'timestamp': DateTime.now()
+                .toIso8601String()
+                .split('T')
+                .join(' ')
+                .substring(0, 16),
+            'address': data['vendorLocation'] ?? '',
+            'latitude': 0.0,
+            'longitude': 0.0,
+          }
+        ]),
+      }, SetOptions(merge: true));
+
+      final assignedBy = data['assignedBy']?.toString() ?? '';
+      if (assignedBy.isNotEmpty) {
+        await createNotification(
+          toPhone: assignedBy,
+          title: 'Driver On The Way 🛻',
+          body: '${driverName ?? 'Driver'} vendor '
+              '${(data['vendorName'] ?? '').toString().isNotEmpty ? '${data['vendorName']} ' : ''}'
+              'ke paas material lene nikla hai (trip $tripId).',
+          type: 'vendor_way',
+          tripId: tripId,
+        );
+      }
+    } catch (_) {}
+  }
+
+  /// Driver reached the vendor, showed the loading pass, and loading has
+  /// started. Admin is pinged to set the destination NOW (it stays hidden from
+  /// the driver until the load is approved).
+  Future<void> startLoading(
+    String tripId, {
+    String? location,
+    double? latitude,
+    double? longitude,
+    String? driverName,
+  }) async {
+    try {
+      final data =
+          (await _db.collection('trips').doc(tripId).get()).data() ?? {};
+      final st = data['status'];
+      if (st != 'EN_ROUTE_VENDOR' && st != 'ASSIGNED') return;
+      await _db.collection('trips').doc(tripId).set({
+        'status': 'LOADING',
+        'currentMilestone': 2,
+        'milestonesLog': FieldValue.arrayUnion([
+          {
+            'milestone': 2,
+            'label': 'Vendor pahuncha — loading shuru',
+            'timestamp': DateTime.now()
+                .toIso8601String()
+                .split('T')
+                .join(' ')
+                .substring(0, 16),
+            'address': location ?? data['vendorLocation'] ?? '',
+            'latitude': latitude ?? 0.0,
+            'longitude': longitude ?? 0.0,
+          }
+        ]),
+      }, SetOptions(merge: true));
+
+      final assignedBy = data['assignedBy']?.toString() ?? '';
+      if (assignedBy.isNotEmpty) {
+        await createNotification(
+          toPhone: assignedBy,
+          title: 'Truck Loading 📦',
+          body: '${driverName ?? 'Driver'} ka truck load ho raha hai '
+              '(trip $tripId). Abhi destination set kar dein.',
+          type: 'loading_started',
+          tripId: tripId,
+        );
+      }
+    } catch (_) {}
+  }
+
+  /// Admin sets the drop destination (during loading). The driver only sees it
+  /// once the load is approved and the trip goes ACTIVE.
+  Future<void> setTripDestination(
+    String tripId, {
+    required String dropCity,
+    required String dropLocation,
+    double? dropLatitude,
+    double? dropLongitude,
+  }) async {
+    try {
+      await _db.collection('trips').doc(tripId).set({
+        'dropCity': dropCity,
+        'dropLocation': dropLocation,
+        if (dropLatitude != null) 'dropLatitude': dropLatitude,
+        if (dropLongitude != null) 'dropLongitude': dropLongitude,
+        'destinationSetAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {}
+  }
+
+  /// One-time reminder to the admin when the destination still isn't set
+  /// ~10 minutes after the load request. Returns true if a reminder was sent.
+  Future<bool> remindSetDestination(String tripId) async {
+    try {
+      final data =
+          (await _db.collection('trips').doc(tripId).get()).data() ?? {};
+      if (data['status'] != 'LOAD_REQUESTED') return false;
+      if (data['destinationReminderSent'] == true) return false;
+      if ((data['dropCity'] ?? '').toString().isNotEmpty) return false;
+
+      await _db.collection('trips').doc(tripId).set(
+          {'destinationReminderSent': true}, SetOptions(merge: true));
+
+      final assignedBy = data['assignedBy']?.toString() ?? '';
+      if (assignedBy.isNotEmpty) {
+        await createNotification(
+          toPhone: assignedBy,
+          title: 'Reminder: Destination Set Karein ⏰',
+          body: 'Trip $tripId ka truck loaded hai aur 10 minute ho gaye — '
+              'destination set karke load approve karein.',
+          type: 'set_destination_reminder',
+          tripId: tripId,
+        );
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Driver has loaded goods at pickup and asks the admin to activate the trip.
   /// The trip is marked `LOAD_REQUESTED` (still not active) and the admin is
   /// notified with an approve/reject request.
@@ -303,12 +448,21 @@ class FirebaseService extends GetxService {
   }
 
   /// Admin approves the load — the trip becomes ACTIVE NOW (and any other active
-  /// trip of that driver is suspended). The driver is notified.
-  Future<void> approveLoad(String tripId, {String? adminName}) async {
+  /// trip of that driver is suspended). The driver is notified and only now
+  /// sees the destination. Returns an error message when it can't be approved
+  /// (already handled, or destination not set yet), null on success.
+  Future<String?> approveLoad(String tripId, {String? adminName}) async {
     try {
       final data =
           (await _db.collection('trips').doc(tripId).get()).data() ?? {};
-      if (data['status'] != 'LOAD_REQUESTED') return; // already handled
+      if (data['status'] != 'LOAD_REQUESTED') {
+        return 'Ye request pehle hi handle ho chuki hai.';
+      }
+      if ((data['dropCity'] ?? '').toString().trim().isEmpty &&
+          (data['dropLocation'] ?? '').toString().trim().isEmpty) {
+        return 'Pehle destination set karein — uske bina load approve nahi '
+            'ho sakta.';
+      }
       await updateTripMilestone(
         tripId,
         3,
@@ -321,13 +475,17 @@ class FirebaseService extends GetxService {
         await createNotification(
           toPhone: driverPhone,
           title: 'Trip Activated ✅',
-          body: 'Admin approved your load. Trip $tripId is now ACTIVE. '
-              'Drive safely!',
+          body: 'Admin approved your load. Trip $tripId is now ACTIVE — '
+              'destination: ${data['dropCity'] ?? ''} '
+              '${data['dropLocation'] ?? ''}. Drive safely!',
           type: 'trip_activated',
           tripId: tripId,
         );
       }
-    } catch (_) {}
+      return null;
+    } catch (e) {
+      return 'Approve nahi ho paya: $e';
+    }
   }
 
   /// Admin rejects the load — the trip goes back to ASSIGNED and the driver is
@@ -913,6 +1071,10 @@ class FirebaseService extends GetxService {
     }
   }
 
+  /// Saves the uploaded POD proof + remarks on the trip. Deliberately does NOT
+  /// mark the trip DELIVERED — that only happens after the admin verifies the
+  /// proof and approves ([approveDelivery]). The delivery request itself is
+  /// raised separately via [requestDelivery].
   Future<void> saveProofOfDeliveryDetails(
     String tripId,
     String downloadUrl,
@@ -922,14 +1084,6 @@ class FirebaseService extends GetxService {
     double? longitude,
   }) async {
     try {
-      await updateTripMilestone(
-        tripId,
-        4,
-        status: 'DELIVERED',
-        locationName: locationName,
-        latitude: latitude,
-        longitude: longitude,
-      );
       await _db.collection('trips').doc(tripId).set(
         {'podUrl': downloadUrl, 'remarks': remarks},
         SetOptions(merge: true),
@@ -1086,6 +1240,173 @@ class FirebaseService extends GetxService {
     } catch (_) {
       return [];
     }
+  }
+
+  /// Live stream of all trucks for the admin (assignment + inspection status).
+  Stream<List<Map<String, dynamic>>> watchAllTrucks() {
+    return _db.collection('trucks').snapshots().map((s) => s.docs.map((d) {
+          final m = d.data();
+          m['id'] = d.id;
+          return m;
+        }).toList());
+  }
+
+  // ---------------------------------------------------------------------------
+  // DAILY TRUCK ASSIGNMENT + INSPECTION
+  // Morning flow: admin assigns a truck to each driver -> driver inspects it ->
+  // either reports a problem (reason + photo, admin notified) or accepts it
+  // (truck becomes READY for trips, admin notified).
+  // inspectionStatus: 'pending' -> 'problem' | 'ready'
+  // ---------------------------------------------------------------------------
+
+  /// Admin assigns [truckNo] to a driver. Any previous assignment of this truck
+  /// is replaced and the driver is notified to inspect + accept it.
+  Future<void> assignTruckToDriver(String truckNo, String driverPhone,
+      {String? model}) async {
+    final p = SessionService.normalizePhone(driverPhone);
+    if (truckNo.isEmpty || p.isEmpty) return;
+    try {
+      await _db.collection('trucks').doc(truckNo).set({
+        'truckNo': truckNo,
+        if (model != null && model.isNotEmpty) 'model': model,
+        'assignedTo': p,
+        'assignedBy': ownerKey,
+        'assignedAt': FieldValue.serverTimestamp(),
+        'inspectionStatus': 'pending',
+        'inspectionIssue': FieldValue.delete(),
+        'inspectionIssueImage': FieldValue.delete(),
+      }, SetOptions(merge: true));
+
+      await createNotification(
+        toPhone: p,
+        title: 'Truck Assigned 🚛',
+        body: 'Truck $truckNo aapko assign hua hai. Inspection karke '
+            'accept karein ya problem report karein.',
+        type: 'truck_assigned',
+        refId: truckNo,
+      );
+    } catch (_) {}
+  }
+
+  /// Upload a truck-issue photo (web + mobile safe bytes).
+  Future<String> uploadTruckIssueImage(String truckNo, Uint8List? bytes) async {
+    final owner = ownerKey.isEmpty ? 'unknown' : ownerKey;
+    if (bytes == null || bytes.isEmpty || useMockStorage) return '';
+    try {
+      final ref = _storage
+          .ref()
+          .child('truck_issues')
+          .child(owner)
+          .child('$truckNo.jpg');
+      final task =
+          await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+      return await task.ref.getDownloadURL();
+    } catch (e) {
+      _warnStorage('Truck Issue', e);
+      return '';
+    }
+  }
+
+  /// Driver reports a problem found during inspection. Admins are notified with
+  /// the reason (photo proof saved on the truck doc).
+  Future<void> reportTruckIssue(
+    String truckNo, {
+    required String reason,
+    String imageUrl = '',
+    String? driverName,
+  }) async {
+    if (truckNo.isEmpty) return;
+    try {
+      await _db.collection('trucks').doc(truckNo).set({
+        'inspectionStatus': 'problem',
+        'inspectionIssue': reason,
+        if (imageUrl.isNotEmpty) 'inspectionIssueImage': imageUrl,
+        'inspectedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      await notifyAdmins(
+        title: 'Truck Problem ⚠️',
+        body: '${driverName ?? 'Driver'} ke truck $truckNo me problem: $reason',
+        type: 'truck_issue',
+        refId: truckNo,
+      );
+    } catch (_) {}
+  }
+
+  /// Driver confirms the truck's condition is proper — it becomes READY for
+  /// trips and the admins are informed.
+  Future<void> acceptTruck(String truckNo, {String? driverName}) async {
+    if (truckNo.isEmpty) return;
+    try {
+      await _db.collection('trucks').doc(truckNo).set({
+        'inspectionStatus': 'ready',
+        'inspectionIssue': FieldValue.delete(),
+        'inspectionIssueImage': FieldValue.delete(),
+        'inspectedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      await notifyAdmins(
+        title: 'Truck Ready ✅',
+        body: '${driverName ?? 'Driver'} ka truck $truckNo thik hai — '
+            'trip ke liye ready.',
+        type: 'truck_ready',
+        refId: truckNo,
+      );
+    } catch (_) {}
+  }
+
+  Future<Map<String, dynamic>?> getTruck(String truckNo) async {
+    try {
+      final doc = await _db.collection('trucks').doc(truckNo).get();
+      if (!doc.exists) return null;
+      final data = doc.data();
+      if (data != null) data['id'] = doc.id;
+      return data;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Admin resolves a reported truck problem — truck goes back to READY and the
+  /// assigned driver is informed.
+  Future<void> clearTruckIssue(String truckNo) async {
+    if (truckNo.isEmpty) return;
+    try {
+      final data =
+          (await _db.collection('trucks').doc(truckNo).get()).data() ?? {};
+      await _db.collection('trucks').doc(truckNo).set({
+        'inspectionStatus': 'ready',
+        'inspectionIssue': FieldValue.delete(),
+        'inspectionIssueImage': FieldValue.delete(),
+      }, SetOptions(merge: true));
+      final driver = (data['assignedTo'] ?? '').toString();
+      if (driver.isNotEmpty) {
+        await createNotification(
+          toPhone: driver,
+          title: 'Truck Active ✅',
+          body: 'Truck $truckNo ki problem resolve ho gayi — truck ab '
+              'active/ready hai.',
+          type: 'truck_ready',
+          refId: truckNo,
+        );
+      }
+    } catch (_) {}
+  }
+
+  /// Live: the truck currently assigned to this driver (null if none).
+  Stream<Map<String, dynamic>?> watchTruckForDriver(String phone) {
+    final p = SessionService.normalizePhone(phone);
+    if (p.isEmpty) return Stream.value(null);
+    return _db
+        .collection('trucks')
+        .where('assignedTo', isEqualTo: p)
+        .snapshots()
+        .map((s) {
+      if (s.docs.isEmpty) return null;
+      final m = s.docs.first.data();
+      m['id'] = s.docs.first.id;
+      return m;
+    });
   }
 
   Future<void> saveTruck(String truckId, Map<String, dynamic> truckData) async {

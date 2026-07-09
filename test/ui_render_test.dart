@@ -315,6 +315,36 @@ void main() {
     expect(find.text('Highway Terminal Admin'), findsOneWidget);
   });
 
+  testWidgets('Admin back press returns to Dashboard tab, then double-back hint',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await setUpAdmin();
+    final c = Get.find<AdminHomeController>();
+    c.currentTabIndex.value = 2; // Trucks tab
+
+    await mockNetworkImagesFor(() async {
+      await tester.pumpWidget(_app(const AdminHomeView()));
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 120));
+      }
+    });
+
+    // First back: non-home tab → jumps to Dashboard, app stays open.
+    c.handleBackPress();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(c.currentTabIndex.value, 0);
+
+    // Next back on Dashboard: shows the "press again to exit" hint.
+    c.handleBackPress();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Exit App'), findsOneWidget);
+
+    // Drain the snackbar so no pending timers fail the test.
+    await tester.pump(const Duration(seconds: 4));
+  });
+
   testWidgets('Admin panel renders on web/desktop (wide) without overflow',
       (tester) async {
     tester.view.devicePixelRatio = 1.0;
@@ -331,8 +361,9 @@ void main() {
       }
     });
     expect(tester.takeException(), isNull);
-    // Wide layout uses a NavigationRail instead of the bottom bar.
-    expect(find.byType(NavigationRail), findsOneWidget);
+    // Wide layout shows the dark brand sidebar + top bar instead of bottom nav.
+    expect(find.text('BHARAT'), findsOneWidget);
+    expect(find.text('Assign Trip'), findsOneWidget);
   });
 
   testWidgets('Trip detail dialog renders long-address milestones without overflow',

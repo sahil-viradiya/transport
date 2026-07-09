@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/services/firebase_service.dart';
@@ -48,10 +49,23 @@ class TripsController extends GetxController {
     activeTab.value = tab;
   }
 
+  StreamSubscription? _tripsSub;
+
   @override
   void onInit() {
     super.onInit();
-    fetchTripsFromFirebase();
+    // Live stream: the driver's trip list stays current the moment anything
+    // changes in Firestore (admin assigns, approves load/delivery, etc.) — no
+    // manual refresh needed when moving between screens.
+    try {
+      final firebaseService = Get.find<FirebaseService>();
+      final session = Get.find<SessionService>();
+      _tripsSub = firebaseService
+          .watchTripsForOwner(session.ownerKey)
+          .listen(allTrips.assignAll);
+    } catch (_) {
+      fetchTripsFromFirebase();
+    }
     searchController.addListener(() {
       searchQuery.value = searchController.text;
     });
@@ -147,6 +161,7 @@ class TripsController extends GetxController {
 
   @override
   void onClose() {
+    _tripsSub?.cancel();
     searchController.dispose();
     super.onClose();
   }
@@ -165,6 +180,15 @@ class TripItemModel {
   final bool isActive;
   final bool priority;
   final int currentMilestone;
+  // Vendor / material details (morning assignment form)
+  final String vendorName;
+  final String vendorLocation;
+  final String materialName;
+  final String productName;
+  final String passHolderName;
+  final String royaltyName;
+  final String loadingPassId;
+  final String pickupDistrict;
   final String remainingDistance;
   final String estimatedTime;
   final String currentAddress;
@@ -190,6 +214,14 @@ class TripItemModel {
     required this.isActive,
     this.priority = false,
     this.currentMilestone = 0,
+    this.vendorName = '',
+    this.vendorLocation = '',
+    this.materialName = '',
+    this.productName = '',
+    this.passHolderName = '',
+    this.royaltyName = '',
+    this.loadingPassId = '',
+    this.pickupDistrict = '',
     this.remainingDistance = '',
     this.estimatedTime = '',
     this.currentAddress = '',

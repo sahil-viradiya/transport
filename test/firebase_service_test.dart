@@ -133,18 +133,30 @@ void main() {
       expect(t2['isActive'], true);
     });
 
-    test('delivery saves POD url + remarks and marks trip DELIVERED', () async {
+    test('POD save keeps trip NOT delivered — admin must verify + approve first',
+        () async {
       final svc = service();
-      await svc.saveTrip('t1', {'truckNo': 'GJ-01'});
+      await svc.saveTrip(
+          't1', {'truckNo': 'GJ-01', 'status': 'ACTIVE NOW', 'isActive': true});
 
+      // Driver uploads proof → only podUrl/remarks saved, status unchanged.
       await svc.saveProofOfDeliveryDetails(
           't1', 'https://example.com/pod.jpg', 'Handed to gate keeper');
-
-      final data = (await firestore.collection('trips').doc('t1').get()).data()!;
-      expect(data['status'], 'DELIVERED');
-      expect(data['isActive'], false);
+      var data = (await firestore.collection('trips').doc('t1').get()).data()!;
+      expect(data['status'], 'ACTIVE NOW');
       expect(data['podUrl'], 'https://example.com/pod.jpg');
       expect(data['remarks'], 'Handed to gate keeper');
+
+      // Delivery requested → awaiting admin verification.
+      await svc.requestDelivery('t1', location: 'Drop Gate');
+      data = (await firestore.collection('trips').doc('t1').get()).data()!;
+      expect(data['status'], 'DELIVERY_REQUESTED');
+
+      // Admin verifies the proof and approves → NOW it's delivered.
+      await svc.approveDelivery('t1');
+      data = (await firestore.collection('trips').doc('t1').get()).data()!;
+      expect(data['status'], 'DELIVERED');
+      expect(data['isActive'], false);
     });
   });
 
@@ -328,7 +340,8 @@ void main() {
     test('approveLoad → ACTIVE NOW + notifies the driver', () async {
       owner = admin;
       final svc = service();
-      await svc.assignTripToDriver('TRP-1', {'driverPhone': ownerA});
+      await svc.assignTripToDriver(
+          'TRP-1', {'driverPhone': ownerA, 'dropCity': 'Rajkot'});
       owner = ownerA;
       await svc.acceptTrip('TRP-1');
       await svc.requestLoadApproval('TRP-1', driverName: 'Rajesh');
@@ -346,7 +359,8 @@ void main() {
     test('approve is one-time — a second approveLoad is a no-op', () async {
       owner = admin;
       final svc = service();
-      await svc.assignTripToDriver('TRP-1', {'driverPhone': ownerA});
+      await svc.assignTripToDriver(
+          'TRP-1', {'driverPhone': ownerA, 'dropCity': 'Rajkot'});
       owner = ownerA;
       await svc.acceptTrip('TRP-1');
       await svc.requestLoadApproval('TRP-1');
@@ -382,6 +396,99 @@ void main() {
       final driverNotes = await svc.getNotifications(ownerA);
       final rej = driverNotes.firstWhere((n) => n['type'] == 'load_rejected');
       expect(rej['body'].toString().contains('Wrong goods'), true);
+    });
+  });
+
+  group('Vendor journey (assign → on-the-way → loading → destination gate)', () {
+    const admin = '+919999999999';
+
+    Future<FirebaseService> setupAssigned(FirebaseService svc) async {
+      owner = admin;
+      await svc.assignTripToDriver('TRP-1', {
+        'driverPhone': ownerA,
+        'vendorName': 'Shree Aggregates',
+        'vendorLocation': 'Aslali Quarry',
+        'materialName': 'Kapchi',
+        'passHolderName': 'Ramesh',
+        'royaltyName': 'Gujarat Minerals',
+        'loadingPassId': '12345678',
+        'pickupDistrict': 'Ahmedabad',
+      });
+      owner = ownerA;
+      await svc.acceptTrip('TRP-1');
+      return svc;
+    }
+
+    test('vendor/material fields persist and parse into the model', () async {
+      final svc = await setupAssigned(service());
+      final trip =
+          (await svc.getTripsForOwner(ownerA)).firstWhere((t) => t.id == 'TRP-1');
+      expect(trip.vendorName, 'Shree Aggregates');
+      expect(trip.materialName, 'Kapchi');
+      expect(trip.loadingPassId, '12345678');
+      expect(trip.pickupDistrict, 'Ahmedabad');
+    });
+
+    test('startToVendor → EN_ROUTE_VENDOR + admin sees on-the-way', () async {
+      final svc = await setupAssigned(service());
+
+      await svc.startToVendor('TRP-1', driverName: 'Rajesh');
+
+      final t = (await firestore.collection('trips').doc('TRP-1').get()).data()!;
+      expect(t['status'], 'EN_ROUTE_VENDOR');
+      final notes = await svc.getNotifications(admin);
+      expect(notes.any((n) => n['type'] == 'vendor_way'), true);
+    });
+
+    test('startLoading → LOADING + admin pinged to set destination', () async {
+      final svc = await setupAssigned(service());
+      await svc.startToVendor('TRP-1');
+
+      await svc.startLoading('TRP-1',
+          location: 'Aslali Quarry', driverName: 'Rajesh');
+
+      final t = (await firestore.collection('trips').doc('TRP-1').get()).data()!;
+      expect(t['status'], 'LOADING');
+      final notes = await svc.getNotifications(admin);
+      expect(notes.any((n) => n['type'] == 'loading_started'), true);
+    });
+
+    test('approveLoad is blocked until the destination is set', () async {
+      final svc = await setupAssigned(service());
+      await svc.startToVendor('TRP-1');
+      await svc.startLoading('TRP-1');
+      await svc.requestLoadApproval('TRP-1');
+
+      // No destination yet → blocked with a message, status unchanged.
+      owner = admin;
+      final err = await svc.approveLoad('TRP-1');
+      expect(err, isNotNull);
+      var t = (await firestore.collection('trips').doc('TRP-1').get()).data()!;
+      expect(t['status'], 'LOAD_REQUESTED');
+
+      // Admin sets the destination → approve succeeds → ACTIVE NOW.
+      await svc.setTripDestination('TRP-1',
+          dropCity: 'Rajkot', dropLocation: 'Mavdi Site');
+      final ok = await svc.approveLoad('TRP-1');
+      expect(ok, isNull);
+      t = (await firestore.collection('trips').doc('TRP-1').get()).data()!;
+      expect(t['status'], 'ACTIVE NOW');
+      expect(t['dropCity'], 'Rajkot');
+    });
+
+    test('remindSetDestination fires once and only while destination missing',
+        () async {
+      final svc = await setupAssigned(service());
+      await svc.startLoading('TRP-1');
+      await svc.requestLoadApproval('TRP-1');
+
+      expect(await svc.remindSetDestination('TRP-1'), true);
+      // Second reminder suppressed by the flag.
+      expect(await svc.remindSetDestination('TRP-1'), false);
+
+      final notes = await svc.getNotifications(admin);
+      expect(
+          notes.where((n) => n['type'] == 'set_destination_reminder').length, 1);
     });
   });
 
@@ -501,6 +608,85 @@ void main() {
       final trips = await svc.getTripsForOwner(ownerA);
       expect(trips.firstWhere((t) => t.id == 'TRP-1').priority, true);
       expect(trips.firstWhere((t) => t.id == 'TRP-2').priority, false);
+    });
+  });
+
+  group('Truck assignment + inspection', () {
+    const admin = '+919999999999';
+    Future<void> seedAdmin() =>
+        firestore.collection('users').doc(admin).set({'role': 'admin'});
+
+    test('assignTruckToDriver → pending inspection + driver notified', () async {
+      await seedAdmin();
+      owner = admin;
+      final svc = service();
+
+      await svc.assignTruckToDriver('GJ-01-AB-1234', '+91 98765 43210',
+          model: 'Tata Signa');
+
+      final t = (await firestore.collection('trucks').doc('GJ-01-AB-1234').get())
+          .data()!;
+      expect(t['assignedTo'], ownerA); // normalized phone
+      expect(t['assignedBy'], admin);
+      expect(t['inspectionStatus'], 'pending');
+
+      final notes = await svc.getNotifications(ownerA);
+      final n = notes.firstWhere((n) => n['type'] == 'truck_assigned');
+      expect(n['refId'], 'GJ-01-AB-1234');
+    });
+
+    test('reportTruckIssue → problem + admins notified with reason', () async {
+      await seedAdmin();
+      owner = admin;
+      final svc = service();
+      await svc.assignTruckToDriver('GJ-01', ownerA);
+
+      owner = ownerA;
+      await svc.reportTruckIssue('GJ-01',
+          reason: 'Tyre puncture', imageUrl: 'https://x/issue.jpg',
+          driverName: 'Rajesh');
+
+      final t =
+          (await firestore.collection('trucks').doc('GJ-01').get()).data()!;
+      expect(t['inspectionStatus'], 'problem');
+      expect(t['inspectionIssue'], 'Tyre puncture');
+      expect(t['inspectionIssueImage'], 'https://x/issue.jpg');
+
+      final adminNotes = await svc.getNotifications(admin);
+      final n = adminNotes.firstWhere((n) => n['type'] == 'truck_issue');
+      expect(n['body'].toString().contains('Tyre puncture'), true);
+    });
+
+    test('acceptTruck → ready (issue cleared) + admins notified', () async {
+      await seedAdmin();
+      owner = admin;
+      final svc = service();
+      await svc.assignTruckToDriver('GJ-01', ownerA);
+      owner = ownerA;
+      await svc.reportTruckIssue('GJ-01', reason: 'Brake loose');
+
+      await svc.acceptTruck('GJ-01', driverName: 'Rajesh');
+
+      final t =
+          (await firestore.collection('trucks').doc('GJ-01').get()).data()!;
+      expect(t['inspectionStatus'], 'ready');
+      expect(t.containsKey('inspectionIssue'), false);
+
+      final adminNotes = await svc.getNotifications(admin);
+      expect(adminNotes.any((n) => n['type'] == 'truck_ready'), true);
+    });
+
+    test('watchTruckForDriver streams the assigned truck', () async {
+      owner = admin;
+      final svc = service();
+      await svc.assignTruckToDriver('GJ-07', ownerA);
+
+      final t = await svc.watchTruckForDriver('+91 98765 43210').first;
+      expect(t, isNotNull);
+      expect(t!['truckNo'], 'GJ-07');
+
+      final none = await svc.watchTruckForDriver(ownerB).first;
+      expect(none, isNull);
     });
   });
 

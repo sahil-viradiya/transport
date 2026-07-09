@@ -22,6 +22,8 @@ import '../modules/notification_detail/views/notification_detail_view.dart';
 import '../modules/active_drivers/views/active_drivers_view.dart';
 import '../modules/driver_detail/bindings/driver_detail_binding.dart';
 import '../modules/driver_detail/views/driver_detail_view.dart';
+import '../modules/expense_detail/bindings/expense_detail_binding.dart';
+import '../modules/expense_detail/views/expense_detail_view.dart';
 
 part 'app_routes.dart';
 
@@ -89,6 +91,11 @@ class AppPages {
       name: _Paths.DRIVER_DETAIL,
       page: () => const DriverDetailView(),
       binding: DriverDetailBinding(),
+    ),
+    GetPage(
+      name: _Paths.EXPENSE_DETAIL,
+      page: () => const ExpenseDetailView(),
+      binding: ExpenseDetailBinding(),
     ),
   ];
 }

@@ -5,7 +5,6 @@ import 'package:transport/app/core/utils/image_picker_helper.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import '../../../data/services/firebase_service.dart';
 import '../../../data/services/location_service.dart';
-import '../../trips/controllers/trips_controller.dart';
 
 class ProofOfDeliveryController extends GetxController {
   final remarksController = TextEditingController();
@@ -109,29 +108,8 @@ class ProofOfDeliveryController extends GetxController {
         longitude: currentLng,
       );
       
-      // Update local state in TripsController
-      try {
-        final tripsController = Get.find<TripsController>();
-        final updatedTrips = tripsController.allTrips.map((trip) {
-          if (trip.id == tripId.value) {
-            return TripItemModel(
-              id: trip.id,
-              truckNo: trip.truckNo,
-              status: 'DELIVERED',
-              pickupCity: trip.pickupCity,
-              pickupLocation: trip.pickupLocation,
-              dropCity: trip.dropCity,
-              dropLocation: trip.dropLocation,
-              date: trip.date,
-              tabType: trip.tabType,
-              isActive: false,
-              driverPhone: trip.driverPhone,
-            );
-          }
-          return trip;
-        }).toList();
-        tripsController.allTrips.assignAll(updatedTrips);
-      } catch (_) {}
+      // Note: the trip is NOT delivered yet — the admin still has to verify the
+      // uploaded proof and approve. The live trips stream reflects any change.
     } catch (_) {}
 
     uploadProgress.value = 1.0;

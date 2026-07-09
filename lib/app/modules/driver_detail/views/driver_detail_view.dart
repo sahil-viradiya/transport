@@ -32,9 +32,17 @@ class DriverDetailView extends GetView<DriverDetailController> {
             children: [
               _profileCard(u, isDark),
               const SizedBox(height: 16),
-              _vehicleCard(p, isDark),
+              _vehicleCard(p, trip, isDark),
               const SizedBox(height: 16),
-              if (trip != null) _tripCard(trip, isDark) else _noTrip(isDark),
+              if (trip != null) _tripCard(context, trip, isDark) else _noTrip(isDark),
+              if (p['documents'] != null && (p['documents'] as List).isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _documentsCard(p['documents'] as List, isDark),
+              ],
+              if (controller.expenses.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _expensesCard(isDark),
+              ],
             ],
           ),
         );
@@ -127,7 +135,12 @@ class DriverDetailView extends GetView<DriverDetailController> {
     );
   }
 
-  Widget _vehicleCard(Map<String, dynamic> p, bool isDark) {
+  Widget _vehicleCard(Map<String, dynamic> p, Map<String, dynamic>? trip, bool isDark) {
+    var vehicleNo = (p['vehicleNo'] ?? '').toString().trim();
+    if (vehicleNo.isEmpty || vehicleNo == 'No vehicle') {
+      vehicleNo = (trip?['truckNo'] ?? 'No vehicle').toString();
+    }
+    final vehicleModel = p['vehicleModel'] ?? '';
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: _deco(isDark),
@@ -140,10 +153,11 @@ class DriverDetailView extends GetView<DriverDetailController> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AppText((p['vehicleNo'] ?? 'No vehicle').toString(),
+                AppText(vehicleNo,
                     style: AppTextStyle.bodyLarge, fontWeight: FontWeight.w700),
-                AppText((p['vehicleModel'] ?? '').toString(),
-                    style: AppTextStyle.labelMedium),
+                if (vehicleModel.toString().isNotEmpty)
+                  AppText(vehicleModel.toString(),
+                      style: AppTextStyle.labelMedium),
               ],
             ),
           ),
@@ -152,35 +166,238 @@ class DriverDetailView extends GetView<DriverDetailController> {
     );
   }
 
-  Widget _tripCard(Map<String, dynamic> trip, bool isDark) {
+  Widget _tripCard(BuildContext context, Map<String, dynamic> trip, bool isDark) {
+    return InkWell(
+      onTap: () {
+        Navigator.of(context, rootNavigator: true).pushNamed(
+          Routes.TRIP_DETAILS,
+          arguments: {
+            'tripId': trip['id']?.toString() ?? '',
+            'isAlreadyActive': trip['isActive'] == true,
+          },
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: _deco(isDark),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const AppText('CURRENT TRIP',
+                    style: AppTextStyle.labelMedium,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textSecondary),
+                const Spacer(),
+                AppText(trip['id']?.toString() ?? '',
+                    style: AppTextStyle.labelMedium, fontWeight: FontWeight.w700),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: AppText('${trip['pickupCity'] ?? ''} → ${trip['dropCity'] ?? ''}',
+                      style: AppTextStyle.titleLarge, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+              ],
+            ),
+            const SizedBox(height: 14),
+            TripProgressTracker(trip: trip),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _documentsCard(List<dynamic> documents, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: _deco(isDark),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              const AppText('CURRENT TRIP',
-                  style: AppTextStyle.labelMedium,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textSecondary),
-              const Spacer(),
-              AppText(trip['id']?.toString() ?? '',
-                  style: AppTextStyle.labelMedium, fontWeight: FontWeight.w700),
-            ],
+          const AppText('DOCUMENTS',
+              style: AppTextStyle.labelMedium,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textSecondary),
+          const SizedBox(height: 12),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: documents.length,
+            separatorBuilder: (context, index) => const Divider(height: 16),
+            itemBuilder: (context, index) {
+              final doc = Map<String, dynamic>.from(documents[index] ?? {});
+              final title = (doc['title'] ?? 'Document').toString();
+              final subtitle = (doc['subtitle'] ?? '').toString();
+              final expiry = (doc['expiryDate'] ?? '').toString();
+              final status = (doc['status'] ?? '').toString();
+              final isExpired = status == 'Expired';
+
+              IconData iconData = Icons.description_rounded;
+              if (title.toLowerCase().contains('license')) {
+                iconData = Icons.badge_rounded;
+              } else if (title.toLowerCase().contains('rc') || title.toLowerCase().contains('registration')) {
+                iconData = Icons.local_shipping_rounded;
+              }
+
+              return Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(iconData, color: AppColors.primary, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppText(title, style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                        if (subtitle.isNotEmpty)
+                          AppText(subtitle, style: AppTextStyle.labelMedium, color: AppColors.textSecondary),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: (isExpired ? AppColors.error : AppColors.success).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: AppText(status,
+                            style: AppTextStyle.labelMedium,
+                            color: isExpired ? AppColors.error : AppColors.success,
+                            fontWeight: FontWeight.bold),
+                      ),
+                      if (expiry.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        AppText('Expiry: $expiry', style: AppTextStyle.labelMedium, color: AppColors.textSecondary),
+                      ],
+                    ],
+                  ),
+                ],
+              );
+            },
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: AppText('${trip['pickupCity'] ?? ''} → ${trip['dropCity'] ?? ''}',
-                    style: AppTextStyle.titleLarge, fontWeight: FontWeight.w700),
-              ),
-            ],
+        ],
+      ),
+    );
+  }
+
+  /// This driver's expense claims — title, amount and approval status.
+  Widget _expensesCard(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: _deco(isDark),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const AppText('EXPENSES',
+              style: AppTextStyle.labelMedium,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textSecondary),
+          const SizedBox(height: 12),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: controller.expenses.length,
+            separatorBuilder: (_, __) => const Divider(height: 16),
+            itemBuilder: (context, i) {
+              final e = controller.expenses[i];
+              final status = (e['status'] ?? 'Pending').toString();
+              final color = status == 'Approved'
+                  ? AppColors.success
+                  : (status == 'Rejected'
+                      ? AppColors.error
+                      : AppColors.tertiaryDark);
+              return InkWell(
+                onTap: () {
+                  Navigator.of(context, rootNavigator: true).pushNamed(
+                    Routes.EXPENSE_DETAIL,
+                    arguments: {
+                      'id': e['id']?.toString() ?? '',
+                    },
+                  );
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.receipt_long_rounded,
+                            color: color, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AppText((e['title'] ?? 'Expense').toString(),
+                                style: AppTextStyle.bodyMedium,
+                                fontWeight: FontWeight.bold,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
+                            if ((e['tripId'] ?? '').toString().isNotEmpty)
+                              AppText('Trip: ${e['tripId']}',
+                                  style: AppTextStyle.labelMedium,
+                                  color: AppColors.textSecondary),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              AppText((e['amount'] ?? '').toString(),
+                                  style: AppTextStyle.bodyMedium,
+                                  fontWeight: FontWeight.w700),
+                              const SizedBox(height: 2),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: AppText(status,
+                                    style: AppTextStyle.labelMedium,
+                                    color: color,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right_rounded,
+                              color: AppColors.textSecondary),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
-          const SizedBox(height: 14),
-          TripProgressTracker(trip: trip),
         ],
       ),
     );

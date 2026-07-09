@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
@@ -24,6 +25,7 @@ class AdminHomeController extends GetxController {
   StreamSubscription? _tripsSub;
   StreamSubscription? _expensesSub;
   StreamSubscription? _usersSub;
+  StreamSubscription? _trucksSub;
 
   @override
   void onInit() {
@@ -37,6 +39,7 @@ class AdminHomeController extends GetxController {
     _tripsSub?.cancel();
     _expensesSub?.cancel();
     _usersSub?.cancel();
+    _trucksSub?.cancel();
     super.onClose();
   }
 
@@ -50,6 +53,44 @@ class AdminHomeController extends GetxController {
       expenses.assignAll(list);
     });
     _usersSub = _firebaseService.watchAllUsers().listen(users.assignAll);
+    _trucksSub = _firebaseService.watchAllTrucks().listen(trucks.assignAll);
+  }
+
+  /// Set the drop destination for a trip (typically while the truck is
+  /// loading). The driver sees it only after the load is approved.
+  Future<void> setDestination(String tripId, String dropCity,
+      String dropLocation) async {
+    AppPopup.showLoading(message: 'Setting destination...');
+    try {
+      await _firebaseService.setTripDestination(tripId,
+          dropCity: dropCity, dropLocation: dropLocation);
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(
+          title: 'Destination Set 📍',
+          message: '$dropCity — $dropLocation. Ab load approve kar sakte hain.');
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
+  }
+
+  /// Assign a truck to a driver (morning duty allocation). The driver gets a
+  /// notification to inspect + accept it.
+  Future<void> assignTruck(String truckNo, String driverPhone,
+      {String? model}) async {
+    AppPopup.showLoading(message: 'Assigning truck...');
+    try {
+      await _firebaseService.assignTruckToDriver(truckNo, driverPhone,
+          model: model);
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(
+          title: 'Truck Assigned 🚛',
+          message: '$truckNo assigned. Driver ko inspection ke liye '
+              'notification bhej di gayi.');
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
   }
 
   Map<String, dynamic> _mapTrip(dynamic trip) => {
@@ -65,6 +106,13 @@ class AdminHomeController extends GetxController {
         'isActive': trip.isActive,
         'priority': trip.priority,
         'currentMilestone': trip.currentMilestone,
+        'vendorName': trip.vendorName,
+        'vendorLocation': trip.vendorLocation,
+        'materialName': trip.materialName,
+        'passHolderName': trip.passHolderName,
+        'royaltyName': trip.royaltyName,
+        'loadingPassId': trip.loadingPassId,
+        'pickupDistrict': trip.pickupDistrict,
         'tabType': trip.tabType,
         'remainingDistance': trip.remainingDistance,
         'estimatedTime': trip.estimatedTime,
@@ -80,6 +128,33 @@ class AdminHomeController extends GetxController {
 
   void changeTabIndex(int index) {
     currentTabIndex.value = index;
+  }
+
+  DateTime? _lastBackPressAt;
+
+  /// Back on a non-Dashboard tab returns to Dashboard; on Dashboard the app
+  /// exits only on a second back press within 2 seconds (same as driver Home).
+  void handleBackPress() {
+    if (currentTabIndex.value != 0) {
+      changeTabIndex(0);
+      return;
+    }
+
+    final now = DateTime.now();
+    final firstPressOrExpired = _lastBackPressAt == null ||
+        now.difference(_lastBackPressAt!) > const Duration(seconds: 2);
+
+    if (firstPressOrExpired) {
+      _lastBackPressAt = now;
+      AppSnackBar.showInfo(
+        title: 'Exit App',
+        message: 'Press back again to exit.',
+        position: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    SystemNavigator.pop();
   }
 
   /// Drivers who are currently on duty (checked-in Available) OR running an
@@ -103,6 +178,54 @@ class AdminHomeController extends GetxController {
           (t) => t['isActive'] == true && (t['driverPhone'] ?? '').toString() == phone);
     } catch (_) {
       return null;
+    }
+  }
+
+  // ---- Truck kanban helpers (dashboard) ----
+  List<Map<String, dynamic>> get idleTrucks => trucks
+      .where((t) => (t['assignedTo'] ?? '').toString().isEmpty)
+      .toList();
+
+  List<Map<String, dynamic>> get problemTrucks =>
+      trucks.where((t) => t['inspectionStatus'] == 'problem').toList();
+
+  List<Map<String, dynamic>> get assignedTrucks => trucks
+      .where((t) =>
+          (t['assignedTo'] ?? '').toString().isNotEmpty &&
+          t['inspectionStatus'] != 'problem')
+      .toList();
+
+  int get completedTripsCount =>
+      trips.where((t) => t['status'] == 'DELIVERED').length;
+
+  int get activeTripsCount => trips.where((t) => t['isActive'] == true).length;
+
+  /// The driver's running (not delivered/rejected) trip, for assigned-truck
+  /// card details on the dashboard.
+  Map<String, dynamic>? currentTripForDriver(String phone) =>
+      trips.firstWhereOrNull((t) =>
+          (t['driverPhone'] ?? '').toString() == phone &&
+          t['status'] != 'DELIVERED' &&
+          t['status'] != 'REJECTED');
+
+  String driverNameFor(String phone) {
+    final u = users.firstWhereOrNull((u) => (u['phone'] ?? '') == phone);
+    final name = (u?['name'] ?? '').toString();
+    return name.isEmpty ? phone : name;
+  }
+
+  /// Admin marks a problem-truck active again (issue resolved).
+  Future<void> markTruckActive(String truckNo) async {
+    AppPopup.showLoading(message: 'Marking active...');
+    try {
+      await _firebaseService.clearTruckIssue(truckNo);
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(
+          title: 'Truck Active ✅',
+          message: '$truckNo ready — driver ko inform kar diya.');
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
     }
   }
 

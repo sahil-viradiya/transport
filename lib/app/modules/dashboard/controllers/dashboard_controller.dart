@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
@@ -47,6 +51,13 @@ class DashboardController extends GetxController {
   final RxBool isCheckingDuty = false.obs;
   bool get isOnDuty => dutyStatus.value == 'available';
 
+  // Assigned truck + daily inspection state (live from Firestore)
+  final Rxn<Map<String, dynamic>> myTruck = Rxn<Map<String, dynamic>>();
+  StreamSubscription? _truckSub;
+  String get myTruckNo => (myTruck.value?['truckNo'] ?? '').toString();
+  String get truckInspection =>
+      (myTruck.value?['inspectionStatus'] ?? '').toString();
+
   // Active Trip Getter
   TripItemModel? get activeTrip {
     try {
@@ -86,6 +97,13 @@ class DashboardController extends GetxController {
     }
     loadProfileFromFirebase();
 
+    // Live: the truck assigned to this driver (morning duty allocation).
+    try {
+      _truckSub = Get.find<FirebaseService>()
+          .watchTruckForDriver(_session.ownerKey)
+          .listen(myTruck.call);
+    } catch (_) {}
+
     // Listen to allTrips in TripsController to reactively refresh profile statistics
     try {
       final tripsController = Get.find<TripsController>();
@@ -93,6 +111,137 @@ class DashboardController extends GetxController {
         loadProfileFromFirebase();
       });
     } catch (_) {}
+  }
+
+  @override
+  void onClose() {
+    _truckSub?.cancel();
+    super.onClose();
+  }
+
+  /// Driver confirms the assigned truck's condition is proper → READY.
+  void acceptAssignedTruck() {
+    final truckNo = myTruckNo;
+    if (truckNo.isEmpty) return;
+    AppPopup.showConfirmation(
+      title: 'Accept Truck?',
+      description:
+          'Aapne truck $truckNo ka inspection kar liya aur condition proper '
+          'hai? Admin ko inform kiya jayega.',
+      confirmText: 'Accept',
+      onConfirm: () async {
+        AppPopup.showLoading(message: 'Accepting truck...');
+        try {
+          await Get.find<FirebaseService>()
+              .acceptTruck(truckNo, driverName: driverName.value);
+          AppPopup.hideLoading();
+          AppSnackBar.showSuccess(
+              title: 'Truck Ready ✅',
+              message: '$truckNo trip ke liye ready hai. Admin ko bata diya.');
+        } catch (e) {
+          AppPopup.hideLoading();
+          AppSnackBar.showError(title: 'Error', message: e.toString());
+        }
+      },
+    );
+  }
+
+  /// Driver found a problem during inspection → reason + photo → admin.
+  void reportTruckProblem() {
+    final truckNo = myTruckNo;
+    if (truckNo.isEmpty) return;
+    final reasonCtrl = TextEditingController();
+    final photoBytes = Rx<Uint8List?>(null);
+
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Problem in $truckNo?',
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: reasonCtrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Problem kya hai? (e.g. tyre puncture)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Obx(() => photoBytes.value == null
+                ? OutlinedButton.icon(
+                    onPressed: () async {
+                      final x = await ImagePicker().pickImage(
+                          source: ImageSource.camera, imageQuality: 70);
+                      if (x != null) photoBytes.value = await x.readAsBytes();
+                    },
+                    icon: const Icon(Icons.photo_camera_rounded),
+                    label: const Text('Attach Photo'),
+                  )
+                : Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.memory(photoBytes.value!,
+                            width: 48, height: 48, fit: BoxFit.cover),
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                          child: Text('Photo attached ✓',
+                              style: TextStyle(color: Color(0xFF16A34A)))),
+                      TextButton(
+                        onPressed: () => photoBytes.value = null,
+                        child: const Text('Change'),
+                      ),
+                    ],
+                  )),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () async {
+              final reason = reasonCtrl.text.trim();
+              if (reason.isEmpty) {
+                AppSnackBar.showWarning(
+                    title: 'Reason Required',
+                    message: 'Problem ka reason likhna zaroori hai.');
+                return;
+              }
+              Get.back();
+              AppPopup.showLoading(message: 'Reporting problem...');
+              try {
+                final fb = Get.find<FirebaseService>();
+                String imageUrl = '';
+                if (photoBytes.value != null) {
+                  imageUrl =
+                      await fb.uploadTruckIssueImage(truckNo, photoBytes.value);
+                }
+                await fb.reportTruckIssue(
+                  truckNo,
+                  reason: reason,
+                  imageUrl: imageUrl,
+                  driverName: driverName.value,
+                );
+                AppPopup.hideLoading();
+                AppSnackBar.showInfo(
+                    title: 'Problem Reported ⚠️',
+                    message: 'Admin ko bata diya gaya hai.');
+              } catch (e) {
+                AppPopup.hideLoading();
+                AppSnackBar.showError(title: 'Error', message: e.toString());
+              }
+            },
+            child: const Text('Report', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> loadProfileFromFirebase() async {

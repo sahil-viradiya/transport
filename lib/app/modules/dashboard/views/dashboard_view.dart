@@ -52,6 +52,7 @@ class DashboardView extends GetView<DashboardController> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildDutyCard(context),
+                      _buildMyTruckCard(context),
                       const SizedBox(height: 16),
                       _buildActiveTripCard(context),
                       const SizedBox(height: 24),
@@ -265,6 +266,132 @@ class DashboardView extends GetView<DashboardController> {
                       ),
                     ),
             ),
+          ],
+        ),
+      );
+    });
+  }
+
+  // ---- My Truck: daily assignment + inspection card ----
+  Widget _buildMyTruckCard(BuildContext context) {
+    return Obx(() {
+      final truck = controller.myTruck.value;
+      if (truck == null) return const SizedBox.shrink();
+
+      final truckNo = (truck['truckNo'] ?? '').toString();
+      final model = (truck['model'] ?? '').toString();
+      final inspection = controller.truckInspection;
+      final issue = (truck['inspectionIssue'] ?? '').toString();
+
+      final (accent, statusLabel, statusIcon) = switch (inspection) {
+        'ready' => (AppColors.success, 'Ready ✓', Icons.verified_rounded),
+        'problem' => (
+            AppColors.error,
+            'Problem Reported',
+            Icons.report_problem_rounded
+          ),
+        _ => (
+            AppColors.tertiaryDark,
+            'Inspection Pending',
+            Icons.pending_rounded
+          ),
+      };
+
+      return Container(
+        margin: const EdgeInsets.only(top: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: _cardDecoration(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Icon(Icons.local_shipping_rounded,
+                      color: accent, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppText(truckNo,
+                          style: AppTextStyle.titleLarge,
+                          fontWeight: FontWeight.w700,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                      if (model.isNotEmpty)
+                        AppText(model, style: AppTextStyle.labelMedium),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(statusIcon, size: 12, color: accent),
+                      const SizedBox(width: 4),
+                      AppText(statusLabel,
+                          style: AppTextStyle.labelMedium,
+                          color: accent,
+                          fontWeight: FontWeight.bold),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (inspection == 'problem' && issue.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              AppText('⚠️ $issue — admin ko inform kiya gaya hai.',
+                  style: AppTextStyle.labelMedium,
+                  color: AppColors.error,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis),
+            ],
+            if (inspection != 'ready') ...[
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: controller.reportTruckProblem,
+                      icon: const Icon(Icons.report_problem_rounded, size: 18),
+                      label: const Text('Report Problem'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        side: const BorderSide(color: AppColors.error),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: controller.acceptAssignedTruck,
+                      icon: const Icon(Icons.check_rounded, size: 18),
+                      label: const Text('Accept Truck'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       );

@@ -17,6 +17,7 @@ class NotificationDetailController extends GetxController {
   final RxBool isActing = false.obs;
   final Rxn<Map<String, dynamic>> trip = Rxn<Map<String, dynamic>>();
   final Rxn<Map<String, dynamic>> expense = Rxn<Map<String, dynamic>>();
+  final Rxn<Map<String, dynamic>> truck = Rxn<Map<String, dynamic>>();
 
   String get type => note['type']?.toString() ?? 'info';
   String get tripId => note['tripId']?.toString() ?? '';
@@ -38,6 +39,9 @@ class NotificationDetailController extends GetxController {
       if (tripId.isNotEmpty) trip.value = await _fb.getTripData(tripId);
       if (refId.isNotEmpty && type.startsWith('expense')) {
         expense.value = await _fb.getExpense(refId);
+      }
+      if (refId.isNotEmpty && type.startsWith('truck')) {
+        truck.value = await _fb.getTruck(refId);
       }
     } catch (_) {}
     isLoading.value = false;
@@ -69,7 +73,13 @@ class NotificationDetailController extends GetxController {
     try {
       switch (action) {
         case 'load':
-          await _fb.approveLoad(tripId, adminName: name);
+          final err = await _fb.approveLoad(tripId, adminName: name);
+          if (err != null) {
+            AppPopup.hideLoading();
+            AppSnackBar.showWarning(title: 'Approve Nahi Hua', message: err);
+            isActing.value = false;
+            return;
+          }
           break;
         case 'delivery':
           await _fb.approveDelivery(tripId, adminName: name);

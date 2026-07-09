@@ -24,18 +24,20 @@ class ConnectivityService extends GetxService {
   }
 
   void _updateConnectionStatus(List<ConnectivityResult> results) {
-    // If we have any active connection (wifi, mobile, ethernet, vpn) we are connected
     final hasConnection = results.any((result) => result != ConnectivityResult.none);
+    final previousConnection = isConnected.value;
     isConnected.value = hasConnection;
 
     if (!hasConnection) {
-      AppSnackBar.showError(
-        title: 'Connection Lost',
-        message: 'Please check your internet connection.',
-        position: SnackPosition.BOTTOM,
-      );
+      if (previousConnection && !_isInitialCheck) {
+        AppSnackBar.showError(
+          title: 'Connection Lost',
+          message: 'Please check your internet connection.',
+          position: SnackPosition.BOTTOM,
+        );
+      }
     } else {
-      if (!_isInitialCheck) {
+      if (!previousConnection && !_isInitialCheck) {
         AppSnackBar.showSuccess(
           title: 'Connection Restored',
           message: 'You are back online.',

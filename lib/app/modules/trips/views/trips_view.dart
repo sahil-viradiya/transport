@@ -154,6 +154,7 @@ class TripsView extends GetView<TripsController> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: null,
         onPressed: () {},
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.add, color: Colors.white),

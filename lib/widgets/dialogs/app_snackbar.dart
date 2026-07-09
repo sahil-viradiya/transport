@@ -68,31 +68,33 @@ class AppSnackBar {
     required IconData icon,
     required SnackPosition position,
   }) {
+    if (Get.overlayContext == null) return;
     Get.rawSnackbar(
       titleText: Text(
         title,
         style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.bold,
-          fontSize: 16,
+          fontSize: 14,
         ),
       ),
       messageText: Text(
         message,
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 14,
+          fontSize: 12,
         ),
       ),
       icon: Icon(
         icon,
         color: Colors.white,
-        size: 28,
+        size: 22,
       ),
       backgroundColor: backgroundColor,
       snackPosition: position,
-      margin: const EdgeInsets.all(16),
-      borderRadius: 12,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      borderRadius: 8,
       duration: const Duration(seconds: 3),
       isDismissible: true,
       forwardAnimationCurve: Curves.easeOutBack,

@@ -15,45 +15,46 @@ class AppBottomSheet {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Get.bottomSheet<T>(
-      Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF0F172A) : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.only(
-          top: 10,
-          left: 20,
-          right: 20,
-          bottom: 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Drag handle
-            if (enableDrag)
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFDFE1E6),
-                    borderRadius: BorderRadius.circular(2),
+      Material(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        clipBehavior: Clip.antiAlias,
+        child: Container(
+          padding: const EdgeInsets.only(
+            top: 10,
+            left: 20,
+            right: 20,
+            bottom: 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Drag handle
+              if (enableDrag)
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFDFE1E6),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-            if (title != null) ...[
-              AppText(
-                title,
-                style: AppTextStyle.headlineSmall,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
+              if (title != null) ...[
+                AppText(
+                  title,
+                  style: AppTextStyle.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+              ],
+              // Content
+              Flexible(child: child),
             ],
-            // Content
-            Flexible(child: child),
-          ],
+          ),
         ),
       ),
       isDismissible: isDismissible,

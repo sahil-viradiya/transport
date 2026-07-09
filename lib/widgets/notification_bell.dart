@@ -252,7 +252,11 @@ class NotificationBell extends StatelessWidget {
       AppSnackBar.showSuccess(
           title: 'Delivery Approved ✅', message: 'Trip $tripId is complete.');
     } else {
-      await fb.approveLoad(tripId, adminName: adminName);
+      final err = await fb.approveLoad(tripId, adminName: adminName);
+      if (err != null) {
+        AppSnackBar.showWarning(title: 'Approve Nahi Hua', message: err);
+        return; // keep the notification actionable
+      }
       AppSnackBar.showSuccess(
           title: 'Load Approved ✅', message: 'Trip $tripId is now ACTIVE.');
     }
@@ -313,6 +317,18 @@ class NotificationBell extends StatelessWidget {
         return (Icons.login_rounded, AppColors.success);
       case 'check_out':
         return (Icons.logout_rounded, AppColors.textSecondary);
+      case 'truck_assigned':
+        return (Icons.local_shipping_rounded, AppColors.primary);
+      case 'truck_issue':
+        return (Icons.report_problem_rounded, AppColors.error);
+      case 'truck_ready':
+        return (Icons.verified_rounded, AppColors.success);
+      case 'vendor_way':
+        return (Icons.directions_rounded, AppColors.info);
+      case 'loading_started':
+        return (Icons.inventory_2_rounded, AppColors.tertiaryDark);
+      case 'set_destination_reminder':
+        return (Icons.add_location_alt_rounded, AppColors.error);
       default:
         return (Icons.notifications_rounded, AppColors.tertiaryDark);
     }

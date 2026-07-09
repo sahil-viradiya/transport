@@ -134,21 +134,93 @@ class TripDetailsView extends GetView<TripDetailsController> {
             _buildDetailCard(
               isDark: isDark,
               label: 'DEPARTURE',
-              title: controller.departureTitle,
-              subtitle: controller.departureSubtitle,
+              title: controller.departureTitle.value,
+              subtitle: controller.departureSubtitle.value,
               footerIcon: Icons.calendar_today_rounded,
-              footerText: controller.departureTime,
+              footerText: controller.departureTime.value,
             ),
             const SizedBox(height: 12),
+
+            // 2b. Vendor & Material card (assignment form details)
+            Obx(() {
+              final ex = controller.tripExtra.value;
+              if (ex == null ||
+                  (ex['vendorName'] ?? '').toString().isEmpty) {
+                return const SizedBox.shrink();
+              }
+              Widget row(IconData icon, String label, String value) =>
+                  value.isEmpty
+                      ? const SizedBox.shrink()
+                      : Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(icon,
+                                  size: 16, color: AppColors.textSecondary),
+                              const SizedBox(width: 8),
+                              AppText('$label: ',
+                                  style: AppTextStyle.labelMedium,
+                                  fontWeight: FontWeight.bold),
+                              Expanded(
+                                child: AppText(value,
+                                    style: AppTextStyle.labelMedium,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis),
+                              ),
+                            ],
+                          ),
+                        );
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                      color: isDark ? Colors.white10 : AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.storefront_rounded,
+                            color: AppColors.primary, size: 18),
+                        SizedBox(width: 8),
+                        AppText('VENDOR & MATERIAL',
+                            style: AppTextStyle.labelMedium,
+                            fontWeight: FontWeight.bold),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    row(Icons.storefront_rounded, 'Vendor',
+                        (ex['vendorName'] ?? '').toString()),
+                    row(Icons.place_rounded, 'Vendor Location',
+                        (ex['vendorLocation'] ?? '').toString()),
+                    row(Icons.category_rounded, 'Material',
+                        (ex['materialName'] ?? '').toString()),
+                    row(Icons.badge_rounded, 'Pass Holder',
+                        (ex['passHolderName'] ?? '').toString()),
+                    row(Icons.workspace_premium_rounded, 'Royalty',
+                        (ex['royaltyName'] ?? '').toString()),
+                    row(Icons.confirmation_number_rounded, 'Loading Pass',
+                        (ex['loadingPassId'] ?? '').toString()),
+                    row(Icons.map_rounded, 'District',
+                        (ex['pickupDistrict'] ?? '').toString()),
+                  ],
+                ),
+              );
+            }),
 
             // 3. Destination Card
             _buildDetailCard(
               isDark: isDark,
               label: 'DESTINATION',
-              title: controller.destinationTitle,
-              subtitle: controller.destinationSubtitle,
+              title: controller.destinationTitle.value,
+              subtitle: controller.destinationSubtitle.value,
               footerIcon: Icons.local_shipping_rounded,
-              footerText: 'Consignment ${controller.consignmentNo}',
+              footerText: 'Consignment ${controller.consignmentNo.value}',
             ),
             const SizedBox(height: 12),
 
@@ -199,7 +271,7 @@ class TripDetailsView extends GetView<TripDetailsController> {
                     children: [
                       _buildManifestGridItem('WEIGHT', controller.weight),
                       _buildManifestGridItem('UNITS', controller.units),
-                      _buildManifestGridItem('VEHICLE', controller.vehicleNo),
+                      _buildManifestGridItem('VEHICLE', controller.vehicleNo.value),
                     ],
                   ),
                 ],
@@ -219,12 +291,29 @@ class TripDetailsView extends GetView<TripDetailsController> {
 
             const SizedBox(height: 32),
 
-            // 6. Action Button: Start Journey
-            AppButton(
-              text: 'Start Journey',
-              icon: Icons.play_arrow_rounded,
-              onPressed: controller.startJourney,
-            ),
+            // 6. Action Button — label follows the vendor-journey stage
+            Obx(() => AppButton(
+                  text: controller.primaryActionLabel,
+                  icon: Icons.play_arrow_rounded,
+                  onPressed: controller.startJourney,
+                )),
+            // Destination na set ho aur 10 min ho jayein → direct call option.
+            Obx(() => controller.showCallAdmin.value
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: OutlinedButton.icon(
+                      onPressed: controller.callAdmin,
+                      icon: const Icon(Icons.call_rounded, size: 18),
+                      label: const Text(
+                          'Destination set nahi hua — Admin ko Call karein'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        side: const BorderSide(color: AppColors.error),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink()),
             const SizedBox(height: 12),
             Center(
               child: AppText(
@@ -417,12 +506,12 @@ class TripDetailsView extends GetView<TripDetailsController> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              AppText(controller.vehicleNo,
+                              AppText(controller.vehicleNo.value,
                                   style: AppTextStyle.bodyLarge,
                                   color: AppColors.textPrimary,
                                   fontWeight: FontWeight.bold),
                               AppText(
-                                  'Route: ${controller.departureTitle} ➔ ${controller.destinationTitle}',
+                                  'Route: ${controller.departureTitle.value} ➔ ${controller.destinationTitle.value}',
                                   style: AppTextStyle.labelMedium),
                             ],
                           ),
@@ -491,10 +580,10 @@ class TripDetailsView extends GetView<TripDetailsController> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         AppText(
-                            '${controller.departureTitle.split(' ').first} (Started)',
+                            '${controller.departureTitle.value.split(' ').first} (Started)',
                             style: AppTextStyle.labelMedium),
                         AppText(
-                            '${controller.destinationTitle.split(' ').first} (Destination)',
+                            '${controller.destinationTitle.value.split(' ').first} (Destination)',
                             style: AppTextStyle.labelMedium),
                       ],
                     ),

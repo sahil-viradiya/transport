@@ -14,6 +14,7 @@ import 'package:transport/widgets/dialogs/app_popup.dart';
 import '../controllers/admin_home_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/time_utils.dart';
+import '../../../data/notifications_controller.dart';
 
 class AdminHomeView extends GetView<AdminHomeController> {
   const AdminHomeView({super.key});
@@ -48,73 +49,57 @@ class AdminHomeView extends GetView<AdminHomeController> {
       return Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 880),
+          constraints: const BoxConstraints(maxWidth: 1280),
           child: stack,
         ),
       );
     });
 
     if (isWide) {
+      // Web/desktop: dark brand sidebar + top bar (reference dashboard layout).
       content = Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Obx(() => NavigationRail(
-                selectedIndex: controller.currentTabIndex.value,
-                onDestinationSelected: controller.changeTabIndex,
-                labelType: NavigationRailLabelType.all,
-                backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-                indicatorColor: AppColors.primaryLight,
-                selectedIconTheme:
-                    const IconThemeData(color: AppColors.primary),
-                selectedLabelTextStyle: const TextStyle(
-                    color: AppColors.primary, fontWeight: FontWeight.w700),
-                destinations: const [
-                  NavigationRailDestination(
-                    icon: Icon(Icons.analytics_outlined),
-                    selectedIcon:
-                        Icon(Icons.analytics_rounded, color: AppColors.primary),
-                    label: Text('Dashboard'),
-                  ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.alt_route_outlined),
-                    selectedIcon:
-                        Icon(Icons.alt_route_rounded, color: AppColors.primary),
-                    label: Text('Trips'),
-                  ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.local_shipping_outlined),
-                    selectedIcon: Icon(Icons.local_shipping_rounded,
-                        color: AppColors.primary),
-                    label: Text('Trucks'),
-                  ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.people_outline_rounded),
-                    selectedIcon:
-                        Icon(Icons.people_rounded, color: AppColors.primary),
-                    label: Text('Roles'),
-                  ),
-                ],
-              )),
-          const VerticalDivider(width: 1, thickness: 1),
-          Expanded(child: content),
+          _buildSidebar(),
+          Expanded(
+            child: Column(
+              children: [
+                _buildTopBar(context, isDark),
+                const Divider(height: 1),
+                Expanded(child: content),
+              ],
+            ),
+          ),
         ],
       );
     }
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        controller.handleBackPress();
+      },
+      child: Scaffold(
       backgroundColor:
           isDark ? const Color(0xFF0F172A) : const Color(0xFFF3F7FD),
-      appBar: AppBar(
-        title: const AppText('Highway Terminal Admin',
-            style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
-        actions: [
-          const NotificationBell(color: AppColors.textPrimary),
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: AppColors.error),
-            tooltip: 'Logout Session',
-            onPressed: controller.logout,
-          ),
-        ],
-      ),
+      // Wide layout draws its own top bar next to the sidebar.
+      appBar: isWide
+          ? null
+          : AppBar(
+              title: const AppText('Highway Terminal Admin',
+                  style: AppTextStyle.headlineSmall,
+                  fontWeight: FontWeight.bold),
+              actions: [
+                const NotificationBell(color: AppColors.textPrimary),
+                IconButton(
+                  icon:
+                      const Icon(Icons.logout_rounded, color: AppColors.error),
+                  tooltip: 'Logout Session',
+                  onPressed: controller.logout,
+                ),
+              ],
+            ),
       body: content,
       bottomNavigationBar: isWide
           ? null
@@ -151,6 +136,634 @@ class AdminHomeView extends GetView<AdminHomeController> {
                   ),
                 ],
               )),
+      ),
+    );
+  }
+
+  // ---- Web/desktop shell: dark brand sidebar + top bar ----
+
+  static const _navItems = [
+    (Icons.dashboard_rounded, 'Dashboard'),
+    (Icons.alt_route_rounded, 'Trips'),
+    (Icons.local_shipping_rounded, 'Trucks'),
+    (Icons.people_rounded, 'Drivers'),
+  ];
+
+  Widget _buildSidebar() {
+    return Container(
+      width: 230,
+      color: AppColors.charcoal,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.local_shipping_rounded,
+                      color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppText('BHARAT',
+                          style: AppTextStyle.bodyLarge,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800),
+                      AppText('TRANSPORT',
+                          style: AppTextStyle.labelMedium,
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w800),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...List.generate(_navItems.length, (i) {
+            final (icon, label) = _navItems[i];
+            return Obx(() {
+              final selected = controller.currentTabIndex.value == i;
+              return Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                child: Material(
+                  color: selected
+                      ? AppColors.primary.withValues(alpha: 0.18)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  child: InkWell(
+                    onTap: () => controller.changeTabIndex(i),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          Icon(icon,
+                              size: 20,
+                              color: selected
+                                  ? AppColors.primary
+                                  : Colors.white54),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: AppText(label,
+                                style: AppTextStyle.bodyMedium,
+                                color:
+                                    selected ? Colors.white : Colors.white70,
+                                fontWeight: selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            });
+          }),
+          const Spacer(),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: OutlinedButton.icon(
+              onPressed: controller.logout,
+              icon: const Icon(Icons.logout_rounded, size: 16),
+              label: const Text('Logout'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white70,
+                side: const BorderSide(color: Colors.white24),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopBar(BuildContext context, bool isDark) {
+    return Container(
+      color: isDark ? const Color(0xFF0F172A) : Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
+        children: [
+          Obx(() {
+            final (_, label) = _navItems[controller.currentTabIndex.value];
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppText(label,
+                    style: AppTextStyle.headlineSmall,
+                    fontWeight: FontWeight.w700),
+                const AppText('Welcome Admin', style: AppTextStyle.labelMedium),
+              ],
+            );
+          }),
+          const Spacer(),
+          ElevatedButton.icon(
+            onPressed: () => _showTripFormDialog(context, isDark),
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Assign Trip'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
+          const SizedBox(width: 8),
+          const NotificationBell(color: AppColors.textSecondary),
+        ],
+      ),
+    );
+  }
+
+  // ---- Dashboard: stats grid ----
+  Widget _buildStatsGrid(bool isDark) {
+    final stats = [
+      ('TOTAL TRUCKS', '${controller.trucks.length}',
+          Icons.local_shipping_rounded, const Color(0xFFDCFCE7),
+          const Color(0xFF15803D), () => controller.changeTabIndex(2)),
+      ('ASSIGNED TODAY', '${controller.assignedTrucks.length}',
+          Icons.event_available_rounded, const Color(0xFFE0F2FE),
+          const Color(0xFF0369A1), () => controller.changeTabIndex(2)),
+      ('IDLE TRUCKS', '${controller.idleTrucks.length}',
+          Icons.pause_circle_rounded, const Color(0xFFFEF9C3),
+          const Color(0xFFA16207), () => controller.changeTabIndex(2)),
+      ('BREAKDOWN', '${controller.problemTrucks.length}', Icons.build_rounded,
+          const Color(0xFFFEE2E2), const Color(0xFFB91C1C),
+          () => controller.changeTabIndex(2)),
+      ('ACTIVE TRIPS', '${controller.activeTripsCount}',
+          Icons.my_location_rounded, const Color(0xFFF3E8FF),
+          const Color(0xFF7E22CE), controller.openActiveDrivers),
+      ('COMPLETED', '${controller.completedTripsCount}', Icons.task_alt_rounded,
+          const Color(0xFFE3FCEF), const Color(0xFF006644),
+          () => controller.changeTabIndex(1)),
+    ];
+    return LayoutBuilder(builder: (context, cons) {
+      final cols = cons.maxWidth >= 1100 ? 6 : (cons.maxWidth >= 700 ? 3 : 2);
+      final w = (cons.maxWidth - (cols - 1) * 12) / cols;
+      return Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: stats
+            .map((s) => SizedBox(
+                  width: w,
+                  child: _buildStatCard(s.$1, s.$2, s.$3, s.$4, s.$5, isDark,
+                      onTap: s.$6),
+                ))
+            .toList(),
+      );
+    });
+  }
+
+  // ---- Dashboard: truck kanban (Assigned / Breakdown / Idle) ----
+  Widget _buildTruckKanban(BuildContext context, bool isDark) {
+    Widget assigned = _kanbanColumn(
+      isDark,
+      'Assigned Trucks',
+      controller.assignedTrucks.length,
+      AppColors.success,
+      controller.assignedTrucks
+          .take(4)
+          .map((t) => _assignedTruckCard(context, isDark, t))
+          .toList(),
+      emptyText: 'Abhi koi truck assigned nahi hai.',
+    );
+    Widget breakdown = _kanbanColumn(
+      isDark,
+      'Breakdown Trucks',
+      controller.problemTrucks.length,
+      AppColors.error,
+      controller.problemTrucks
+          .take(4)
+          .map((t) => _problemTruckCard(isDark, t))
+          .toList(),
+      emptyText: 'Koi breakdown nahi — sab theek! 🎉',
+    );
+    Widget idle = _kanbanColumn(
+      isDark,
+      'Idle Trucks',
+      controller.idleTrucks.length,
+      AppColors.tertiaryDark,
+      controller.idleTrucks
+          .take(4)
+          .map((t) => _idleTruckCard(context, isDark, t))
+          .toList(),
+      emptyText: 'Sab trucks assigned hain.',
+    );
+
+    return LayoutBuilder(builder: (c, cons) {
+      if (cons.maxWidth >= 900) {
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: assigned),
+            const SizedBox(width: 16),
+            Expanded(child: breakdown),
+            const SizedBox(width: 16),
+            Expanded(child: idle),
+          ],
+        );
+      }
+      return Column(
+        children: [
+          assigned,
+          const SizedBox(height: 16),
+          breakdown,
+          const SizedBox(height: 16),
+          idle,
+        ],
+      );
+    });
+  }
+
+  Widget _kanbanColumn(bool isDark, String title, int count, Color dot,
+      List<Widget> cards,
+      {required String emptyText}) {
+    final more = count - cards.length;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.circle, size: 10, color: dot),
+              const SizedBox(width: 6),
+              Expanded(
+                child: AppText('$title ($count)',
+                    style: AppTextStyle.bodyLarge,
+                    fontWeight: FontWeight.w700,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (cards.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: AppText(emptyText,
+                  style: AppTextStyle.labelMedium,
+                  textAlign: TextAlign.center),
+            )
+          else
+            ...cards,
+          if (more > 0)
+            TextButton(
+              onPressed: () => controller.changeTabIndex(2),
+              child: Text('+$more more'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  BoxDecoration _kanbanCardDeco(bool isDark) => BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border:
+            Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200),
+      );
+
+  (String, Color) _assignedChip(Map<String, dynamic>? trip, String inspection) {
+    switch (trip?['status']) {
+      case 'EN_ROUTE_VENDOR':
+        return ('On The Way', AppColors.info);
+      case 'LOADING':
+        return ('Loading', AppColors.tertiaryDark);
+      case 'LOAD_REQUESTED':
+        return ('Load Requested', AppColors.tertiaryDark);
+      case 'ACTIVE NOW':
+        return ('Active', AppColors.success);
+      case 'DELIVERY_REQUESTED':
+        return ('Delivery Requested', AppColors.info);
+      case 'PENDING':
+        return ('Pending Accept', AppColors.textSecondary);
+      case 'ASSIGNED':
+        return ('Trip Assigned', AppColors.primary);
+    }
+    return inspection == 'ready'
+        ? ('Ready', AppColors.success)
+        : ('Inspection Pending', AppColors.tertiaryDark);
+  }
+
+  Widget _kvRow(IconData icon, String label, String value) {
+    if (value.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 13, color: AppColors.textHint),
+          const SizedBox(width: 6),
+          AppText('$label: ',
+              style: AppTextStyle.labelMedium, fontWeight: FontWeight.w600),
+          Expanded(
+            child: AppText(value,
+                style: AppTextStyle.labelMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _assignedTruckCard(
+      BuildContext context, bool isDark, Map<String, dynamic> truck) {
+    final phone = (truck['assignedTo'] ?? '').toString();
+    final trip = controller.currentTripForDriver(phone);
+    final (chipLabel, chipColor) =
+        _assignedChip(trip, (truck['inspectionStatus'] ?? '').toString());
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: _kanbanCardDeco(isDark),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: AppText((truck['truckNo'] ?? '').toString(),
+                    style: AppTextStyle.bodyMedium,
+                    fontWeight: FontWeight.w700,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: chipColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: AppText(chipLabel,
+                    style: AppTextStyle.labelMedium,
+                    color: chipColor,
+                    fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          AppText('Driver: ${controller.driverNameFor(phone)}',
+              style: AppTextStyle.labelMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 8),
+          _kvRow(Icons.place_rounded, 'Pickup',
+              (trip?['pickupLocation'] ?? '').toString()),
+          _kvRow(Icons.category_rounded, 'Material',
+              (trip?['materialName'] ?? '').toString()),
+          _kvRow(Icons.confirmation_number_rounded, 'Pass',
+              (trip?['loadingPassId'] ?? '').toString()),
+          _kvRow(Icons.workspace_premium_rounded, 'Royalty',
+              (trip?['royaltyName'] ?? '').toString()),
+          _kvRow(
+              Icons.flag_rounded,
+              'Destination',
+              (trip?['dropCity'] ?? '').toString().isEmpty
+                  ? '— (set pending)'
+                  : (trip?['dropCity'] ?? '').toString()),
+          if (trip != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () =>
+                        _showTripDetailsDialog(context, isDark, trip),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      side: const BorderSide(color: AppColors.primary),
+                    ),
+                    child: const Text('View Details',
+                        style: TextStyle(fontSize: 12)),
+                  ),
+                ),
+                if ((trip['dropCity'] ?? '').toString().isEmpty) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _showSetDestinationDialog(trip),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                      child: const Text('Set Destination',
+                          style: TextStyle(fontSize: 12)),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _problemTruckCard(bool isDark, Map<String, dynamic> truck) {
+    final phone = (truck['assignedTo'] ?? '').toString();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: _kanbanCardDeco(isDark),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: AppText((truck['truckNo'] ?? '').toString(),
+                    style: AppTextStyle.bodyMedium,
+                    fontWeight: FontWeight.w700),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const AppText('Breakdown',
+                    style: AppTextStyle.labelMedium,
+                    color: AppColors.error,
+                    fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          if (phone.isNotEmpty)
+            AppText('Driver: ${controller.driverNameFor(phone)}',
+                style: AppTextStyle.labelMedium),
+          const SizedBox(height: 6),
+          _kvRow(Icons.report_problem_rounded, 'Reason',
+              (truck['inspectionIssue'] ?? '').toString()),
+          const SizedBox(height: 6),
+          ElevatedButton(
+            onPressed: () =>
+                controller.markTruckActive((truck['truckNo'] ?? '').toString()),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+            ),
+            child: const Text('Mark Active', style: TextStyle(fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _idleTruckCard(
+      BuildContext context, bool isDark, Map<String, dynamic> truck) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: _kanbanCardDeco(isDark),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: AppText((truck['truckNo'] ?? '').toString(),
+                    style: AppTextStyle.bodyMedium,
+                    fontWeight: FontWeight.w700),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.tertiaryDark.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const AppText('Idle',
+                    style: AppTextStyle.labelMedium,
+                    color: AppColors.tertiaryDark,
+                    fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          AppText((truck['model'] ?? '').toString(),
+              style: AppTextStyle.labelMedium),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: () => _showAssignTruckDialog(context, truck),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.success,
+              side: const BorderSide(color: AppColors.success),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+            ),
+            child: const Text('Assign Truck', style: TextStyle(fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---- Dashboard: recent activities (admin's live notification feed) ----
+  Widget _buildRecentActivities(bool isDark) {
+    if (!Get.isRegistered<NotificationsController>()) {
+      return const SizedBox.shrink();
+    }
+    final notifs = Get.find<NotificationsController>();
+    Color dotFor(String type) {
+      if (type.contains('reject') || type.contains('issue')) {
+        return AppColors.error;
+      }
+      if (type.contains('accept') ||
+          type.contains('ready') ||
+          type.contains('approved') ||
+          type.contains('activated')) {
+        return AppColors.success;
+      }
+      return AppColors.primary;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const AppText('Recent Activities',
+              style: AppTextStyle.bodyLarge, fontWeight: FontWeight.w700),
+          const SizedBox(height: 10),
+          Obx(() {
+            final items = notifs.items.take(6).toList();
+            if (items.isEmpty) {
+              return const AppText('No recent activity.',
+                  style: AppTextStyle.labelMedium);
+            }
+            return Column(
+              children: items.map((n) {
+                final ts = n['createdAt'];
+                String when = '';
+                try {
+                  if (ts is Timestamp) when = timeAgo(ts.toDate());
+                } catch (_) {}
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Icon(Icons.circle,
+                            size: 8,
+                            color: dotFor((n['type'] ?? '').toString())),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AppText((n['title'] ?? '').toString(),
+                                style: AppTextStyle.bodyMedium,
+                                fontWeight: FontWeight.w700,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
+                            AppText((n['body'] ?? '').toString(),
+                                style: AppTextStyle.labelMedium,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis),
+                          ],
+                        ),
+                      ),
+                      if (when.isNotEmpty)
+                        AppText(when,
+                            style: AppTextStyle.labelMedium,
+                            color: AppColors.textHint),
+                    ],
+                  ),
+                );
+              }).toList(),
+            );
+          }),
+        ],
+      ),
     );
   }
 
@@ -164,75 +777,29 @@ class AdminHomeView extends GetView<AdminHomeController> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Obx(() => Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildStatCard(
-                            'TOTAL TRIPS',
-                            '${controller.trips.length}',
-                            Icons.alt_route_rounded,
-                            const Color(0xFFE0F2FE),
-                            const Color(0xFF0369A1),
-                            isDark,
-                            onTap: () => controller.changeTabIndex(1),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildStatCard(
-                            'TOTAL TRUCKS',
-                            '${controller.trucks.length}',
-                            Icons.local_shipping_rounded,
-                            const Color(0xFFDCFCE7),
-                            const Color(0xFF15803D),
-                            isDark,
-                            onTap: () => controller.changeTabIndex(2),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildStatCard(
-                            'DRIVERS / USERS',
-                            '${controller.users.length}',
-                            Icons.people_rounded,
-                            const Color(0xFFFEF9C3),
-                            const Color(0xFFA16207),
-                            isDark,
-                            onTap: () => controller.changeTabIndex(3),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildStatCard(
-                            'ACTIVE DRIVERS',
-                            '${controller.activeDrivers.length}',
-                            Icons.my_location_rounded,
-                            const Color(0xFFF3E8FF),
-                            const Color(0xFF7E22CE),
-                            isDark,
-                            onTap: controller.openActiveDrivers,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                )),
+            // Stat cards (6-up on desktop, wraps on phone)
+            Obx(() => _buildStatsGrid(isDark)),
+            const SizedBox(height: 20),
+
+            // Truck kanban: Assigned / Breakdown / Idle
+            Obx(() => _buildTruckKanban(context, isDark)),
+            const SizedBox(height: 20),
+
+            // Recent activities feed
+            _buildRecentActivities(isDark),
             const SizedBox(height: 24),
 
             // Live Tracking Panel Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const AppText('LIVE DRIVER TRACKING',
-                    style: AppTextStyle.labelLarge,
-                    fontWeight: FontWeight.bold),
+                const Expanded(
+                  child: AppText('LIVE DRIVER TRACKING',
+                      style: AppTextStyle.labelLarge,
+                      fontWeight: FontWeight.bold,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ),
                 TextButton.icon(
                   onPressed: controller.loadData,
                   icon: const Icon(Icons.sync_rounded, size: 16),
@@ -811,6 +1378,20 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           ),
                           Row(
                             children: [
+                              if ((trip['dropCity'] ?? '')
+                                      .toString()
+                                      .trim()
+                                      .isEmpty &&
+                                  trip['status'] != 'DELIVERED')
+                                IconButton(
+                                  icon: const Icon(
+                                      Icons.add_location_alt_rounded,
+                                      color: AppColors.tertiaryDark,
+                                      size: 20),
+                                  tooltip: 'Set Destination',
+                                  onPressed: () =>
+                                      _showSetDestinationDialog(trip),
+                                ),
                               IconButton(
                                 icon: const Icon(Icons.visibility_rounded,
                                     color: AppColors.primary, size: 20),
@@ -839,6 +1420,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
         }),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: null,
         backgroundColor: AppColors.primary,
         onPressed: () => _showTripFormDialog(context, isDark),
         child: const Icon(Icons.add, color: Colors.white),
@@ -847,6 +1429,148 @@ class AdminHomeView extends GetView<AdminHomeController> {
   }
 
   // --- TAB 3: TRUCKS MANAGEMENT ---
+  /// Morning duty allocation strip on each truck card: who it's assigned to,
+  /// the driver's inspection verdict, and an Assign/Reassign action.
+  Widget _truckAssignmentSection(
+      BuildContext context, bool isDark, Map<String, dynamic> truck) {
+    final assignedTo = (truck['assignedTo'] ?? '').toString();
+    final inspection = (truck['inspectionStatus'] ?? '').toString();
+    final issue = (truck['inspectionIssue'] ?? '').toString();
+
+    String driverName = assignedTo;
+    if (assignedTo.isNotEmpty) {
+      final u = controller.users
+          .firstWhereOrNull((u) => (u['phone'] ?? '') == assignedTo);
+      if (u != null && (u['name'] ?? '').toString().isNotEmpty) {
+        driverName = u['name'].toString();
+      }
+    }
+
+    (String, Color, IconData) badge;
+    if (assignedTo.isEmpty) {
+      badge = ('Not Assigned', AppColors.textSecondary, Icons.person_off_rounded);
+    } else if (inspection == 'ready') {
+      badge = ('Ready ✓', AppColors.success, Icons.verified_rounded);
+    } else if (inspection == 'problem') {
+      badge = ('Problem Reported', AppColors.error, Icons.report_problem_rounded);
+    } else {
+      badge = ('Inspection Pending', AppColors.tertiaryDark, Icons.pending_rounded);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(badge.$3, size: 16, color: badge.$2),
+            const SizedBox(width: 6),
+            Flexible(
+              child: AppText(
+                assignedTo.isEmpty
+                    ? 'Not assigned to any driver'
+                    : 'Driver: $driverName',
+                style: AppTextStyle.labelMedium,
+                fontWeight: FontWeight.w600,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: badge.$2.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: AppText(badge.$1,
+                  style: AppTextStyle.labelMedium,
+                  color: badge.$2,
+                  fontWeight: FontWeight.bold),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: () => _showAssignTruckDialog(context, truck),
+              icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+              label: Text(assignedTo.isEmpty ? 'Assign' : 'Reassign'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+            ),
+          ],
+        ),
+        if (inspection == 'problem' && issue.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: AppText('⚠️ $issue',
+                style: AppTextStyle.labelMedium,
+                color: AppColors.error,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis),
+          ),
+      ],
+    );
+  }
+
+  void _showAssignTruckDialog(BuildContext context, Map<String, dynamic> truck) {
+    final drivers = controller.users
+        .where((u) => (u['role'] ?? 'driver') != 'admin')
+        .toList();
+    if (drivers.isEmpty) {
+      AppSnackBar.showWarning(
+          title: 'No Drivers', message: 'Pehle koi driver register karein.');
+      return;
+    }
+    String selected = (truck['assignedTo'] ?? '').toString();
+    if (selected.isEmpty ||
+        !drivers.any((d) => (d['phone'] ?? '') == selected)) {
+      selected = (drivers.first['phone'] ?? '').toString();
+    }
+
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Assign ${truck['truckNo']}',
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: DropdownButtonFormField<String>(
+          initialValue: selected,
+          decoration: const InputDecoration(
+            labelText: 'Select Driver',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.person_rounded),
+          ),
+          items: drivers
+              .map((d) => DropdownMenuItem(
+                    value: (d['phone'] ?? '').toString(),
+                    child: Text(
+                      '${d['name'] ?? d['phone']}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ))
+              .toList(),
+          onChanged: (v) {
+            if (v != null) selected = v;
+          },
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            onPressed: () {
+              Get.back();
+              controller.assignTruck(
+                (truck['truckNo'] ?? '').toString(),
+                selected,
+                model: truck['model']?.toString(),
+              );
+            },
+            child: const Text('Assign', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTrucksTab(BuildContext context, bool isDark) {
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -896,63 +1620,73 @@ class AdminHomeView extends GetView<AdminHomeController> {
                     ),
                   ],
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color:
-                            isDark ? Colors.white10 : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.local_shipping_rounded,
-                          color: isEnRoute ? Colors.green : AppColors.primary,
-                          size: 28),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          AppText(truck['truckNo'] ?? '',
-                              style: AppTextStyle.bodyLarge,
-                              fontWeight: FontWeight.bold),
-                          const SizedBox(height: 4),
-                          AppText(truck['model'] ?? 'Tata Truck',
-                              style: AppTextStyle.labelMedium),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isEnRoute
-                                  ? const Color(0xFFE3FCEF)
-                                  : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: AppText(
-                              truck['status'] ?? 'Idle',
-                              style: AppTextStyle.labelMedium,
-                              color: isEnRoute
-                                  ? const Color(0xFF006644)
-                                  : Colors.grey.shade600,
-                              fontWeight: FontWeight.bold,
-                            ),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white10
+                                : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ],
-                      ),
+                          child: Icon(Icons.local_shipping_rounded,
+                              color:
+                                  isEnRoute ? Colors.green : AppColors.primary,
+                              size: 28),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AppText(truck['truckNo'] ?? '',
+                                  style: AppTextStyle.bodyLarge,
+                                  fontWeight: FontWeight.bold),
+                              const SizedBox(height: 4),
+                              AppText(truck['model'] ?? 'Tata Truck',
+                                  style: AppTextStyle.labelMedium),
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isEnRoute
+                                      ? const Color(0xFFE3FCEF)
+                                      : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: AppText(
+                                  truck['status'] ?? 'Idle',
+                                  style: AppTextStyle.labelMedium,
+                                  color: isEnRoute
+                                      ? const Color(0xFF006644)
+                                      : Colors.grey.shade600,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit_rounded,
+                              color: AppColors.primary, size: 20),
+                          onPressed: () => _showTruckFormDialog(context, isDark,
+                              editModeTruck: truck),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded,
+                              color: AppColors.error, size: 20),
+                          onPressed: () =>
+                              controller.deleteTruck(truck['truckNo']),
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.edit_rounded,
-                          color: AppColors.primary, size: 20),
-                      onPressed: () => _showTruckFormDialog(context, isDark,
-                          editModeTruck: truck),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded,
-                          color: AppColors.error, size: 20),
-                      onPressed: () => controller.deleteTruck(truck['truckNo']),
-                    ),
+                    const Divider(height: 20),
+                    _truckAssignmentSection(context, isDark, truck),
                   ],
                 ),
               );
@@ -961,6 +1695,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
         }),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: null,
         backgroundColor: AppColors.primary,
         onPressed: () => _showTruckFormDialog(context, isDark),
         child: const Icon(Icons.add, color: Colors.white),
@@ -1132,6 +1867,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
         }),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: null,
         backgroundColor: AppColors.primary,
         onPressed: () => _showUserFormDialog(context, isDark),
         child: const Icon(Icons.add, color: Colors.white),
@@ -1142,6 +1878,64 @@ class AdminHomeView extends GetView<AdminHomeController> {
   // --- POPUP DIALOG FORM HELPERS ---
 
   // 1. ADD / EDIT TRIP DIALOG
+
+  /// Set the drop destination while the truck is loading — the driver sees it
+  /// only after the load is approved.
+  void _showSetDestinationDialog(Map<String, dynamic> trip) {
+    final cityCtrl =
+        TextEditingController(text: (trip['dropCity'] ?? '').toString());
+    final locCtrl =
+        TextEditingController(text: (trip['dropLocation'] ?? '').toString());
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Set Destination — ${trip['id']}',
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: cityCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Drop City',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.location_city_rounded),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: locCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Drop Location',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.pin_drop_rounded),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            onPressed: () {
+              final city = cityCtrl.text.trim();
+              final loc = locCtrl.text.trim();
+              if (city.isEmpty || loc.isEmpty) {
+                AppSnackBar.showWarning(
+                    title: 'Incomplete',
+                    message: 'Drop city aur location dono bharein.');
+                return;
+              }
+              Get.back();
+              controller.setDestination(
+                  (trip['id'] ?? '').toString(), city, loc);
+            },
+            child: const Text('Set', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _showTripFormDialog(BuildContext context, bool isDark,
       {Map<String, dynamic>? editModeTrip}) {
@@ -1156,6 +1950,21 @@ class AdminHomeView extends GetView<AdminHomeController> {
     final dropLocCtrl =
         TextEditingController(text: editModeTrip?['dropLocation'] ?? '');
     final dateCtrl = TextEditingController(text: editModeTrip?['date'] ?? '');
+    // Vendor / material details
+    final vendorNameCtrl =
+        TextEditingController(text: editModeTrip?['vendorName'] ?? '');
+    final vendorLocCtrl =
+        TextEditingController(text: editModeTrip?['vendorLocation'] ?? '');
+    final materialCtrl =
+        TextEditingController(text: editModeTrip?['materialName'] ?? '');
+    final passHolderCtrl =
+        TextEditingController(text: editModeTrip?['passHolderName'] ?? '');
+    final royaltyCtrl =
+        TextEditingController(text: editModeTrip?['royaltyName'] ?? '');
+    final loadingPassCtrl =
+        TextEditingController(text: editModeTrip?['loadingPassId'] ?? '');
+    final pickupDistrictCtrl =
+        TextEditingController(text: editModeTrip?['pickupDistrict'] ?? '');
     final pickupLatCtrl = TextEditingController(
         text: editModeTrip?['pickupLatitude'] != null
             ? editModeTrip!['pickupLatitude'].toString()
@@ -1359,6 +2168,117 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           ),
                         ),
                         const SizedBox(height: 16),
+                        // --- Vendor / Material details ---
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: vendorNameCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Vendor Name',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.storefront_rounded),
+                                ),
+                                validator: (v) =>
+                                    v!.isEmpty ? 'Field required' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: vendorLocCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Vendor Location',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.place_rounded),
+                                ),
+                                validator: (v) =>
+                                    v!.isEmpty ? 'Field required' : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: materialCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Material Name',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.category_rounded),
+                                ),
+                                validator: (v) =>
+                                    v!.isEmpty ? 'Field required' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: pickupDistrictCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Pickup District',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.map_rounded),
+                                ),
+                                validator: (v) =>
+                                    v!.isEmpty ? 'Field required' : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: passHolderCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Pass Holder Name',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.badge_rounded),
+                                ),
+                                validator: (v) =>
+                                    v!.isEmpty ? 'Field required' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: royaltyCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Royalty Name',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.workspace_premium_rounded),
+                                ),
+                                validator: (v) =>
+                                    v!.isEmpty ? 'Field required' : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: loadingPassCtrl,
+                          keyboardType: TextInputType.number,
+                          maxLength: 8,
+                          decoration: const InputDecoration(
+                            labelText: 'Loading Pass ID (8 digits)',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.confirmation_number_rounded),
+                            counterText: '',
+                          ),
+                          validator: (v) {
+                            final s = (v ?? '').trim();
+                            if (s.isEmpty) return 'Field required';
+                            if (!RegExp(r'^\d{8}$').hasMatch(s)) {
+                              return 'Exactly 8 digits required';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
                         Row(
                           children: [
                             Expanded(
@@ -1378,12 +2298,11 @@ class AdminHomeView extends GetView<AdminHomeController> {
                               child: TextFormField(
                                 controller: dropCityCtrl,
                                 decoration: const InputDecoration(
-                                  labelText: 'Drop City',
+                                  labelText: 'Drop City (optional)',
+                                  helperText: 'Loading ke time set hoga',
                                   border: OutlineInputBorder(),
                                   prefixIcon: Icon(Icons.location_city_rounded),
                                 ),
-                                validator: (v) =>
-                                    v!.isEmpty ? 'Field required' : null,
                               ),
                             ),
                           ],
@@ -1456,7 +2375,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                         TextFormField(
                           controller: dropLocCtrl,
                           decoration: InputDecoration(
-                            labelText: 'Drop Location',
+                            labelText: 'Drop Location (optional)',
+                            helperText:
+                                'Destination loading ke time set kar sakte hain',
                             border: const OutlineInputBorder(),
                             prefixIcon: const Icon(Icons.pin_drop_rounded),
                             suffixIcon: IconButton(
@@ -1471,8 +2392,6 @@ class AdminHomeView extends GetView<AdminHomeController> {
                               },
                             ),
                           ),
-                          validator: (v) =>
-                              v!.isEmpty ? 'Field required' : null,
                         ),
                         const SizedBox(height: 16),
                         Row(
@@ -1572,6 +2491,14 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                     'id': idCtrl.text.trim(),
                                     'truckNo': selectedTruck,
                                     'driverPhone': selectedDriver,
+                                    'vendorName': vendorNameCtrl.text.trim(),
+                                    'vendorLocation': vendorLocCtrl.text.trim(),
+                                    'materialName': materialCtrl.text.trim(),
+                                    'passHolderName': passHolderCtrl.text.trim(),
+                                    'royaltyName': royaltyCtrl.text.trim(),
+                                    'loadingPassId': loadingPassCtrl.text.trim(),
+                                    'pickupDistrict':
+                                        pickupDistrictCtrl.text.trim(),
                                     'pickupCity': pickupCityCtrl.text.trim(),
                                     'pickupLocation': pickupLocCtrl.text.trim(),
                                     'dropCity': dropCityCtrl.text.trim(),

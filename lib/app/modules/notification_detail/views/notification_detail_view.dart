@@ -29,7 +29,13 @@ class NotificationDetailView extends GetView<NotificationDetailController> {
               _headerCard(isDark),
               const SizedBox(height: 16),
               if (controller.trip.value != null) _tripCard(context, isDark),
+              if (controller.trip.value != null &&
+                  (controller.trip.value!['podUrl'] ?? '')
+                      .toString()
+                      .startsWith('http'))
+                _podProofCard(controller.trip.value!, isDark),
               if (controller.expense.value != null) _expenseCard(isDark),
+              if (controller.truck.value != null) _truckCard(isDark),
               const SizedBox(height: 20),
               _actionSection(),
             ],
@@ -139,6 +145,137 @@ class NotificationDetailView extends GetView<NotificationDetailController> {
             ),
             const SizedBox(height: 16),
             TripProgressTracker(trip: t),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The uploaded Proof-of-Delivery photo + driver remarks, shown to the admin
+  /// so they can verify the proof before approving the delivery.
+  Widget _podProofCard(Map<String, dynamic> trip, bool isDark) {
+    final podUrl = trip['podUrl'].toString();
+    final remarks = (trip['remarks'] ?? '').toString();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: _card(
+        isDark,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.verified_rounded,
+                    color: AppColors.success, size: 18),
+                SizedBox(width: 8),
+                AppText('PROOF OF DELIVERY',
+                    style: AppTextStyle.labelMedium,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textSecondary),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                podUrl,
+                height: 240,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  height: 120,
+                  color: Colors.grey.shade200,
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.broken_image_rounded,
+                      color: AppColors.textHint),
+                ),
+              ),
+            ),
+            if (remarks.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              AppText('Driver remarks: $remarks',
+                  style: AppTextStyle.bodyMedium),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Truck context for truck_assigned / truck_issue / truck_ready — shows the
+  /// inspection status and, for problems, the reported reason + photo proof.
+  Widget _truckCard(bool isDark) {
+    final t = controller.truck.value!;
+    final inspection = (t['inspectionStatus'] ?? '').toString();
+    final issue = (t['inspectionIssue'] ?? '').toString();
+    final issueImage = (t['inspectionIssueImage'] ?? '').toString();
+    final (color, label) = switch (inspection) {
+      'ready' => (AppColors.success, 'Ready ✓'),
+      'problem' => (AppColors.error, 'Problem Reported'),
+      _ => (AppColors.tertiaryDark, 'Inspection Pending'),
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: _card(
+        isDark,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.local_shipping_rounded,
+                    color: AppColors.primary, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: AppText((t['truckNo'] ?? '').toString(),
+                      style: AppTextStyle.bodyLarge,
+                      fontWeight: FontWeight.w700),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: AppText(label,
+                      style: AppTextStyle.labelMedium,
+                      color: color,
+                      fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            if ((t['model'] ?? '').toString().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              AppText((t['model'] ?? '').toString(),
+                  style: AppTextStyle.labelMedium),
+            ],
+            if (issue.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              AppText('⚠️ Problem: $issue',
+                  style: AppTextStyle.bodyMedium,
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w600),
+            ],
+            if (issueImage.startsWith('http')) ...[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  issueImage,
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    height: 100,
+                    color: Colors.grey.shade200,
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.broken_image_rounded,
+                        color: AppColors.textHint),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
