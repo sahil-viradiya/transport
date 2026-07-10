@@ -234,6 +234,10 @@ class TripDetailsController extends GetxController {
         return 'Loading Done — Approval Bhejo';
       case 'LOAD_REQUESTED':
         return 'Admin approval ka intezaar...';
+      case 'ACTIVE NOW':
+        return 'Deliver — Upload Proof of Delivery';
+      case 'DELIVERY_REQUESTED':
+        return 'Awaiting Delivery Approval...';
       default:
         return 'Start Journey';
     }
@@ -265,7 +269,7 @@ class TripDetailsController extends GetxController {
   /// While the load request waits without a destination, remind the admin once
   /// after ~10 minutes and then surface a direct "Call Admin" option.
   void _syncDestinationReminder(Map<String, dynamic> data) {
-    final waiting = data['status'] == 'LOAD_REQUESTED' &&
+    final waiting = (data['status'] == 'LOADING' || data['status'] == 'LOAD_REQUESTED') &&
         (data['dropCity'] ?? '').toString().trim().isEmpty;
     if (!waiting) {
       _destReminderTimer?.cancel();
@@ -275,7 +279,7 @@ class TripDetailsController extends GetxController {
     }
 
     DateTime? requestedAt;
-    final ts = data['loadRequestedAt'];
+    final ts = data['loadingStartedAt'] ?? data['loadRequestedAt'];
     try {
       requestedAt = ts is DateTime ? ts : ts?.toDate();
     } catch (_) {}
@@ -296,6 +300,148 @@ class TripDetailsController extends GetxController {
     check();
     _destReminderTimer ??=
         Timer.periodic(const Duration(minutes: 1), (_) => check());
+  }
+
+  // Staged vendor journey — one button, next step depends on the status:
+  // ASSIGNED → start to vendor; EN_ROUTE_VENDOR → reached, loading starts;
+  // LOADING → request load approval; LOAD_REQUESTED → wait (call admin option).
+  void startJourney() {
+    switch (tripStatus.value) {
+      case 'DELIVERED':
+        AppSnackBar.showError(
+            title: 'Trip Completed',
+            message: 'This trip is already completed.');
+        return;
+
+      case 'DELIVERY_REQUESTED':
+        AppSnackBar.showInfo(
+          title: 'Awaiting Approval',
+          message: 'Delivery approval request admin ko bheja ja chuka hai. '
+              'Approve hote hi trip complete hogi.',
+        );
+        return;
+
+      case 'ACTIVE NOW':
+        Get.toNamed(Routes.PROOF_OF_DELIVERY, arguments: {'tripId': tripId})?.then((result) async {
+          if (result == true) {
+            String driverName = '';
+            try {
+              driverName = Get.find<SessionService>().name.value;
+            } catch (_) {}
+            AppPopup.showLoading(message: 'Requesting delivery approval...');
+            final fix = await _realFix();
+            try {
+              final fb = Get.find<FirebaseService>();
+              await fb.requestDelivery(
+                tripId,
+                location: fix.address,
+                latitude: fix.lat,
+                longitude: fix.lng,
+                driverName: driverName,
+              );
+              AppPopup.hideLoading();
+              AppSnackBar.showSuccess(
+                title: 'Delivery Sent 📍',
+                message: 'Admin ko approval ke liye bheja gaya hai.',
+              );
+            } catch (e) {
+              AppPopup.hideLoading();
+              AppSnackBar.showError(title: 'Error', message: e.toString());
+            }
+          }
+        });
+        return;
+
+      case 'LOAD_REQUESTED':
+        AppSnackBar.showInfo(
+          title: 'Awaiting Approval',
+          message: 'Load approval request admin ko bheja ja chuka hai. '
+              'Approve hote hi trip active hogi.',
+        );
+        return;
+
+      case 'EN_ROUTE_VENDOR':
+        AppPopup.showConfirmation(
+          title: 'VENDOR PAHUNCH GAYE?',
+          description: 'Vendor ko loading pass dikhakar truck ki loading '
+              'shuru ho gayi hai? Admin ko inform kiya jayega (aur wo '
+              'destination set karega).',
+          confirmText: 'Loading Shuru',
+          cancelText: 'Cancel',
+          onConfirm: () async {
+            AppPopup.showLoading(message: 'Capturing location...');
+            final fix = await _realFix();
+            try {
+              await Get.find<FirebaseService>().startLoading(
+                tripId,
+                location: fix.address,
+                latitude: fix.lat,
+                longitude: fix.lng,
+                driverName: _driverName,
+              );
+            } catch (_) {}
+            AppPopup.hideLoading();
+            AppSnackBar.showSuccess(
+              title: 'Loading Shuru 📦',
+              message: 'Admin ko bata diya — wo destination set karega.',
+            );
+          },
+        );
+        return;
+
+      case 'LOADING':
+        AppPopup.showConfirmation(
+          title: 'LOADING COMPLETE?',
+          description:
+              'Maal load ho gaya? Admin ko approval ke liye request bhejein. '
+              'Admin approve karega tabhi trip active hogi aur destination '
+              'dikhega.',
+          confirmText: 'Send Request',
+          cancelText: 'Cancel',
+          onConfirm: () async {
+            AppPopup.showLoading(message: 'Capturing location...');
+            final fix = await _realFix();
+            try {
+              await Get.find<FirebaseService>().requestLoadApproval(
+                tripId,
+                pickupLocation: fix.address,
+                driverName: _driverName,
+                latitude: fix.lat,
+                longitude: fix.lng,
+              );
+            } catch (_) {}
+            AppPopup.hideLoading();
+            AppSnackBar.showSuccess(
+              title: 'Request Sent 📦',
+              message: 'Admin approve karega tabhi trip active hogi.',
+            );
+          },
+        );
+        return;
+
+      default:
+        // ASSIGNED (or legacy trips): driver leaves for the vendor.
+        AppPopup.showConfirmation(
+          title: 'VENDOR KE LIYE NIKLEIN?',
+          description:
+              'Aap vendor ke paas material lene nikal rahe hain? Admin ko '
+              '"on the way" status dikhega.',
+          confirmText: 'Start',
+          cancelText: 'Cancel',
+          onConfirm: () async {
+            AppPopup.showLoading(message: 'Starting...');
+            try {
+              await Get.find<FirebaseService>()
+                  .startToVendor(tripId, driverName: _driverName);
+            } catch (_) {}
+            AppPopup.hideLoading();
+            AppSnackBar.showSuccess(
+              title: 'On The Way 🛻',
+              message: 'Admin ko inform kar diya. Safe driving!',
+            );
+          },
+        );
+    }
   }
 
   /// Direct call to the admin who assigned the trip (last resort when the
@@ -603,108 +749,7 @@ class TripDetailsController extends GetxController {
     }
   }
 
-  // Staged vendor journey — one button, next step depends on the status:
-  // ASSIGNED → start to vendor; EN_ROUTE_VENDOR → reached, loading starts;
-  // LOADING → request load approval; LOAD_REQUESTED → wait (call admin option).
-  void startJourney() {
-    switch (tripStatus.value) {
-      case 'DELIVERED':
-        AppSnackBar.showError(
-            title: 'Trip Completed',
-            message: 'This trip is already completed.');
-        return;
 
-      case 'LOAD_REQUESTED':
-        AppSnackBar.showInfo(
-          title: 'Awaiting Approval',
-          message: 'Load approval request admin ko bheja ja chuka hai. '
-              'Approve hote hi trip active hogi.',
-        );
-        return;
-
-      case 'EN_ROUTE_VENDOR':
-        AppPopup.showConfirmation(
-          title: 'VENDOR PAHUNCH GAYE?',
-          description: 'Vendor ko loading pass dikhakar truck ki loading '
-              'shuru ho gayi hai? Admin ko inform kiya jayega (aur wo '
-              'destination set karega).',
-          confirmText: 'Loading Shuru',
-          cancelText: 'Cancel',
-          onConfirm: () async {
-            AppPopup.showLoading(message: 'Capturing location...');
-            final fix = await _realFix();
-            try {
-              await Get.find<FirebaseService>().startLoading(
-                tripId,
-                location: fix.address,
-                latitude: fix.lat,
-                longitude: fix.lng,
-                driverName: _driverName,
-              );
-            } catch (_) {}
-            AppPopup.hideLoading();
-            AppSnackBar.showSuccess(
-              title: 'Loading Shuru 📦',
-              message: 'Admin ko bata diya — wo destination set karega.',
-            );
-          },
-        );
-        return;
-
-      case 'LOADING':
-        AppPopup.showConfirmation(
-          title: 'LOADING COMPLETE?',
-          description:
-              'Maal load ho gaya? Admin ko approval ke liye request bhejein. '
-              'Admin approve karega tabhi trip active hogi aur destination '
-              'dikhega.',
-          confirmText: 'Send Request',
-          cancelText: 'Cancel',
-          onConfirm: () async {
-            AppPopup.showLoading(message: 'Capturing location...');
-            final fix = await _realFix();
-            try {
-              await Get.find<FirebaseService>().requestLoadApproval(
-                tripId,
-                pickupLocation: fix.address,
-                driverName: _driverName,
-                latitude: fix.lat,
-                longitude: fix.lng,
-              );
-            } catch (_) {}
-            AppPopup.hideLoading();
-            AppSnackBar.showSuccess(
-              title: 'Request Sent 📦',
-              message: 'Admin approve karega tabhi trip active hogi.',
-            );
-          },
-        );
-        return;
-
-      default:
-        // ASSIGNED (or legacy trips): driver leaves for the vendor.
-        AppPopup.showConfirmation(
-          title: 'VENDOR KE LIYE NIKLEIN?',
-          description:
-              'Aap vendor ke paas material lene nikal rahe hain? Admin ko '
-              '"on the way" status dikhega.',
-          confirmText: 'Start',
-          cancelText: 'Cancel',
-          onConfirm: () async {
-            AppPopup.showLoading(message: 'Starting...');
-            try {
-              await Get.find<FirebaseService>()
-                  .startToVendor(tripId, driverName: _driverName);
-            } catch (_) {}
-            AppPopup.hideLoading();
-            AppSnackBar.showSuccess(
-              title: 'On The Way 🛻',
-              message: 'Admin ko inform kar diya. Safe driving!',
-            );
-          },
-        );
-    }
-  }
 
   // Update milestone checkpoint progress
   void selectMilestone(int milestoneIndex) {

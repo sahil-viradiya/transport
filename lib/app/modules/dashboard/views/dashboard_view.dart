@@ -4,15 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/dashboard_controller.dart';
 import '../../home/controllers/home_controller.dart';
+import '../../profile/controllers/profile_controller.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../../widgets/app_button.dart';
-import '../../../../widgets/premium_widgets.dart';
-import '../../../../widgets/trip_progress_tracker.dart';
 import '../../../../widgets/notification_bell.dart';
 import '../../../data/notifications_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../routes/app_pages.dart';
+import '../../../../widgets/dialogs/app_snackbar.dart';
 
+/// Reference driver dashboard: greeting header, green My Truck card, Today's
+/// Trip + Trip Status tiles, 6-tile action grid, Trip Progress stepper card
+/// and the duty check-in card. All previous functionality stays reachable.
 class DashboardView extends GetView<DashboardController> {
   const DashboardView({super.key});
 
@@ -20,54 +23,77 @@ class DashboardView extends GetView<DashboardController> {
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return NetworkImage(path);
     } else if (!kIsWeb && path.isNotEmpty && File(path).existsSync()) {
-      // File() is unsupported on web — only touch it on mobile/desktop.
       return FileImage(File(path));
     }
     return const NetworkImage(
         'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150');
   }
 
+  String _greeting() {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Good Morning 👋';
+    if (h < 17) return 'Good Afternoon 👋';
+    return 'Good Evening 👋';
+  }
+
+  static String friendlyStatus(String status) {
+    switch (status) {
+      case 'PENDING':
+        return 'Pending Accept';
+      case 'ASSIGNED':
+        return 'Accepted';
+      case 'EN_ROUTE_VENDOR':
+        return 'On The Way';
+      case 'LOADING':
+        return 'Loading';
+      case 'LOAD_REQUESTED':
+        return 'Load Requested';
+      case 'ACTIVE NOW':
+        return 'On The Way (Dest.)';
+      case 'DELIVERY_REQUESTED':
+        return 'Delivery Requested';
+      case 'DELIVERED':
+        return 'Completed';
+      default:
+        return '—';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final homeController = Get.find<HomeController>();
+    final home = Get.find<HomeController>();
 
     return Scaffold(
       body: Obx(() {
         if (!controller.isOnline.value) {
           return SafeArea(child: _buildOfflineView(context, isDark));
         }
-        return RefreshIndicator(
-          onRefresh: controller.loadProfileFromFirebase,
-          color: AppColors.primary,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildHero(),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildDutyCard(context),
-                      _buildMyTruckCard(context),
-                      const SizedBox(height: 16),
-                      _buildActiveTripCard(context),
-                      const SizedBox(height: 24),
-                      const SectionHeader('Quick Actions'),
-                      const SizedBox(height: 12),
-                      _buildQuickActions(context, homeController),
-                      const SizedBox(height: 24),
-                      SectionHeader('Notifications',
-                          actionLabel: 'View All', onAction: () {}),
-                      const SizedBox(height: 12),
-                      _buildNotifications(),
-                    ],
-                  ),
-                ),
-              ],
+        return SafeArea(
+          child: RefreshIndicator(
+            onRefresh: controller.loadProfileFromFirebase,
+            color: AppColors.primary,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildHeader(context),
+                  const SizedBox(height: 16),
+                  _buildMyTruckCard(),
+                  _buildTruckAcceptanceAlert(),
+                  const SizedBox(height: 12),
+                  _buildTodayTiles(context),
+                  const SizedBox(height: 16),
+                  _buildActionGrid(context, home),
+                  const SizedBox(height: 16),
+                  _buildTripProgressCard(context),
+                  const SizedBox(height: 16),
+                  _buildDutyCard(context),
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
           ),
         );
@@ -75,109 +101,507 @@ class DashboardView extends GetView<DashboardController> {
     );
   }
 
-  // ---- Saffron gradient hero header ----
-  Widget _buildHero() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: AppColors.saffronGradient,
+  Widget _buildTruckAcceptanceAlert() {
+    return Obx(() {
+      final status = controller.truckInspection;
+      if (status != 'approved_pending_accept') return const SizedBox.shrink();
+      final truckNo = controller.myTruckNo;
+      return Container(
+        margin: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.primaryLight.withOpacity(0.8),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.primary, width: 1.5),
         ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: AppColors.primaryDark, size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  child: AppText(
+                    'Inspection Approved! 🚛',
+                    style: AppTextStyle.bodyMedium,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryDark,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            AppText(
+              'Admin ne truck $truckNo ka inspection approve kar diya hai. Trip shuru karne ke liye truck accept karein.',
+              style: AppTextStyle.labelMedium,
+              color: AppColors.primaryDark,
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: controller.acceptMyTruck,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryDark,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Accept Truck', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
+      );
+    });
+  }
+
+  // ---- Greeting header (avatar + name + bell + SOS) ----
+  Widget _buildHeader(BuildContext context) {
+    return Row(
+      children: [
+        Obx(() => CircleAvatar(
+              radius: 22,
+              backgroundColor: AppColors.primaryLight,
+              backgroundImage:
+                  _getImageProvider(controller.avatarUrl.value),
+            )),
+        const SizedBox(width: 12),
+        Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Obx(() => Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border:
-                              Border.all(color: Colors.white, width: 2),
-                          image: DecorationImage(
-                            image: _getImageProvider(controller.avatarUrl.value),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      )),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        AppText('Ram Ram 🙏',
-                            style: AppTextStyle.labelMedium,
-                            color: Colors.white.withValues(alpha: 0.9)),
-                        Obx(() => AppText(
-                              controller.driverName.value.isEmpty
-                                  ? 'Truck Owner'
-                                  : controller.driverName.value,
-                              style: AppTextStyle.titleLarge,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700)),
-                      ],
-                    ),
-                  ),
-                  const NotificationBell(color: Colors.white),
-                  _circleIcon(Icons.sos_rounded, controller.triggerEmergencySos,
-                      bg: Colors.white.withValues(alpha: 0.18)),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: Obx(() => HeroStat(
-                          icon: Icons.local_shipping_rounded,
-                          label: 'Vehicle',
-                          value: controller.vehicleNo.value.isEmpty
-                              ? '—'
-                              : controller.vehicleNo.value,
-                        )),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Obx(() => HeroStat(
-                          icon: Icons.route_rounded,
-                          label: 'Total Trips',
-                          value: controller.todayTripsCount.value
-                              .toString()
-                              .padLeft(2, '0'),
-                        )),
-                  ),
-                ],
-              ),
+              AppText(_greeting(),
+                  style: AppTextStyle.labelMedium,
+                  color: AppColors.textSecondary),
+              Obx(() => AppText(
+                    controller.driverName.value.isEmpty
+                        ? 'Driver'
+                        : controller.driverName.value,
+                    style: AppTextStyle.titleLarge,
+                    fontWeight: FontWeight.w800,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  )),
             ],
           ),
         ),
-      ),
+        GestureDetector(
+          onTap: controller.triggerEmergencySos,
+          child: Container(
+            width: 40,
+            height: 40,
+            margin: const EdgeInsets.only(right: 4),
+            decoration: BoxDecoration(
+              color: AppColors.error.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child:
+                const Icon(Icons.sos_rounded, color: AppColors.error, size: 20),
+          ),
+        ),
+        const NotificationBell(color: AppColors.textPrimary),
+      ],
     );
   }
 
-  Widget _circleIcon(IconData icon, VoidCallback onTap, {required Color bg}) {
-    return GestureDetector(
+  // ---- Green "My Truck" card ----
+  Widget _buildMyTruckCard() {
+    return Obx(() {
+      final truck = controller.myTruck.value;
+      final truckNo = (truck?['truckNo'] ?? controller.vehicleNo.value)
+          .toString();
+      final model =
+          (truck?['model'] ?? controller.vehicleModel.value).toString();
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: AppColors.saffronGradient,
+          ),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppText('My Truck',
+                      style: AppTextStyle.labelMedium,
+                      color: Colors.white.withValues(alpha: 0.9)),
+                  const SizedBox(height: 4),
+                  AppText(truckNo.isEmpty ? 'Not assigned yet' : truckNo,
+                      style: AppTextStyle.headlineSmall,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  if (model.isNotEmpty)
+                    AppText(model,
+                        style: AppTextStyle.labelMedium,
+                        color: Colors.white.withValues(alpha: 0.85)),
+                ],
+              ),
+            ),
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(Icons.local_shipping_rounded,
+                  color: Colors.white, size: 28),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  // ---- Today's Trip + Trip Status tiles ----
+  Widget _buildTodayTiles(BuildContext context) {
+    return Obx(() {
+      final trip = controller.currentTrip;
+      final status = friendlyStatus(trip?.status ?? '');
+      return Row(
+        children: [
+          Expanded(
+            child: _miniTile(
+              context,
+              label: "Today's Trip",
+              value: trip?.id ?? 'No Trip',
+              sub: trip != null ? status : '—',
+              icon: Icons.assignment_rounded,
+              tint: const Color(0xFF7E22CE),
+              onTap: trip == null
+                  ? null
+                  : () => Navigator.of(context, rootNavigator: true).pushNamed(
+                        Routes.TRIP_DETAILS,
+                        arguments: {
+                          'tripId': trip.id,
+                          'isAlreadyActive': trip.isActive
+                        },
+                      ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _miniTile(
+              context,
+              label: 'Trip Status',
+              value: status,
+              sub: trip != null ? trip.id : '—',
+              icon: Icons.location_on_rounded,
+              tint: AppColors.info,
+              onTap: null,
+            ),
+          ),
+        ],
+      );
+    });
+  }
+
+  Widget _miniTile(BuildContext context,
+      {required String label,
+      required String value,
+      required String sub,
+      required IconData icon,
+      required Color tint,
+      VoidCallback? onTap}) {
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-        child: Icon(icon, color: Colors.white, size: 22),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: tint.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: tint.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppText(label,
+                      style: AppTextStyle.labelMedium, color: tint),
+                  const SizedBox(height: 2),
+                  AppText(value,
+                      style: AppTextStyle.bodyLarge,
+                      fontWeight: FontWeight.w800,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  AppText(sub,
+                      style: AppTextStyle.labelMedium,
+                      color: AppColors.textHint,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+            Icon(icon, color: tint, size: 20),
+          ],
+        ),
       ),
     );
   }
 
-  // ---- Duty / Check-in card ----
+  // ---- 6-tile action grid ----
+  Widget _buildActionGrid(BuildContext context, HomeController home) {
+    Widget tile(IconData icon, String label, Color color, VoidCallback onTap,
+        {int badge = 0}) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, color: color, size: 22),
+                  ),
+                  if (badge > 0)
+                    Positioned(
+                      right: -4,
+                      top: -4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.error,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: AppText('$badge',
+                            style: AppTextStyle.labelMedium,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              AppText(label,
+                  style: AppTextStyle.labelMedium,
+                  fontWeight: FontWeight.w600,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Obx(() {
+      final inspectionBadge = (controller.myTruck.value != null &&
+              controller.truckInspection != 'ready')
+          ? 1
+          : 0;
+      final notifBadge = Get.isRegistered<NotificationsController>()
+          ? Get.find<NotificationsController>().unreadCount
+          : 0;
+      return GridView.count(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisCount: 3,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 1.15,
+        children: [
+          tile(Icons.local_shipping_rounded, 'My Trips', AppColors.primary,
+              () => home.changeTabIndex(1)),
+          tile(Icons.fact_check_rounded, 'Inspection', AppColors.info,
+              () => home.changeTabIndex(3),
+              badge: inspectionBadge),
+          tile(Icons.workspace_premium_rounded, 'Pass & Royalty',
+              const Color(0xFF7E22CE), () {
+            final trip = controller.currentTrip;
+            if (trip == null) {
+              AppSnackBar.showInfo(
+                  title: 'No Trip', message: 'Abhi koi trip assigned nahi.');
+              return;
+            }
+            Navigator.of(context, rootNavigator: true).pushNamed(
+              Routes.TRIP_DETAILS,
+              arguments: {'tripId': trip.id, 'isAlreadyActive': trip.isActive},
+            );
+          }),
+          tile(Icons.description_rounded, 'Documents', AppColors.tertiaryDark,
+              () {
+            home.changeTabIndex(4);
+            try {
+              Get.find<ProfileController>().selectSubTab(1);
+            } catch (_) {}
+          }),
+          tile(Icons.currency_rupee_rounded, 'Earnings', AppColors.success,
+              () => home.changeTabIndex(2)),
+          tile(Icons.notifications_rounded, 'Notifications', AppColors.error,
+              () => const NotificationBell().open(context),
+              badge: notifBadge),
+        ],
+      );
+    });
+  }
+
+  // ---- Trip Progress stepper card (5 reference stages) ----
+  Widget _buildTripProgressCard(BuildContext context) {
+    return Obx(() {
+      final trip = controller.currentTrip;
+      if (trip == null) return const SizedBox.shrink();
+
+      const labels = [
+        'On The\nWay',
+        'Reached\nVendor',
+        'Loading',
+        'On The Way\n(Dest.)',
+        'Completed'
+      ];
+      // stage index reached (0-based); current = next
+      int done;
+      String info;
+      switch (trip.status) {
+        case 'EN_ROUTE_VENDOR':
+          done = 0;
+          info = 'You are on the way to ${trip.vendorLocation.isEmpty ? trip.pickupLocation : trip.vendorLocation}';
+          break;
+        case 'LOADING':
+          done = 2;
+          info = 'Truck is loading at ${trip.vendorName.isEmpty ? 'vendor' : trip.vendorName}';
+          break;
+        case 'LOAD_REQUESTED':
+          done = 3;
+          info = 'Loading complete — waiting for admin approval';
+          break;
+        case 'ACTIVE NOW':
+        case 'DELIVERY_REQUESTED':
+          done = 4;
+          info = trip.dropCity.isEmpty
+              ? 'On the way to destination'
+              : 'On the way to ${trip.dropCity}';
+          break;
+        case 'DELIVERED':
+          done = 5;
+          info = 'Trip completed. Great job!';
+          break;
+        default:
+          done = 0;
+          info = 'Trip assigned — accept & start when ready';
+      }
+
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: _cardDecoration(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const AppText('Trip Progress',
+                style: AppTextStyle.bodyLarge, fontWeight: FontWeight.w800),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.info.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_rounded,
+                      color: AppColors.info, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: AppText(info,
+                        style: AppTextStyle.labelMedium,
+                        color: AppColors.info,
+                        fontWeight: FontWeight.w600,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: List.generate(labels.length * 2 - 1, (i) {
+                if (i.isOdd) {
+                  final idx = i ~/ 2;
+                  return Expanded(
+                    child: Container(
+                      height: 3,
+                      margin: const EdgeInsets.only(top: 11),
+                      color: idx < done
+                          ? AppColors.success
+                          : AppColors.border,
+                    ),
+                  );
+                }
+                final idx = i ~/ 2;
+                final isDone = idx < done;
+                final isCurrent = idx == done && trip.status != 'DELIVERED';
+                final color = isDone
+                    ? AppColors.success
+                    : (isCurrent ? AppColors.info : AppColors.textHint);
+                return Column(
+                  children: [
+                    Icon(
+                        isDone
+                            ? Icons.check_circle_rounded
+                            : (isCurrent
+                                ? Icons.radio_button_checked_rounded
+                                : Icons.circle_outlined),
+                        size: 24,
+                        color: color),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      width: 56,
+                      child: AppText(labels[idx],
+                          style: AppTextStyle.labelMedium,
+                          textAlign: TextAlign.center,
+                          color: color,
+                          fontWeight:
+                              isCurrent ? FontWeight.w700 : FontWeight.w500),
+                    ),
+                  ],
+                );
+              }),
+            ),
+            const SizedBox(height: 14),
+            AppButton(
+              text: 'Update Status',
+              icon: Icons.published_with_changes_rounded,
+              onPressed: () =>
+                  Navigator.of(context, rootNavigator: true).pushNamed(
+                Routes.TRIP_DETAILS,
+                arguments: {
+                  'tripId': trip.id,
+                  'isAlreadyActive': trip.isActive
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  // ---- Duty / Check-in card (kept from before) ----
   Widget _buildDutyCard(BuildContext context) {
     return Obx(() {
       final onDuty = controller.isOnDuty;
@@ -198,9 +622,7 @@ class DashboardView extends GetView<DashboardController> {
                     borderRadius: BorderRadius.circular(13),
                   ),
                   child: Icon(
-                    onDuty
-                        ? Icons.check_circle_rounded
-                        : Icons.nightlight_round,
+                    onDuty ? Icons.check_circle_rounded : Icons.nightlight_round,
                     color: accent,
                     size: 24,
                   ),
@@ -210,21 +632,10 @@ class DashboardView extends GetView<DashboardController> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration:
-                                BoxDecoration(color: accent, shape: BoxShape.circle),
-                          ),
-                          const SizedBox(width: 6),
-                          AppText(onDuty ? 'On Duty • Available' : 'Off Duty',
-                              style: AppTextStyle.titleLarge,
-                              fontWeight: FontWeight.w700,
-                              color: accent),
-                        ],
-                      ),
+                      AppText(onDuty ? 'On Duty • Available' : 'Off Duty',
+                          style: AppTextStyle.titleLarge,
+                          fontWeight: FontWeight.w700,
+                          color: accent),
                       const SizedBox(height: 2),
                       AppText(
                         onDuty
@@ -272,379 +683,13 @@ class DashboardView extends GetView<DashboardController> {
     });
   }
 
-  // ---- My Truck: daily assignment + inspection card ----
-  Widget _buildMyTruckCard(BuildContext context) {
-    return Obx(() {
-      final truck = controller.myTruck.value;
-      if (truck == null) return const SizedBox.shrink();
-
-      final truckNo = (truck['truckNo'] ?? '').toString();
-      final model = (truck['model'] ?? '').toString();
-      final inspection = controller.truckInspection;
-      final issue = (truck['inspectionIssue'] ?? '').toString();
-
-      final (accent, statusLabel, statusIcon) = switch (inspection) {
-        'ready' => (AppColors.success, 'Ready ✓', Icons.verified_rounded),
-        'problem' => (
-            AppColors.error,
-            'Problem Reported',
-            Icons.report_problem_rounded
-          ),
-        _ => (
-            AppColors.tertiaryDark,
-            'Inspection Pending',
-            Icons.pending_rounded
-          ),
-      };
-
-      return Container(
-        margin: const EdgeInsets.only(top: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: _cardDecoration(context),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: Icon(Icons.local_shipping_rounded,
-                      color: accent, size: 24),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AppText(truckNo,
-                          style: AppTextStyle.titleLarge,
-                          fontWeight: FontWeight.w700,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                      if (model.isNotEmpty)
-                        AppText(model, style: AppTextStyle.labelMedium),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(statusIcon, size: 12, color: accent),
-                      const SizedBox(width: 4),
-                      AppText(statusLabel,
-                          style: AppTextStyle.labelMedium,
-                          color: accent,
-                          fontWeight: FontWeight.bold),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (inspection == 'problem' && issue.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              AppText('⚠️ $issue — admin ko inform kiya gaya hai.',
-                  style: AppTextStyle.labelMedium,
-                  color: AppColors.error,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis),
-            ],
-            if (inspection != 'ready') ...[
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: controller.reportTruckProblem,
-                      icon: const Icon(Icons.report_problem_rounded, size: 18),
-                      label: const Text('Report Problem'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.error,
-                        side: const BorderSide(color: AppColors.error),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: controller.acceptAssignedTruck,
-                      icon: const Icon(Icons.check_rounded, size: 18),
-                      label: const Text('Accept Truck'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.success,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      );
-    });
-  }
-
-  // ---- Active trip card (white, with progress tracker) ----
-  Widget _buildActiveTripCard(BuildContext context) {
-    return Obx(() {
-      final trip = controller.activeTrip;
-      final homeController = Get.find<HomeController>();
-
-      if (trip == null) {
-        return Container(
-          padding: const EdgeInsets.all(22),
-          decoration: _cardDecoration(context),
-          child: Column(
-            children: [
-              const Icon(Icons.local_shipping_outlined,
-                  color: AppColors.textHint, size: 44),
-              const SizedBox(height: 10),
-              const AppText('No Active Trip',
-                  style: AppTextStyle.headlineSmall, fontWeight: FontWeight.w700),
-              const SizedBox(height: 6),
-              const AppText(
-                'Abhi koi trip chalu nahi hai. Assigned trips dekh kar journey shuru karein.',
-                style: AppTextStyle.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              AppButton(
-                text: 'View My Trips',
-                icon: Icons.arrow_forward_rounded,
-                onPressed: () => homeController.changeTabIndex(1),
-              ),
-            ],
-          ),
-        );
-      }
-
-      final tripMap = {
-        'currentMilestone': trip.currentMilestone,
-        'status': trip.status,
-        'milestonesLog': trip.milestonesLog,
-        'pickupLocation': trip.pickupLocation,
-        'dropLocation': trip.dropLocation,
-        'dropCity': trip.dropCity,
-      };
-      final eta = trip.estimatedTime.isNotEmpty ? trip.estimatedTime : 'Pending';
-
-      return Container(
-        padding: const EdgeInsets.all(18),
-        decoration: _cardDecoration(context),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const AppText('ACTIVE TRIP',
-                      style: AppTextStyle.labelMedium,
-                      color: AppColors.primaryDark,
-                      fontWeight: FontWeight.w700),
-                ),
-                const Spacer(),
-                const Icon(Icons.schedule_rounded,
-                    size: 15, color: AppColors.textSecondary),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: AppText('ETA $eta',
-                      style: AppTextStyle.labelMedium,
-                      fontWeight: FontWeight.w700,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const AppText('FROM', style: AppTextStyle.labelMedium),
-                      AppText(trip.pickupCity,
-                          style: AppTextStyle.titleLarge,
-                          fontWeight: FontWeight.w700),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.east_rounded, color: AppColors.primary),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const AppText('TO', style: AppTextStyle.labelMedium),
-                      AppText(trip.dropCity,
-                          style: AppTextStyle.titleLarge,
-                          fontWeight: FontWeight.w700,
-                          textAlign: TextAlign.end),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            TripProgressTracker(trip: tripMap, showSummary: false),
-            const SizedBox(height: 18),
-            AppButton(
-              text: 'Resume Navigation',
-              icon: Icons.navigation_rounded,
-              onPressed: () {
-                Navigator.of(context, rootNavigator: true).pushNamed(
-                  Routes.TRIP_DETAILS,
-                  arguments: {'tripId': trip.id, 'isAlreadyActive': true},
-                );
-              },
-            ),
-          ],
-        ),
-      );
-    });
-  }
-
-  Widget _buildQuickActions(BuildContext context, HomeController home) {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 4,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 0.72,
-      children: [
-        QuickActionTile(
-          icon: Icons.local_shipping_rounded,
-          label: 'My Trips',
-          color: AppColors.primary,
-          onTap: () => home.changeTabIndex(1),
-        ),
-        QuickActionTile(
-          icon: Icons.receipt_long_rounded,
-          label: 'Kharcha',
-          color: AppColors.tertiaryDark,
-          onTap: () => home.changeTabIndex(2),
-        ),
-        QuickActionTile(
-          icon: Icons.description_rounded,
-          label: 'Documents',
-          color: AppColors.info,
-          onTap: () => home.changeTabIndex(3),
-        ),
-        QuickActionTile(
-          icon: Icons.sos_rounded,
-          label: 'SOS',
-          color: AppColors.error,
-          onTap: controller.triggerEmergencySos,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildNotifications() {
-    final notifs = Get.find<NotificationsController>();
-    return Obx(() {
-      final items = notifs.items.take(4).toList();
-      if (items.isEmpty) {
-        return Container(
-          padding: const EdgeInsets.all(18),
-          decoration: _cardDecoration(Get.context!),
-          child: const Row(
-            children: [
-              Icon(Icons.notifications_none_rounded,
-                  color: AppColors.textHint, size: 22),
-              SizedBox(width: 10),
-              Expanded(
-                child: AppText('No notifications yet',
-                    style: AppTextStyle.bodyMedium),
-              ),
-            ],
-          ),
-        );
-      }
-      return Column(
-        children: items.map((n) {
-          final read = n['read'] == true;
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(14),
-            decoration: _cardDecoration(Get.context!),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.notifications_rounded,
-                      color: AppColors.primary, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AppText(n['title']?.toString() ?? '',
-                          style: AppTextStyle.bodyLarge,
-                          fontWeight: FontWeight.w700),
-                      const SizedBox(height: 2),
-                      AppText(n['body']?.toString() ?? '',
-                          style: AppTextStyle.bodyMedium),
-                    ],
-                  ),
-                ),
-                if (!read)
-                  Container(
-                    margin: const EdgeInsets.only(left: 6, top: 4),
-                    width: 9,
-                    height: 9,
-                    decoration: const BoxDecoration(
-                        color: AppColors.primary, shape: BoxShape.circle),
-                  ),
-              ],
-            ),
-          );
-        }).toList(),
-      );
-    });
-  }
-
   BoxDecoration _cardDecoration(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return BoxDecoration(
-      color: isDark ? const Color(0xFF1F1B18) : Colors.white,
-      borderRadius: BorderRadius.circular(18),
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      borderRadius: BorderRadius.circular(16),
       border:
-          Border.all(color: isDark ? const Color(0xFF332E2A) : AppColors.border),
-      boxShadow: [
-        BoxShadow(
-          color: AppColors.charcoal.withValues(alpha: isDark ? 0.25 : 0.05),
-          blurRadius: 16,
-          offset: const Offset(0, 6),
-        ),
-      ],
+          Border.all(color: isDark ? Colors.white10 : AppColors.border),
     );
   }
 

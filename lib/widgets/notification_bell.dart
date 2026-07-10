@@ -15,6 +15,12 @@ class NotificationBell extends StatelessWidget {
 
   const NotificationBell({super.key, this.color = Colors.white});
 
+  /// Opens the notifications bottom sheet from anywhere (dashboard tiles etc.).
+  void open(BuildContext context) {
+    if (!Get.isRegistered<NotificationsController>()) return;
+    _openSheet(context, Get.find<NotificationsController>());
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!Get.isRegistered<NotificationsController>()) {

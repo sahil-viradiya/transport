@@ -12,7 +12,7 @@ import '../modules/otp_verification/views/otp_verification_view.dart';
 import '../modules/home/bindings/home_binding.dart';
 import '../modules/home/views/home_view.dart';
 import '../modules/trip_details/bindings/trip_details_binding.dart';
-import '../modules/trip_details/views/trip_details_view.dart';
+import '../modules/trip_details/views/trip_status_view.dart';
 import '../modules/proof_of_delivery/bindings/proof_of_delivery_binding.dart';
 import '../modules/proof_of_delivery/views/proof_of_delivery_view.dart';
 import '../modules/admin_home/bindings/admin_home_binding.dart';
@@ -65,7 +65,7 @@ class AppPages {
     ),
     GetPage(
       name: _Paths.TRIP_DETAILS,
-      page: () => const TripDetailsView(),
+      page: () => const TripStatusView(),
       binding: TripDetailsBinding(),
     ),
     GetPage(

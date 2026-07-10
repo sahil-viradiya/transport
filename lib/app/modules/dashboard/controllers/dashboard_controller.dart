@@ -68,6 +68,70 @@ class DashboardController extends GetxController {
     }
   }
 
+  /// Today's running trip: the active one, else the first not-yet-completed
+  /// trip (drives the dashboard "Today's Trip" tile + progress card).
+  TripItemModel? get currentTrip {
+    try {
+      final tc = Get.find<TripsController>();
+      return activeTrip ??
+          tc.allTrips.firstWhereOrNull(
+              (t) => t.status != 'DELIVERED' && t.status != 'REJECTED');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Truck-inspection checklist submit (reference form). Sets state to pending review.
+  Future<bool> submitInspection({
+    required Map<String, bool> results, // item -> isGood
+    required String remarks,
+    required List<Uint8List> images,
+  }) async {
+    final truckNo = myTruckNo;
+    if (truckNo.isEmpty) return false;
+    AppPopup.showLoading(message: 'Submitting inspection...');
+    try {
+      final fb = Get.find<FirebaseService>();
+      final List<String> imageUrls = [];
+      if (images.isNotEmpty) {
+        final url = await fb.uploadTruckIssueImage(truckNo, images.first);
+        if (url.isNotEmpty) imageUrls.add(url);
+      }
+      await fb.submitTruckInspection(
+        truckNo,
+        results: results,
+        remarks: remarks,
+        imageUrls: imageUrls,
+        driverName: driverName.value,
+      );
+      AppPopup.hideLoading();
+      return true;
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+      return false;
+    }
+  }
+
+  /// Driver accepts the truck after inspection approval.
+  Future<void> acceptMyTruck() async {
+    final truckNo = myTruckNo;
+    if (truckNo.isEmpty) return;
+    AppPopup.showLoading(message: 'Accepting truck...');
+    try {
+      final fb = Get.find<FirebaseService>();
+      await fb.acceptTruck(truckNo, driverName: driverName.value);
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(
+        title: 'Truck Accepted 🚛',
+        message: 'Aapne truck $truckNo accept kar liya hai.',
+      );
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
+  }
+
   // Dummy notifications matching reference image
   final List<NotificationModel> notifications = [
     NotificationModel(

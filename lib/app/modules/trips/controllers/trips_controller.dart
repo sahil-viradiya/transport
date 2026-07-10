@@ -8,7 +8,7 @@ import '../../../../widgets/dialogs/app_snackbar.dart';
 
 class TripsController extends GetxController {
   final searchController = TextEditingController();
-  final RxString activeTab = 'Today'.obs;
+  final RxString activeTab = 'All'.obs;
   final RxString searchQuery = ''.obs;
 
   // Static stats
@@ -20,16 +20,36 @@ class TripsController extends GetxController {
   // Live owner-scoped trips, populated from Firestore in [fetchTripsFromFirebase].
   final RxList<TripItemModel> allTrips = <TripItemModel>[].obs;
 
+  static const _ongoingStatuses = {
+    'EN_ROUTE_VENDOR',
+    'LOADING',
+    'LOAD_REQUESTED',
+    'ACTIVE NOW',
+    'DELIVERY_REQUESTED',
+  };
+
+  bool _matchesTab(TripItemModel trip) {
+    switch (activeTab.value) {
+      case 'Upcoming':
+        return trip.status == 'PENDING' || trip.status == 'ASSIGNED';
+      case 'Ongoing':
+        return _ongoingStatuses.contains(trip.status);
+      case 'Completed':
+        return trip.status == 'DELIVERED' || trip.status == 'REJECTED';
+      default: // All
+        return true;
+    }
+  }
+
   // Filtered trips list getter — priority (PENDING) trips float to the top.
   List<TripItemModel> get filteredTrips {
     final list = allTrips.where((trip) {
-      final matchesTab = trip.tabType == activeTab.value;
       final matchesSearch = searchQuery.value.isEmpty ||
           trip.id.toLowerCase().contains(searchQuery.value.toLowerCase()) ||
           trip.truckNo.toLowerCase().contains(searchQuery.value.toLowerCase()) ||
           trip.pickupCity.toLowerCase().contains(searchQuery.value.toLowerCase()) ||
           trip.dropCity.toLowerCase().contains(searchQuery.value.toLowerCase());
-      return matchesTab && matchesSearch;
+      return _matchesTab(trip) && matchesSearch;
     }).toList();
     list.sort((a, b) {
       // Priority first, then still-pending (needs action) above the rest.
@@ -188,6 +208,8 @@ class TripItemModel {
   final String passHolderName;
   final String royaltyName;
   final String loadingPassId;
+  final String minPassId;
+  final String maxPassId;
   final String pickupDistrict;
   final String remainingDistance;
   final String estimatedTime;
@@ -221,6 +243,8 @@ class TripItemModel {
     this.passHolderName = '',
     this.royaltyName = '',
     this.loadingPassId = '',
+    this.minPassId = '',
+    this.maxPassId = '',
     this.pickupDistrict = '',
     this.remainingDistance = '',
     this.estimatedTime = '',

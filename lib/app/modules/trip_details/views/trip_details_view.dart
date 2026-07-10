@@ -3,10 +3,10 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/trip_details_controller.dart';
+import 'trip_status_view.dart';
 import '../../../../widgets/app_text.dart';
-import '../../../../widgets/app_button.dart';
-import '../../../../widgets/app_image_view.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/services/session_service.dart';
 
 class TripDetailsView extends GetView<TripDetailsController> {
   const TripDetailsView({super.key});
@@ -25,307 +25,201 @@ class TripDetailsView extends GetView<TripDetailsController> {
     });
   }
 
-  // SCREEN 1: Trip Start Confirmation (Confirm Journey)
+  // SCREEN 1: Trip Details (reference design — info + Call Admin + Update Status)
   Widget _buildStartConfirmationView(BuildContext context, bool isDark) {
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF0F172A) : const Color(0xFFF3F7FD),
+          isDark ? const Color(0xFF0F172A) : AppColors.background,
       appBar: AppBar(
         leading: IconButton(
-          icon: Icon(Icons.close_rounded,
+          icon: Icon(Icons.arrow_back_rounded,
               color: isDark ? Colors.white : AppColors.textPrimary),
           onPressed: () => Get.back(),
         ),
-        title: const AppText('Confirm Journey',
+        title: const AppText('Trip Details',
             style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : AppColors.primaryLight,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: Colors.green,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                const AppText(
-                  'GPS ACTIVE',
-                  style: AppTextStyle.labelMedium,
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 1. Map Illustration Card
-            Container(
-              height: 180,
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Stack(
-                children: [
-                  const AppImageView(
-                    imagePath:
-                        'https://images.unsplash.com/photo-1524661135-423995f22d0b?w=600&auto=format&fit=crop',
-                    borderRadius: 16,
-                    width: double.infinity,
-                    height: double.infinity,
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      color: Colors.black.withValues(alpha: 0.15),
+      body: Obx(() {
+        final ex = controller.tripExtra.value ?? {};
+        final status = controller.tripStatus.value;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header card: id + assigned-on + status chip
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.info.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: AppColors.info.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AppText(controller.tripId,
+                              style: AppTextStyle.headlineSmall,
+                              fontWeight: FontWeight.w800),
+                          const SizedBox(height: 2),
+                          AppText(
+                              'Assigned On ${controller.departureTime.value}',
+                              style: AppTextStyle.labelMedium),
+                        ],
+                      ),
                     ),
-                  ),
-
-                  // Route path mock icons
-                  const Positioned(
-                    top: 30,
-                    left: 70,
-                    child: Icon(Icons.radio_button_checked_rounded,
-                        color: Colors.greenAccent, size: 24),
-                  ),
-                  const Positioned(
-                    bottom: 40,
-                    right: 80,
-                    child: Icon(Icons.location_on_rounded,
-                        color: Colors.redAccent, size: 28),
-                  ),
-
-                  // Bottom Pill Overlays
-                  Positioned(
-                    bottom: 12,
-                    left: 12,
-                    child: Row(
-                      children: [
-                        Obx(() => _buildMapOverlayPill(Icons.route_outlined,
-                            controller.remainingDistance.value)),
-                        const SizedBox(width: 8),
-                        Obx(() => _buildMapOverlayPill(
-                            Icons.access_time_rounded,
-                            controller.estimatedTime.value)),
-                      ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.info.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: AppText(_friendlyStatus(status),
+                          style: AppTextStyle.labelMedium,
+                          color: AppColors.info,
+                          fontWeight: FontWeight.bold),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // 2. Departure Card
-            _buildDetailCard(
-              isDark: isDark,
-              label: 'DEPARTURE',
-              title: controller.departureTitle.value,
-              subtitle: controller.departureSubtitle.value,
-              footerIcon: Icons.calendar_today_rounded,
-              footerText: controller.departureTime.value,
-            ),
-            const SizedBox(height: 12),
-
-            // 2b. Vendor & Material card (assignment form details)
-            Obx(() {
-              final ex = controller.tripExtra.value;
-              if (ex == null ||
-                  (ex['vendorName'] ?? '').toString().isEmpty) {
-                return const SizedBox.shrink();
-              }
-              Widget row(IconData icon, String label, String value) =>
-                  value.isEmpty
-                      ? const SizedBox.shrink()
-                      : Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(icon,
-                                  size: 16, color: AppColors.textSecondary),
-                              const SizedBox(width: 8),
-                              AppText('$label: ',
-                                  style: AppTextStyle.labelMedium,
-                                  fontWeight: FontWeight.bold),
-                              Expanded(
-                                child: AppText(value,
-                                    style: AppTextStyle.labelMedium,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis),
-                              ),
-                            ],
-                          ),
-                        );
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
+              // Key-value details card (vendor / material / pass info)
+              Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                       color: isDark ? Colors.white10 : AppColors.border),
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.storefront_rounded,
-                            color: AppColors.primary, size: 18),
-                        SizedBox(width: 8),
-                        AppText('VENDOR & MATERIAL',
-                            style: AppTextStyle.labelMedium,
-                            fontWeight: FontWeight.bold),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    row(Icons.storefront_rounded, 'Vendor',
-                        (ex['vendorName'] ?? '').toString()),
-                    row(Icons.place_rounded, 'Vendor Location',
-                        (ex['vendorLocation'] ?? '').toString()),
-                    row(Icons.category_rounded, 'Material',
-                        (ex['materialName'] ?? '').toString()),
-                    row(Icons.badge_rounded, 'Pass Holder',
-                        (ex['passHolderName'] ?? '').toString()),
-                    row(Icons.workspace_premium_rounded, 'Royalty',
-                        (ex['royaltyName'] ?? '').toString()),
-                    row(Icons.confirmation_number_rounded, 'Loading Pass',
-                        (ex['loadingPassId'] ?? '').toString()),
-                    row(Icons.map_rounded, 'District',
-                        (ex['pickupDistrict'] ?? '').toString()),
+                    _kv('Vendor Name', (ex['vendorName'] ?? '—').toString()),
+                    _kv('Vendor Location',
+                        (ex['vendorLocation'] ?? '—').toString()),
+                    _kv('Material Name',
+                        (ex['materialName'] ?? '—').toString()),
+                    _kv('Product Name', (ex['productName'] ?? '—').toString()),
+                    _kv('Truck Number', controller.vehicleNo.value),
+                    _kv('Driver Name', _driverDisplayName()),
+                    _kv('Pickup Location',
+                        (ex['pickupLocation'] ?? '—').toString()),
+                    _kv('Pickup District',
+                        (ex['pickupDistrict'] ?? '—').toString()),
+                    _kv('Pass Holder Name',
+                        (ex['passHolderName'] ?? '—').toString()),
+                    _kv('Royalty Name', (ex['royaltyName'] ?? '—').toString()),
+                    _kv(
+                        'Loading Pass ID',
+                        (ex['loadingPassId'] ?? '').toString().isEmpty
+                            ? '—'
+                            : '${ex['loadingPassId']} (8 digit)'),
+                    _kv('Min Pass ID', (ex['minPassId'] ?? '—').toString()),
+                    _kv('Max Pass ID', (ex['maxPassId'] ?? '—').toString(),
+                        last: true),
                   ],
                 ),
-              );
-            }),
-
-            // 3. Destination Card
-            _buildDetailCard(
-              isDark: isDark,
-              label: 'DESTINATION',
-              title: controller.destinationTitle.value,
-              subtitle: controller.destinationSubtitle.value,
-              footerIcon: Icons.local_shipping_rounded,
-              footerText: 'Consignment ${controller.consignmentNo.value}',
-            ),
-            const SizedBox(height: 12),
-
-            // 4. Manifest Details Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color:
-                    isDark ? const Color(0xFF1E293B) : const Color(0xFFE9F2FF),
-                borderRadius: BorderRadius.circular(16),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              const SizedBox(height: 20),
+
+              // Actions: Call Admin + Update Status
+              Row(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const AppText('MANIFEST DETAILS',
-                              style: AppTextStyle.labelMedium,
-                              fontWeight: FontWeight.bold),
-                          const SizedBox(height: 4),
-                          AppText(controller.manifestTitle,
-                              style: AppTextStyle.bodyLarge,
-                              fontWeight: FontWeight.bold),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF7A5900), // Brown bg
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const AppText(
-                          'HIGH VALUE',
-                          style: AppTextStyle.labelMedium,
-                          color: Color(0xFFFFE380), // Gold text
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      _buildManifestGridItem('WEIGHT', controller.weight),
-                      _buildManifestGridItem('UNITS', controller.units),
-                      _buildManifestGridItem('VEHICLE', controller.vehicleNo.value),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // 5. Final Checks
-            const AppText('Final Checks',
-                style: AppTextStyle.labelLarge, fontWeight: FontWeight.bold),
-            const SizedBox(height: 10),
-            _buildChecklistItem(isDark, 'Vehicle Inspection Completed'),
-            const SizedBox(height: 8),
-            _buildChecklistItem(isDark, 'Load weight certified and secured'),
-            const SizedBox(height: 8),
-            _buildChecklistItem(isDark, 'Driver declarations accepted'),
-
-            const SizedBox(height: 32),
-
-            // 6. Action Button — label follows the vendor-journey stage
-            Obx(() => AppButton(
-                  text: controller.primaryActionLabel,
-                  icon: Icons.play_arrow_rounded,
-                  onPressed: controller.startJourney,
-                )),
-            // Destination na set ho aur 10 min ho jayein → direct call option.
-            Obx(() => controller.showCallAdmin.value
-                ? Padding(
-                    padding: const EdgeInsets.only(top: 12),
+                  Expanded(
                     child: OutlinedButton.icon(
                       onPressed: controller.callAdmin,
                       icon: const Icon(Icons.call_rounded, size: 18),
-                      label: const Text(
-                          'Destination set nahi hua — Admin ko Call karein'),
+                      label: const Text('Call Admin'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.error,
-                        side: const BorderSide(color: AppColors.error),
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                     ),
-                  )
-                : const SizedBox.shrink()),
-            const SizedBox(height: 12),
-            Center(
-              child: AppText(
-                'By starting, you confirm you are fit for duty and will comply with all national highway safety regulations.',
-                style: AppTextStyle.labelMedium,
-                color: isDark ? Colors.white30 : AppColors.textHint,
-                textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => Get.to(() => const TripStatusView()),
+                      icon: const Icon(Icons.published_with_changes_rounded,
+                          size: 18),
+                      label: const Text('Update Status'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
+  String _friendlyStatus(String status) {
+    switch (status) {
+      case 'PENDING':
+        return 'Pending Accept';
+      case 'ASSIGNED':
+        return 'Accepted';
+      case 'EN_ROUTE_VENDOR':
+        return 'On The Way';
+      case 'LOADING':
+        return 'Loading';
+      case 'LOAD_REQUESTED':
+        return 'Load Requested';
+      case 'ACTIVE NOW':
+        return 'On The Way (Dest.)';
+      case 'DELIVERY_REQUESTED':
+        return 'Delivery Requested';
+      case 'DELIVERED':
+        return 'Completed';
+      default:
+        return status.isEmpty ? '—' : status;
+    }
+  }
+
+  String _driverDisplayName() {
+    try {
+      final name = Get.find<SessionService>().name.value;
+      return name.isEmpty ? '—' : name;
+    } catch (_) {
+      return '—';
+    }
+  }
+
+  Widget _kv(String label, String value, {bool last = false}) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: last ? 0 : 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: AppText(label,
+                style: AppTextStyle.bodyMedium, color: AppColors.textSecondary),
+          ),
+          Expanded(
+            flex: 3,
+            child: AppText(value,
+                style: AppTextStyle.bodyMedium,
+                fontWeight: FontWeight.w700,
+                textAlign: TextAlign.end,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis),
+          ),
+        ],
       ),
     );
   }

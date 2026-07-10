@@ -254,11 +254,11 @@ class ExpensesView extends GetView<ExpensesController> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (bottomSheetCtx) {
-        return Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
+        return Material(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          clipBehavior: Clip.antiAlias,
+          child: Container(
           padding: EdgeInsets.only(
             top: 16,
             left: 20,
@@ -464,7 +464,8 @@ class ExpensesView extends GetView<ExpensesController> {
               ),
             ],
           ),
-        );
+        ),
+      );
       },
     );
   }

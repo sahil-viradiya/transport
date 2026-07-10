@@ -31,6 +31,7 @@ import 'package:transport/app/modules/notification_detail/bindings/notification_
 import 'package:transport/app/modules/active_drivers/views/active_drivers_view.dart';
 import 'package:transport/app/modules/driver_detail/views/driver_detail_view.dart';
 import 'package:transport/app/modules/driver_detail/bindings/driver_detail_binding.dart';
+import 'package:transport/app/modules/inspection/views/inspection_view.dart';
 
 /// Connectivity stub that reports "online" without touching the platform.
 class _OnlineConnectivity extends ConnectivityService {
@@ -252,8 +253,46 @@ void main() {
     });
 
     expect(tester.takeException(), isNull);
-    // Hero greeting always renders.
-    expect(find.textContaining('Ram Ram'), findsOneWidget);
+    // Reference dashboard: My Truck card + driver name render.
+    expect(find.text('My Truck'), findsOneWidget);
+    expect(find.textContaining('Rajeshbhai'), findsOneWidget);
+  });
+
+  testWidgets('Inspection tab shows pending truck with Start Inspection',
+      (tester) async {
+    await tester.binding.setSurfaceSize(_phone);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final storage = await StorageService().init();
+    Get.put<StorageService>(storage);
+    final session = SessionService(storage: storage);
+    await session.init();
+    await session.setSession(
+        phone: '+919876543210', name: 'Rajesh', role: 'owner');
+    Get.put<SessionService>(session);
+    await Get.putAsync<ConnectivityService>(() => _OnlineConnectivity().init());
+
+    final firestore = FakeFirebaseFirestore();
+    await firestore.collection('trucks').doc('GJ-01').set({
+      'truckNo': 'GJ-01',
+      'assignedTo': '+919876543210',
+      'inspectionStatus': 'pending',
+    });
+    Get.put(FirebaseService(
+        firestore: firestore, ownerKeyResolver: () => '+919876543210'));
+    Get.put(HomeController());
+    Get.put(TripsController());
+    Get.put(DashboardController());
+    Get.put(NotificationsController());
+
+    await mockNetworkImagesFor(() async {
+      await tester.pumpWidget(_app(const InspectionView()));
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 120));
+      }
+    });
+    expect(tester.takeException(), isNull);
+    expect(find.text('Start Inspection'), findsOneWidget);
   });
 
   Future<void> setUpAdmin() async {

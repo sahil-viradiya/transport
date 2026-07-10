@@ -16,6 +16,14 @@ class AdminHomeController extends GetxController {
   final RxInt currentTabIndex = 0.obs;
   final RxBool isLoading = false.obs;
 
+  // Selected trip for tracking timeline in dashboard
+  final RxString selectedTripId = ''.obs;
+
+  // Dashboard filter fields
+  final RxString searchQuery = ''.obs;
+  final RxString selectedStatus = 'All Status'.obs;
+  final Rx<DateTime?> selectedDate = Rx<DateTime?>(null);
+
   // Database lists
   final RxList<Map<String, dynamic>> trips = <Map<String, dynamic>>[].obs;
   final RxList<Map<String, dynamic>> trucks = <Map<String, dynamic>>[].obs;
@@ -48,6 +56,14 @@ class AdminHomeController extends GetxController {
   void _startLiveUpdates() {
     _tripsSub = _firebaseService.watchAllTrips().listen((list) {
       trips.assignAll(list.map(_mapTrip).toList());
+      if (selectedTripId.value.isEmpty && trips.isNotEmpty) {
+        final active = trips.firstWhereOrNull((t) => t['isActive'] == true);
+        if (active != null) {
+          selectedTripId.value = active['id'].toString();
+        } else {
+          selectedTripId.value = trips.first['id'].toString();
+        }
+      }
     });
     _expensesSub = _firebaseService.watchAllExpenses().listen((list) {
       expenses.assignAll(list);
@@ -59,11 +75,15 @@ class AdminHomeController extends GetxController {
   /// Set the drop destination for a trip (typically while the truck is
   /// loading). The driver sees it only after the load is approved.
   Future<void> setDestination(String tripId, String dropCity,
-      String dropLocation) async {
+      String dropLocation,
+      {String customerName = '', String customerAddress = ''}) async {
     AppPopup.showLoading(message: 'Setting destination...');
     try {
       await _firebaseService.setTripDestination(tripId,
-          dropCity: dropCity, dropLocation: dropLocation);
+          dropCity: dropCity,
+          dropLocation: dropLocation,
+          customerName: customerName,
+          customerAddress: customerAddress);
       AppPopup.hideLoading();
       AppSnackBar.showSuccess(
           title: 'Destination Set 📍',
@@ -86,7 +106,7 @@ class AdminHomeController extends GetxController {
       AppSnackBar.showSuccess(
           title: 'Truck Assigned 🚛',
           message: '$truckNo assigned. Driver ko inspection ke liye '
-              'notification bhej di gayi.');
+               'notification bhej di gayi.');
     } catch (e) {
       AppPopup.hideLoading();
       AppSnackBar.showError(title: 'Error', message: e.toString());
@@ -109,9 +129,12 @@ class AdminHomeController extends GetxController {
         'vendorName': trip.vendorName,
         'vendorLocation': trip.vendorLocation,
         'materialName': trip.materialName,
+        'productName': trip.productName,
         'passHolderName': trip.passHolderName,
         'royaltyName': trip.royaltyName,
         'loadingPassId': trip.loadingPassId,
+        'minPassId': trip.minPassId,
+        'maxPassId': trip.maxPassId,
         'pickupDistrict': trip.pickupDistrict,
         'tabType': trip.tabType,
         'remainingDistance': trip.remainingDistance,
@@ -181,19 +204,72 @@ class AdminHomeController extends GetxController {
     }
   }
 
+  // Filter helper functions
+  bool _matchesQuery(String truckNo, String assignedPhone) {
+    if (searchQuery.value.isEmpty) return true;
+    final query = searchQuery.value.toLowerCase().trim();
+    if (truckNo.toLowerCase().contains(query)) return true;
+    if (assignedPhone.toLowerCase().contains(query)) return true;
+    final name = driverNameFor(assignedPhone).toLowerCase();
+    if (name.contains(query)) return true;
+    return false;
+  }
+
+  bool _matchesStatus(Map<String, dynamic> truck, Map<String, dynamic>? trip) {
+    if (selectedStatus.value == 'All Status') return true;
+    final status = selectedStatus.value;
+    if (status == 'Idle') {
+      return (truck['assignedTo'] ?? '').toString().isEmpty;
+    }
+    if (status == 'Breakdown') {
+      return truck['inspectionStatus'] == 'problem';
+    }
+    if (trip == null) return false;
+    final tripStatus = trip['status'] ?? '';
+    if (status == 'Loading') {
+      return tripStatus == 'LOADING' || tripStatus == 'LOAD_REQUESTED';
+    }
+    if (status == 'On The Way') {
+      return tripStatus == 'EN_ROUTE_VENDOR' ||
+          tripStatus == 'ACTIVE NOW' ||
+          tripStatus == 'DELIVERY_REQUESTED';
+    }
+    return false;
+  }
+
+  bool _matchesDate(Map<String, dynamic>? trip) {
+    if (selectedDate.value == null) return true;
+    if (trip == null) return false;
+    final tripDateStr = (trip['date'] ?? '').toString();
+    if (tripDateStr.isEmpty) return false;
+    
+    final formattedSelected = "${selectedDate.value!.year}-${selectedDate.value!.month.toString().padLeft(2, '0')}-${selectedDate.value!.day.toString().padLeft(2, '0')}";
+    return tripDateStr.contains(formattedSelected) || formattedSelected.contains(tripDateStr);
+  }
+
   // ---- Truck kanban helpers (dashboard) ----
   List<Map<String, dynamic>> get idleTrucks => trucks
-      .where((t) => (t['assignedTo'] ?? '').toString().isEmpty)
-      .toList();
-
-  List<Map<String, dynamic>> get problemTrucks =>
-      trucks.where((t) => t['inspectionStatus'] == 'problem').toList();
-
-  List<Map<String, dynamic>> get assignedTrucks => trucks
       .where((t) =>
-          (t['assignedTo'] ?? '').toString().isNotEmpty &&
-          t['inspectionStatus'] != 'problem')
+          (t['assignedTo'] ?? '').toString().isEmpty &&
+          _matchesQuery((t['truckNo'] ?? '').toString(), '') &&
+          (selectedStatus.value == 'All Status' || selectedStatus.value == 'Idle'))
       .toList();
+
+  List<Map<String, dynamic>> get problemTrucks => trucks
+      .where((t) =>
+          t['inspectionStatus'] == 'problem' &&
+          _matchesQuery((t['truckNo'] ?? '').toString(), (t['assignedTo'] ?? '').toString()) &&
+          (selectedStatus.value == 'All Status' || selectedStatus.value == 'Breakdown'))
+      .toList();
+
+  List<Map<String, dynamic>> get assignedTrucks => trucks.where((t) {
+        final assignedTo = (t['assignedTo'] ?? '').toString();
+        if (assignedTo.isEmpty || t['inspectionStatus'] == 'problem') return false;
+        final trip = currentTripForDriver(assignedTo);
+        return _matchesQuery((t['truckNo'] ?? '').toString(), assignedTo) &&
+            _matchesStatus(t, trip) &&
+            _matchesDate(trip);
+      }).toList();
 
   int get completedTripsCount =>
       trips.where((t) => t['status'] == 'DELIVERED').length;
@@ -207,6 +283,27 @@ class AdminHomeController extends GetxController {
           (t['driverPhone'] ?? '').toString() == phone &&
           t['status'] != 'DELIVERED' &&
           t['status'] != 'REJECTED');
+
+  Future<void> completeTrip(String tripId) async {
+    AppPopup.showLoading(message: 'Completing trip...');
+    try {
+      await _firebaseService.updateTripMilestone(
+        tripId,
+        4,
+        status: 'DELIVERED',
+        locationName: 'Completed by Admin',
+      );
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(
+        title: 'Trip Completed ✅',
+        message: 'Trip $tripId has been marked as delivered.',
+      );
+      await loadData();
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
+  }
 
   String driverNameFor(String phone) {
     final u = users.firstWhereOrNull((u) => (u['phone'] ?? '') == phone);
@@ -456,6 +553,39 @@ class AdminHomeController extends GetxController {
     );
   }
 
+  // --- TRUCK INSPECTION APPROVALS ---
+  Future<void> approveInspection(String truckNo) async {
+    AppPopup.showLoading(message: 'Approving inspection...');
+    try {
+      await _firebaseService.approveTruckInspection(truckNo);
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(
+        title: 'Inspection Approved ✅',
+        message: 'Truck $truckNo inspection approved. Driver ko notification bhej di gayi.',
+      );
+      await loadData();
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
+  }
+
+  Future<void> rejectInspection(String truckNo) async {
+    AppPopup.showLoading(message: 'Rejecting inspection...');
+    try {
+      await _firebaseService.rejectTruckInspection(truckNo);
+      AppPopup.hideLoading();
+      AppSnackBar.showInfo(
+        title: 'Inspection Rejected ❌',
+        message: 'Truck $truckNo inspection rejected. Driver ko inspect karne ko keh diya hai.',
+      );
+      await loadData();
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
+  }
+
   // --- LOGOUT TERMINAL ---
   Future<void> logout() async {
     AppPopup.showConfirmation(
@@ -475,5 +605,13 @@ class AdminHomeController extends GetxController {
         AppSnackBar.showSuccess(title: 'Logged Out', message: 'Session closed successfully.');
       },
     );
+  }
+
+  Future<void> clearDatabase() async {
+    try {
+      await _firebaseService.clearDatabase();
+      selectedTripId.value = '';
+      await loadData();
+    } catch (_) {}
   }
 }

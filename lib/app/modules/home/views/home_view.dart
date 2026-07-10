@@ -4,6 +4,7 @@ import '../controllers/home_controller.dart';
 import '../../dashboard/views/dashboard_view.dart';
 import '../../trips/views/trips_view.dart';
 import '../../expenses/views/expenses_view.dart';
+import '../../inspection/views/inspection_view.dart';
 import '../../profile/views/profile_view.dart';
 import '../../../core/theme/app_colors.dart';
 
@@ -19,6 +20,7 @@ class HomeView extends GetView<HomeController> {
       const DashboardView(),
       const TripsView(),
       const ExpensesView(),
+      const InspectionView(),
       const ProfileView(),
     ];
 
@@ -53,6 +55,12 @@ class HomeView extends GetView<HomeController> {
                   icon: Icon(Icons.receipt_long_outlined),
                   selectedIcon: Icon(Icons.receipt_long_rounded, color: AppColors.primary),
                   label: 'Expenses',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.fact_check_outlined),
+                  selectedIcon:
+                      Icon(Icons.fact_check_rounded, color: AppColors.primary),
+                  label: 'Inspection',
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.person_outline_rounded),

@@ -76,9 +76,12 @@ class FirebaseService extends GetxService {
       vendorName: data['vendorName'] ?? '',
       vendorLocation: data['vendorLocation'] ?? '',
       materialName: data['materialName'] ?? '',
+      productName: data['productName'] ?? '',
       passHolderName: data['passHolderName'] ?? '',
       royaltyName: data['royaltyName'] ?? '',
       loadingPassId: data['loadingPassId'] ?? '',
+      minPassId: data['minPassId'] ?? '',
+      maxPassId: data['maxPassId'] ?? '',
       pickupDistrict: data['pickupDistrict'] ?? '',
       remainingDistance: data['remainingDistance'] ?? '',
       estimatedTime: data['estimatedTime'] ?? '',
@@ -319,6 +322,7 @@ class FirebaseService extends GetxService {
       await _db.collection('trips').doc(tripId).set({
         'status': 'LOADING',
         'currentMilestone': 2,
+        'loadingStartedAt': FieldValue.serverTimestamp(),
         'milestonesLog': FieldValue.arrayUnion([
           {
             'milestone': 2,
@@ -355,6 +359,8 @@ class FirebaseService extends GetxService {
     String tripId, {
     required String dropCity,
     required String dropLocation,
+    String customerName = '',
+    String customerAddress = '',
     double? dropLatitude,
     double? dropLongitude,
   }) async {
@@ -362,6 +368,8 @@ class FirebaseService extends GetxService {
       await _db.collection('trips').doc(tripId).set({
         'dropCity': dropCity,
         'dropLocation': dropLocation,
+        if (customerName.isNotEmpty) 'customerName': customerName,
+        if (customerAddress.isNotEmpty) 'customerAddress': customerAddress,
         if (dropLatitude != null) 'dropLatitude': dropLatitude,
         if (dropLongitude != null) 'dropLongitude': dropLongitude,
         'destinationSetAt': FieldValue.serverTimestamp(),
@@ -375,7 +383,7 @@ class FirebaseService extends GetxService {
     try {
       final data =
           (await _db.collection('trips').doc(tripId).get()).data() ?? {};
-      if (data['status'] != 'LOAD_REQUESTED') return false;
+      if (data['status'] != 'LOAD_REQUESTED' && data['status'] != 'LOADING') return false;
       if (data['destinationReminderSent'] == true) return false;
       if ((data['dropCity'] ?? '').toString().isNotEmpty) return false;
 
@@ -387,8 +395,8 @@ class FirebaseService extends GetxService {
         await createNotification(
           toPhone: assignedBy,
           title: 'Reminder: Destination Set Karein ⏰',
-          body: 'Trip $tripId ka truck loaded hai aur 10 minute ho gaye — '
-              'destination set karke load approve karein.',
+          body: 'Trip $tripId ka truck loaded/loading status me hai aur 10 minute ho gaye — '
+              'destination set karein.',
           type: 'set_destination_reminder',
           tripId: tripId,
         );
@@ -1266,6 +1274,24 @@ class FirebaseService extends GetxService {
     final p = SessionService.normalizePhone(driverPhone);
     if (truckNo.isEmpty || p.isEmpty) return;
     try {
+      // Rule: same truck same time 2 driver ko assign nahi ho sakte, and a driver can only have one truck assigned at a time.
+      // 1. Unassign this driver from any other trucks
+      final existingQuery = await _db.collection('trucks').where('assignedTo', isEqualTo: p).get();
+      for (final doc in existingQuery.docs) {
+        if (doc.id != truckNo) {
+          await doc.reference.update({
+            'assignedTo': FieldValue.delete(),
+            'inspectionStatus': FieldValue.delete(),
+            'inspectionIssue': FieldValue.delete(),
+            'inspectionIssueImage': FieldValue.delete(),
+            'inspectionRemarks': FieldValue.delete(),
+            'inspectionResults': FieldValue.delete(),
+            'inspectionImages': FieldValue.delete(),
+          });
+        }
+      }
+
+      // 2. Assign the truck to this driver (will overwrite any previous driver assigned to this truckNo)
       await _db.collection('trucks').doc(truckNo).set({
         'truckNo': truckNo,
         if (model != null && model.isNotEmpty) 'model': model,
@@ -1275,6 +1301,9 @@ class FirebaseService extends GetxService {
         'inspectionStatus': 'pending',
         'inspectionIssue': FieldValue.delete(),
         'inspectionIssueImage': FieldValue.delete(),
+        'inspectionRemarks': FieldValue.delete(),
+        'inspectionResults': FieldValue.delete(),
+        'inspectionImages': FieldValue.delete(),
       }, SetOptions(merge: true));
 
       await createNotification(
@@ -1331,6 +1360,86 @@ class FirebaseService extends GetxService {
         refId: truckNo,
       );
     } catch (_) {}
+  }
+
+  /// Driver submits truck inspection for review.
+  Future<void> submitTruckInspection(
+    String truckNo, {
+    required Map<String, bool> results,
+    required String remarks,
+    required List<String> imageUrls,
+    required String driverName,
+  }) async {
+    if (truckNo.isEmpty) return;
+    final hasIssues = results.values.any((good) => !good);
+    final failedItems = results.entries.where((e) => !e.value).map((e) => e.key).toList();
+    final reason = [
+      if (failedItems.isNotEmpty) failedItems.join(', '),
+      if (remarks.trim().isNotEmpty) remarks.trim(),
+    ].join(' — ');
+
+    await _db.collection('trucks').doc(truckNo).set({
+      'inspectionStatus': 'inspected_pending_review',
+      'inspectionResults': results,
+      'inspectionRemarks': remarks,
+      'inspectionImages': imageUrls,
+      'inspectionIssue': reason.isNotEmpty ? reason : 'All items good',
+      'inspectedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    await notifyAdmins(
+      title: hasIssues ? 'Truck Inspection (Issue) ⚠️' : 'Truck Inspection (All Good) 📋',
+      body: '$driverName ne truck $truckNo inspect kiya. Review pending.',
+      type: 'truck_inspection_submitted',
+      refId: truckNo,
+    );
+  }
+
+  /// Admin approves the truck inspection condition.
+  Future<void> approveTruckInspection(String truckNo) async {
+    if (truckNo.isEmpty) return;
+    final data = (await _db.collection('trucks').doc(truckNo).get()).data() ?? {};
+    final driver = (data['assignedTo'] ?? '').toString();
+    
+    await _db.collection('trucks').doc(truckNo).set({
+      'inspectionStatus': 'approved_pending_accept',
+    }, SetOptions(merge: true));
+
+    if (driver.isNotEmpty) {
+      await createNotification(
+        toPhone: driver,
+        title: 'Inspection Approved ✅',
+        body: 'Truck $truckNo ka inspection approve ho gaya hai. Dashboard par accept karein.',
+        type: 'inspection_approved',
+        refId: truckNo,
+      );
+    }
+  }
+
+  /// Admin rejects/requests re-inspection of the truck.
+  Future<void> rejectTruckInspection(String truckNo) async {
+    if (truckNo.isEmpty) return;
+    final data = (await _db.collection('trucks').doc(truckNo).get()).data() ?? {};
+    final driver = (data['assignedTo'] ?? '').toString();
+    
+    await _db.collection('trucks').doc(truckNo).set({
+      'inspectionStatus': 'pending', // back to pending state so they re-inspect
+      'inspectionRemarks': FieldValue.delete(),
+      'inspectionResults': FieldValue.delete(),
+      'inspectionImages': FieldValue.delete(),
+      'inspectionIssue': FieldValue.delete(),
+      'inspectionIssueImage': FieldValue.delete(),
+    }, SetOptions(merge: true));
+
+    if (driver.isNotEmpty) {
+      await createNotification(
+        toPhone: driver,
+        title: 'Inspection Rejected ❌',
+        body: 'Truck $truckNo ka inspection reject ho gaya hai. Kripya fir se inspect karein.',
+        type: 'inspection_rejected',
+        refId: truckNo,
+      );
+    }
   }
 
   /// Driver confirms the truck's condition is proper — it becomes READY for
@@ -1609,5 +1718,61 @@ class FirebaseService extends GetxService {
     debugPrint('Open Firebase Console > Storage > Get Started to enable it.');
     debugPrint('Falling back to the local file path for now.');
     debugPrint('------------------------------------------------------------');
+  }
+
+  Future<void> clearDatabase() async {
+    try {
+      // 1. Delete all trips
+      final trips = await _db.collection('trips').get();
+      for (var doc in trips.docs) {
+        await doc.reference.delete();
+      }
+
+      // 2. Delete all expenses
+      final expenses = await _db.collection('expenses').get();
+      for (var doc in expenses.docs) {
+        await doc.reference.delete();
+      }
+
+      // 3. Delete all notifications
+      final notifications = await _db.collection('notifications').get();
+      for (var doc in notifications.docs) {
+        await doc.reference.delete();
+      }
+
+      // 4. Delete all trucks
+      final trucks = await _db.collection('trucks').get();
+      for (var doc in trucks.docs) {
+        await doc.reference.delete();
+      }
+
+      // 5. Delete all users except current admin
+      final users = await _db.collection('users').get();
+      for (var doc in users.docs) {
+        if (doc.id != ownerKey) {
+          await doc.reference.delete();
+        }
+      }
+
+      // 6. Delete all drivers except current admin (if driver)
+      final drivers = await _db.collection('drivers').get();
+      for (var doc in drivers.docs) {
+        if (doc.id != ownerKey) {
+          await doc.reference.delete();
+        }
+      }
+      
+      // Reset the seededDemo flag on the current user so they don't get re-seeded automatically
+      if (ownerKey.isNotEmpty) {
+        try {
+          await _db.collection('users').doc(ownerKey).update({'seededDemo': false});
+        } catch (_) {}
+        try {
+          await _db.collection('drivers').doc(ownerKey).update({'seededDemo': false});
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('Error clearing database: $e');
+    }
   }
 }

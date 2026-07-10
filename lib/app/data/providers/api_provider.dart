@@ -109,7 +109,7 @@ class AppErrorHandler {
         return 'Request was cancelled.';
       case DioExceptionType.connectionError:
         return 'No internet connection. Please verify your network settings.';
-      case DioExceptionType.unknown:
+      default:
         return 'An unexpected error occurred. Please try again.';
     }
   }
