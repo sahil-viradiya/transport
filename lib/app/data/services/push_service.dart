@@ -5,6 +5,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'firebase_service.dart';
 import 'session_service.dart';
+import 'web_notify.dart' as web_notify;
 import '../../routes/app_pages.dart';
 import '../../../widgets/dialogs/app_snackbar.dart';
 
@@ -26,9 +27,10 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {}
 /// Defensive everywhere: if FCM isn't configured (desktop, or web without a
 /// VAPID key) it degrades to a no-op and the in-app bell still works.
 class PushService extends GetxService {
-  // Web push needs a VAPID key (Firebase Console → Cloud Messaging → Web Push
-  // certificates). Paste it here to enable background push on web.
-  static const String webVapidKey = '';
+  // Web push VAPID key — Firebase Console → Project Settings → Cloud Messaging
+  // → Web Push certificates → Key pair.
+  static const String webVapidKey =
+      'BKAXZv30eXYX4THvhtZZYNECNa7Qn0ykBga_IyJ1SP6CimbAQmujWD5u2D4Gn3AxFek05ULdpCpPqFQ4wEoSgdA';
 
   final _localNotifications = FlutterLocalNotificationsPlugin();
 
@@ -75,7 +77,7 @@ class PushService extends GetxService {
 
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-      // Foreground message → heads-up banner + snackbar.
+      // Foreground message → heads-up banner (mobile) + snackbar + browser notification (web).
       FirebaseMessaging.onMessage.listen((msg) {
         final n = msg.notification;
         if (n == null) return;
@@ -96,6 +98,16 @@ class PushService extends GetxService {
                 icon: '@mipmap/ic_launcher',
               ),
             ),
+          );
+        }
+
+        // Show a native browser notification on web (foreground messages are
+        // not auto-displayed by the browser; the service worker only handles
+        // background/terminated state).
+        if (kIsWeb) {
+          web_notify.showBrowserNotification(
+            n.title ?? 'Notification',
+            n.body ?? '',
           );
         }
 
@@ -135,12 +147,15 @@ class PushService extends GetxService {
     } catch (_) {}
   }
 
-  /// Show an OS heads-up notification immediately (no backend needed). Called by
-  /// [NotificationsController] whenever a new notification arrives on the
-  /// recipient's live Firestore stream — so floating notifications work in the
-  /// foreground even before the Cloud Function is deployed.
+  /// Show a native browser notification (web) or OS heads-up (mobile/Android).
+  /// Called by [NotificationsController] whenever a new notification arrives on
+  /// the recipient's live Firestore stream.
   Future<void> showLocal(String title, String body, {String? payload}) async {
-    if (kIsWeb) return;
+    // Web: use the browser Notification API directly.
+    if (kIsWeb) {
+      web_notify.showBrowserNotification(title, body);
+      return;
+    }
     try {
       await _localNotifications.show(
         id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
