@@ -3,3 +3,8 @@
 void showBrowserNotification(String title, String body) {
   // no-op on non-web platforms
 }
+
+/// Non-web platforms manage notification permission via the OS, not this API.
+String get notificationPermission => 'granted';
+
+Future<String> requestNotificationPermission() async => 'granted';

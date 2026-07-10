@@ -147,6 +147,32 @@ class PushService extends GetxService {
     } catch (_) {}
   }
 
+  /// Current browser notification permission on web ('granted' / 'denied' /
+  /// 'default' / 'unsupported'). Always 'granted' on mobile — the OS-level
+  /// heads-up there is handled by flutter_local_notifications, not this API.
+  String get webNotificationPermission =>
+      kIsWeb ? web_notify.notificationPermission : 'granted';
+
+  /// Explicitly (re)requests notification permission. Call this from a real
+  /// user tap (e.g. an "Enable Notifications" button) — browsers are far more
+  /// reliable about actually showing the prompt when it's tied to a genuine
+  /// gesture rather than the automatic request at app boot, which some
+  /// browsers silently ignore. Returns true if permission ends up granted.
+  Future<bool> requestNotificationPermission() async {
+    if (kIsWeb) {
+      final result = await web_notify.requestNotificationPermission();
+      return result == 'granted';
+    }
+    try {
+      final settings = await FirebaseMessaging.instance
+          .requestPermission(alert: true, badge: true, sound: true);
+      return settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Show a native browser notification (web) or OS heads-up (mobile/Android).
   /// Called by [NotificationsController] whenever a new notification arrives on
   /// the recipient's live Firestore stream.

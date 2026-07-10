@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../app/data/notifications_controller.dart';
 import '../app/data/services/firebase_service.dart';
+import '../app/data/services/push_service.dart';
 import '../app/data/services/session_service.dart';
 import '../app/core/theme/app_colors.dart';
 import '../app/routes/app_pages.dart';
@@ -77,70 +79,136 @@ class NotificationBell extends StatelessWidget {
           maxChildSize: 0.9,
           minChildSize: 0.4,
           builder: (ctx, scrollController) {
-            return Column(
-              children: [
-                const SizedBox(height: 12),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.textHint,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 12, 8),
-                  child: Row(
-                    children: [
-                      const Expanded(
-                        child: AppText('Notifications',
-                            style: AppTextStyle.headlineSmall,
-                            fontWeight: FontWeight.w700),
+            return StatefulBuilder(
+              builder: (ctx, setSheetState) {
+                return Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.textHint,
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      Obx(() => c.unreadCount > 0
-                          ? TextButton(
-                              onPressed: c.markAllRead,
-                              child: const AppText('Mark all read',
-                                  style: AppTextStyle.labelLarge,
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w600),
-                            )
-                          : const SizedBox.shrink()),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: Obx(() {
-                    if (c.items.isEmpty) {
-                      return const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.notifications_off_rounded,
-                                size: 48, color: AppColors.textHint),
-                            SizedBox(height: 10),
-                            AppText('No notifications yet',
-                                style: AppTextStyle.bodyMedium),
-                          ],
-                        ),
-                      );
-                    }
-                    return ListView.separated(
-                      controller: scrollController,
-                      padding: const EdgeInsets.all(12),
-                      itemCount: c.items.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (_, i) =>
-                          _tile(c, c.items[i], isDark),
-                    );
-                  }),
-                ),
-              ],
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 12, 8),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: AppText('Notifications',
+                                style: AppTextStyle.headlineSmall,
+                                fontWeight: FontWeight.w700),
+                          ),
+                          Obx(() => c.unreadCount > 0
+                              ? TextButton(
+                                  onPressed: c.markAllRead,
+                                  child: const AppText('Mark all read',
+                                      style: AppTextStyle.labelLarge,
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w600),
+                                )
+                              : const SizedBox.shrink()),
+                        ],
+                      ),
+                    ),
+                    if (kIsWeb && Get.isRegistered<PushService>())
+                      _enableNotificationsBanner(setSheetState),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: Obx(() {
+                        if (c.items.isEmpty) {
+                          return const Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.notifications_off_rounded,
+                                    size: 48, color: AppColors.textHint),
+                                SizedBox(height: 10),
+                                AppText('No notifications yet',
+                                    style: AppTextStyle.bodyMedium),
+                              ],
+                            ),
+                          );
+                        }
+                        return ListView.separated(
+                          controller: scrollController,
+                          padding: const EdgeInsets.all(12),
+                          itemCount: c.items.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 8),
+                          itemBuilder: (_, i) =>
+                              _tile(c, c.items[i], isDark),
+                        );
+                      }),
+                    ),
+                  ],
+                );
+              },
             );
           },
         );
       },
+    );
+  }
+
+  /// Web-only banner shown while the browser hasn't granted notification
+  /// permission yet — tapping "Enable" makes the request from this real user
+  /// gesture (far more reliable than the silent automatic request at boot).
+  Widget _enableNotificationsBanner(StateSetter setSheetState) {
+    final push = Get.find<PushService>();
+    final permission = push.webNotificationPermission;
+    if (permission == 'granted') return const SizedBox.shrink();
+
+    final denied = permission == 'denied';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.tertiaryLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.tertiary),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.notifications_active_rounded,
+              color: AppColors.tertiaryDark, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: AppText(
+              denied
+                  ? 'Notifications blocked hain. Browser site settings se allow karein.'
+                  : 'Floating notifications abhi off hain.',
+              style: AppTextStyle.labelMedium,
+              color: AppColors.tertiaryDark,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (!denied)
+            TextButton(
+              onPressed: () async {
+                final granted = await push.requestNotificationPermission();
+                setSheetState(() {});
+                if (granted) {
+                  AppSnackBar.showSuccess(
+                    title: 'Notifications On ✅',
+                    message: 'Ab floating notifications aayengi.',
+                  );
+                } else {
+                  AppSnackBar.showWarning(
+                    title: 'Not Enabled',
+                    message: 'Permission allow nahi hui.',
+                  );
+                }
+              },
+              child: const AppText('Enable',
+                  style: AppTextStyle.labelLarge,
+                  color: AppColors.tertiaryDark,
+                  fontWeight: FontWeight.bold),
+            ),
+        ],
+      ),
     );
   }
 
