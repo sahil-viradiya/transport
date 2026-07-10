@@ -28,7 +28,9 @@ class LoginController extends GetxController {
   Future<void> sendOtp() async {
     if (!formKey.currentState!.validate()) return;
 
-    final phone = phoneController.text.trim().replaceAll(' ', '');
+    // User only types the 10-digit number — +91 is prepended silently here.
+    final digits = phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final phone = '+91$digits';
     isLoading.value = true;
     AppPopup.showLoading(message: 'Requesting OTP...');
 

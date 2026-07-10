@@ -7,6 +7,7 @@ class AppTextField extends StatefulWidget {
   final String? hintText;
   final String? helperText;
   final IconData? prefixIcon;
+  final String? prefixText;
   final Widget? suffixIcon;
   final bool isPassword;
   final TextInputType keyboardType;
@@ -25,6 +26,7 @@ class AppTextField extends StatefulWidget {
     this.hintText,
     this.helperText,
     this.prefixIcon,
+    this.prefixText,
     this.suffixIcon,
     this.isPassword = false,
     this.keyboardType = TextInputType.text,
@@ -80,6 +82,11 @@ class _AppTextFieldState extends State<AppTextField> {
           decoration: InputDecoration(
             hintText: widget.hintText,
             helperText: widget.helperText,
+            prefixText: widget.prefixText,
+            prefixStyle: theme.textTheme.bodyLarge?.copyWith(
+              color: isDark ? Colors.white : AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
             prefixIcon: widget.prefixIcon != null
                 ? Icon(
                     widget.prefixIcon,

@@ -179,18 +179,17 @@ class LoginView extends GetView<LoginController> {
             const SizedBox(height: 8),
             AppTextField(
               controller: controller.phoneController,
-              hintText: 'e.g. +91 98765 43210',
+              hintText: '98765 43210',
               keyboardType: TextInputType.phone,
               prefixIcon: Icons.phone_android_rounded,
+              prefixText: '+91  ',
               validator: (val) {
-                if (val == null || val.trim().isEmpty) {
+                final digits = (val ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+                if (digits.isEmpty) {
                   return 'Phone number is required';
                 }
-                if (!val.startsWith('+')) {
-                  return 'Country code lagayein (e.g. +91)';
-                }
-                if (val.length < 10) {
-                  return 'Sahi mobile number daalein';
+                if (digits.length != 10) {
+                  return 'Sahi 10 digit mobile number daalein';
                 }
                 return null;
               },
