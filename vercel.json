@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "buildCommand": null,
+  "buildCommand": "git clone https://github.com/flutter/flutter.git --depth 1 --branch stable /tmp/flutter && export PATH=\"$PATH:/tmp/flutter/bin\" && flutter pub get && flutter build web --release",
   "outputDirectory": "build/web",
-  "installCommand": "echo 'no install needed'",
+  "installCommand": "echo 'Flutter SDK is installed during the build step'",
   "framework": null,
   "rewrites": [
     { "source": "/((?!firebase-messaging-sw\\.js|flutter_service_worker\\.js|manifest\\.json|favicon\\.png).*)", "destination": "/index.html" }
