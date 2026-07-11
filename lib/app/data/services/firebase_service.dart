@@ -1176,6 +1176,29 @@ class FirebaseService extends GetxService {
     }
   }
 
+  /// Uploads a driver document image (photo / driving licence / heavy-vehicle
+  /// licence) under `driver_documents/{phone}/{docType}.jpg` and returns the
+  /// download URL. Returns '' when there's nothing to upload or Storage isn't
+  /// available (web + mobile safe — takes bytes, not a dart:io File).
+  Future<String> uploadDriverDocument(
+      String phone, String docType, Uint8List? bytes) async {
+    final p = SessionService.normalizePhone(phone);
+    if (bytes == null || bytes.isEmpty || useMockStorage) return '';
+    try {
+      final ref = _storage
+          .ref()
+          .child('driver_documents')
+          .child(p.isEmpty ? 'unknown' : p)
+          .child('$docType.jpg');
+      final task =
+          await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+      return await task.ref.getDownloadURL();
+    } catch (e) {
+      _warnStorage('Driver Document', e);
+      return '';
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // USERS  (login directory, keyed by phone)
   // ---------------------------------------------------------------------------

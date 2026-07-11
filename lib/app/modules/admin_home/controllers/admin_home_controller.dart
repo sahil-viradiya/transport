@@ -480,6 +480,44 @@ class AdminHomeController extends GetxController {
     }
   }
 
+  /// Registers a driver and uploads their documents (photo, driving licence,
+  /// heavy-vehicle licence). Each image is uploaded to Storage and its URL is
+  /// saved on the user doc so the driver record is complete.
+  Future<void> createDriverWithDocuments(
+    Map<String, dynamic> userData, {
+    Uint8List? photoBytes,
+    Uint8List? drivingLicenceBytes,
+    Uint8List? heavyLicenceBytes,
+  }) async {
+    final phone = userData['phone'] as String;
+    AppPopup.showLoading(message: 'Uploading documents & creating profile...');
+    try {
+      if (photoBytes != null) {
+        final url = await _firebaseService.uploadDriverDocument(
+            phone, 'photo', photoBytes);
+        if (url.isNotEmpty) userData['avatarUrl'] = url;
+      }
+      if (drivingLicenceBytes != null) {
+        final url = await _firebaseService.uploadDriverDocument(
+            phone, 'driving_licence', drivingLicenceBytes);
+        if (url.isNotEmpty) userData['drivingLicenceUrl'] = url;
+      }
+      if (heavyLicenceBytes != null) {
+        final url = await _firebaseService.uploadDriverDocument(
+            phone, 'heavy_licence', heavyLicenceBytes);
+        if (url.isNotEmpty) userData['heavyLicenceUrl'] = url;
+      }
+      await _firebaseService.saveUser(phone, userData);
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(
+          title: 'Driver Added', message: 'Driver profile registered.');
+      await loadData();
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
+  }
+
   Future<void> editUserRole(String phone, String newRole) async {
     AppPopup.showLoading(message: 'Updating user role...');
     try {

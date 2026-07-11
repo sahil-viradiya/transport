@@ -173,6 +173,13 @@ class PushService extends GetxService {
     }
   }
 
+  /// Fires ONLY the native browser notification (web) with no in-app snackbar —
+  /// used when the app already shows its own in-app floating card, so the tab
+  /// still gets a system notification when it isn't focused (no double toast).
+  void showWebBrowserNotification(String title, String body) {
+    if (kIsWeb) web_notify.showBrowserNotification(title, body);
+  }
+
   /// Show a native browser notification (web) or OS heads-up (mobile/Android).
   /// Called by [NotificationsController] whenever a new notification arrives on
   /// the recipient's live Firestore stream.
@@ -180,6 +187,10 @@ class PushService extends GetxService {
     // Web: use the browser Notification API directly.
     if (kIsWeb) {
       web_notify.showBrowserNotification(title, body);
+      AppSnackBar.showInfo(
+        title: title,
+        message: body,
+      );
       return;
     }
     try {
