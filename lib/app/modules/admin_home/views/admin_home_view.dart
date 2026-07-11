@@ -37,6 +37,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
       _buildTripsTab(context, isDark),
       _buildTrucksTab(context, isDark),
       _buildUsersTab(context, isDark),
+      _buildVendorsTab(context, isDark),
     ];
 
     Widget content = Obx(() {
@@ -142,6 +143,12 @@ class AdminHomeView extends GetView<AdminHomeController> {
                         Icon(Icons.people_rounded, color: AppColors.primary),
                     label: 'Drivers',
                   ),
+                  NavigationDestination(
+                    icon: Icon(Icons.storefront_outlined),
+                    selectedIcon:
+                        Icon(Icons.storefront_rounded, color: AppColors.primary),
+                    label: 'Vendors',
+                  ),
                 ],
               )),
       ),
@@ -158,11 +165,12 @@ class AdminHomeView extends GetView<AdminHomeController> {
     (Icons.local_shipping_rounded, 'Trucks', 2),
     (Icons.alt_route_rounded, 'Trips', 1),
     (Icons.people_rounded, 'Drivers', 3),
+    (Icons.storefront_rounded, 'Vendors', 4),
   ];
 
   // Mobile bottom-nav visual position → underlying tab index (same order as the
-  // desktop sidebar: Dashboard, Trucks, Trips, Drivers).
-  static const _mobileNavOrder = [0, 2, 1, 3];
+  // desktop sidebar: Dashboard, Trucks, Trips, Drivers, Vendors).
+  static const _mobileNavOrder = [0, 2, 1, 3, 4];
 
   Widget _buildSidebar() {
     return Container(
@@ -296,7 +304,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
           }),
           const Spacer(),
           ElevatedButton.icon(
-            onPressed: () => _showTripFormDialog(context, isDark),
+            onPressed: () => _assignTripGuarded(context, isDark),
             icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
             label: const Text('Assign Trip', style: TextStyle(fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(
@@ -333,7 +341,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
               } else if (value == 'driver') {
                 _showUserFormDialog(context, isDark);
               } else if (value == 'trip') {
-                _showTripFormDialog(context, isDark);
+                _assignTripGuarded(context, isDark);
               }
             },
             itemBuilder: (context) => [
@@ -1738,7 +1746,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
             children: [
               actionCard(Icons.local_shipping_rounded, 'Add Truck', const Color(0xFF047857), () => _showTruckFormDialog(context, isDark)),
               const SizedBox(width: 8),
-              actionCard(Icons.explore_rounded, 'Assign Trip', const Color(0xFF2563EB), () => _showTripFormDialog(context, isDark)),
+              actionCard(Icons.explore_rounded, 'Assign Trip', const Color(0xFF2563EB), () => _assignTripGuarded(context, isDark)),
               const SizedBox(width: 8),
               actionCard(Icons.person_add_rounded, 'Add Driver', const Color(0xFF7E22CE), () => _showUserFormDialog(context, isDark)),
               const SizedBox(width: 8),
@@ -2376,7 +2384,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
       floatingActionButton: FloatingActionButton(
         heroTag: null,
         backgroundColor: AppColors.primary,
-        onPressed: () => _showTripFormDialog(context, isDark),
+        onPressed: () => _assignTripGuarded(context, isDark),
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -2872,20 +2880,60 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                   style: AppTextStyle.labelMedium),
                               if (isDriver) ...[
                                 const SizedBox(height: 6),
-                                _availabilityBadge(user),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  crossAxisAlignment:
+                                      WrapCrossAlignment.center,
+                                  children: [
+                                    _availabilityBadge(user),
+                                    if (controller.isOnLeave(user))
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.tertiaryLight,
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.beach_access_rounded,
+                                                size: 12,
+                                                color: AppColors.tertiaryDark),
+                                            SizedBox(width: 4),
+                                            AppText('On Leave',
+                                                style:
+                                                    AppTextStyle.labelMedium,
+                                                color: AppColors.tertiaryDark,
+                                                fontWeight: FontWeight.bold),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ],
                             ],
                           ),
                         ),
-                        // Role switch + delete, consistent with other tabs.
+                        // Role switch + leave toggle + delete.
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert_rounded,
                               color: AppColors.textSecondary),
                           onSelected: (value) {
                             if (value == 'delete') {
                               controller.deleteUser(user['phone']);
-                            } else if (value != user['role']) {
-                              controller.editUserRole(user['phone'], value);
+                            } else if (value == 'leave') {
+                              controller.setDriverOnLeave(user['phone'], true);
+                            } else if (value == 'unleave') {
+                              controller.setDriverOnLeave(
+                                  user['phone'], false);
+                            } else if (value == 'admin' ||
+                                value == 'driver') {
+                              if (value != user['role']) {
+                                controller.editUserRole(user['phone'], value);
+                              }
                             }
                           },
                           itemBuilder: (_) => [
@@ -2908,6 +2956,28 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                 ],
                               ),
                             ),
+                            if (isDriver)
+                              PopupMenuItem(
+                                value: controller.isOnLeave(user)
+                                    ? 'unleave'
+                                    : 'leave',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                        controller.isOnLeave(user)
+                                            ? Icons.event_available_rounded
+                                            : Icons.beach_access_rounded,
+                                        size: 18,
+                                        color: AppColors.tertiaryDark),
+                                    const SizedBox(width: 10),
+                                    AppText(
+                                        controller.isOnLeave(user)
+                                            ? 'Back On Duty'
+                                            : 'Mark On Leave',
+                                        style: AppTextStyle.bodyMedium),
+                                  ],
+                                ),
+                              ),
                             const PopupMenuItem(
                               value: 'delete',
                               child: Row(
@@ -2941,6 +3011,132 @@ class AdminHomeView extends GetView<AdminHomeController> {
         heroTag: null,
         backgroundColor: AppColors.primary,
         onPressed: () => _showUserFormDialog(context, isDark),
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
+  // --- TAB 5: VENDORS (predefined pickup sources) ---
+  Widget _buildVendorsTab(BuildContext context, bool isDark) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: RefreshIndicator(
+        onRefresh: controller.loadData,
+        child: Obx(() {
+          if (controller.vendors.isEmpty) {
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                SizedBox(height: MediaQuery.of(context).size.height * 0.22),
+                const Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.storefront_outlined,
+                          size: 60, color: AppColors.textHint),
+                      SizedBox(height: 12),
+                      AppText('No vendors yet. Tap "+" to add one.',
+                          style: AppTextStyle.bodyLarge),
+                      SizedBox(height: 4),
+                      AppText(
+                          'Vendor ek baar add karein, phir trip me bas select karein.',
+                          style: AppTextStyle.labelMedium,
+                          color: AppColors.textHint),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+          return ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+            itemCount: controller.vendors.length,
+            itemBuilder: (context, index) {
+              final v = controller.vendors[index];
+              final loc =
+                  (v['pickupLocation'] ?? v['location'] ?? '').toString();
+              final cityDistrict = [
+                (v['city'] ?? '').toString(),
+                (v['district'] ?? '').toString(),
+              ].where((s) => s.isNotEmpty).join(', ');
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color:
+                          Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white10
+                            : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.storefront_rounded,
+                          color: AppColors.primary, size: 26),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AppText((v['name'] ?? 'Vendor').toString(),
+                              style: AppTextStyle.bodyLarge,
+                              fontWeight: FontWeight.bold,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          if (loc.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            AppText(loc,
+                                style: AppTextStyle.labelMedium,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
+                          ],
+                          if (cityDistrict.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            AppText(cityDistrict,
+                                style: AppTextStyle.labelMedium,
+                                color: AppColors.textHint),
+                          ],
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.edit_rounded,
+                          color: AppColors.primary, size: 20),
+                      onPressed: () => _showVendorFormDialog(context, isDark,
+                          editVendor: v),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded,
+                          color: AppColors.error, size: 20),
+                      onPressed: () => controller.deleteVendor(
+                          (v['id'] ?? '').toString(),
+                          name: (v['name'] ?? '').toString()),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        }),
+      ),
+      floatingActionButton: FloatingActionButton(
+        heroTag: null,
+        backgroundColor: AppColors.primary,
+        onPressed: () => _showVendorFormDialog(context, isDark),
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -3008,6 +3204,83 @@ class AdminHomeView extends GetView<AdminHomeController> {
     );
   }
 
+  /// Daily gate: the admin can only create a trip once every on-duty driver has
+  /// a truck assigned. Otherwise it lists who's still pending and blocks.
+  void _assignTripGuarded(BuildContext context, bool isDark) {
+    if (controller.canCreateTrip) {
+      _showTripFormDialog(context, isDark);
+      return;
+    }
+    final pending = controller.driversWithoutTruck;
+    final noDrivers = controller.rosterDrivers.isEmpty;
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.local_shipping_rounded, color: AppColors.tertiaryDark),
+            SizedBox(width: 8),
+            Expanded(
+              child: AppText('Pehle Trucks Assign Karein',
+                  style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppText(
+              noDrivers
+                  ? 'Koi on-duty driver nahi hai. Pehle driver add karein ya leave hata kar duty par laayein.'
+                  : 'Trip banane se pehle har on-duty driver ko truck assign karna zaroori hai. '
+                      'Ye drivers abhi baaki hain:',
+              style: AppTextStyle.bodyMedium,
+            ),
+            if (!noDrivers) ...[
+              const SizedBox(height: 12),
+              ...pending.take(8).map((u) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.person_off_rounded,
+                            size: 16, color: AppColors.error),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: AppText(
+                            (u['name'] ?? u['phone'] ?? 'Driver').toString(),
+                            style: AppTextStyle.bodyMedium,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+              if (pending.length > 8)
+                AppText('+${pending.length - 8} aur…',
+                    style: AppTextStyle.labelMedium, color: AppColors.textHint),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Theek Hai'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            onPressed: () {
+              Get.back();
+              controller.changeTabIndex(2); // jump to Trucks tab
+            },
+            child: const Text('Trucks Kholo',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showTripFormDialog(BuildContext context, bool isDark,
       {Map<String, dynamic>? editModeTrip}) {
     final formKey = GlobalKey<FormState>();
@@ -3055,13 +3328,15 @@ class AdminHomeView extends GetView<AdminHomeController> {
 
     final availableDrivers = controller.users.where((u) {
       if (u['role'] != 'driver') return false;
+      // On-leave drivers can't be assigned trips.
+      if (controller.isOnLeave(u)) return false;
       final phone = u['phone'] as String?;
       if (phone == null || phone.isEmpty) return false;
-      
+
       // Find the truck assigned to this driver phone
       final truck = controller.trucks.firstWhereOrNull((t) => t['assignedTo'] == phone);
       if (truck == null) return false;
-      
+
       // Check if inspection is complete ('ready')
       return truck['inspectionStatus'] == 'ready';
     }).map((u) => u['phone'] as String).toList();
@@ -3089,6 +3364,14 @@ class AdminHomeView extends GetView<AdminHomeController> {
     if (!availableTabs.contains(selectedTabType)) {
       selectedTabType = 'Today';
     }
+
+    // Vendor is predefined — admin just selects it and its location auto-fills.
+    // In edit mode, pre-select the vendor whose name matches the saved trip.
+    String? selectedVendorId = editModeTrip == null
+        ? null
+        : controller.vendors.firstWhereOrNull((v) =>
+            (v['name'] ?? '').toString() ==
+            (editModeTrip['vendorName'] ?? '').toString())?['id'];
 
     String formatDateTime(DateTime date, TimeOfDay time) {
       final months = [
@@ -3170,16 +3453,93 @@ class AdminHomeView extends GetView<AdminHomeController> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const SizedBox(height: 8),
-                        TextFormField(
-                          controller: idCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Trip ID',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.tag_rounded),
+                        // Trip ID is auto-generated — no manual entry.
+                        if (editModeTrip == null)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryLight.withValues(alpha: 0.4),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.tag_rounded,
+                                    size: 18, color: AppColors.primary),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: AppText(
+                                    'Trip ID automatically generate hogi.',
+                                    style: AppTextStyle.labelMedium,
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          enabled: editModeTrip == null,
-                          validator: (v) =>
-                              v!.isEmpty ? 'Field required' : null,
+                        // Vendor selector (predefined) — auto-fills pickup info.
+                        StatefulBuilder(
+                          builder: (ctx, setVendorState) {
+                            return DropdownButtonFormField<String>(
+                              initialValue: selectedVendorId,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Vendor',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.storefront_rounded),
+                                helperText:
+                                    'Predefined vendor select karein — pickup details auto-fill ho jayengi.',
+                              ),
+                              items: [
+                                ...controller.vendors.map((v) => DropdownMenuItem(
+                                      value: (v['id'] ?? '').toString(),
+                                      child: Text(
+                                        (v['name'] ?? 'Vendor').toString(),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    )),
+                                const DropdownMenuItem(
+                                  value: '__add__',
+                                  child: Text('➕ Add New Vendor'),
+                                ),
+                              ],
+                              onChanged: (val) {
+                                if (val == '__add__') {
+                                  _showVendorFormDialog(context, isDark);
+                                  return;
+                                }
+                                if (val == null) return;
+                                final v = controller.vendors
+                                    .firstWhereOrNull((e) => e['id'] == val);
+                                if (v == null) return;
+                                setVendorState(() => selectedVendorId = val);
+                                final loc =
+                                    (v['pickupLocation'] ?? v['location'] ?? '')
+                                        .toString();
+                                vendorNameCtrl.text = (v['name'] ?? '').toString();
+                                vendorLocCtrl.text = loc;
+                                pickupLocCtrl.text = loc;
+                                pickupCityCtrl.text = (v['city'] ?? '').toString();
+                                pickupDistrictCtrl.text =
+                                    (v['district'] ?? '').toString();
+                                if (v['latitude'] != null) {
+                                  pickupLatCtrl.text = v['latitude'].toString();
+                                }
+                                if (v['longitude'] != null) {
+                                  pickupLngCtrl.text = v['longitude'].toString();
+                                }
+                              },
+                              // Vendor is required for new trips; legacy trips
+                              // being edited may predate the vendor list.
+                              validator: (v) {
+                                if (editModeTrip != null) return null;
+                                return (v == null || v.isEmpty || v == '__add__')
+                                    ? 'Vendor select karein'
+                                    : null;
+                              },
+                            );
+                          },
                         ),
                         const SizedBox(height: 16),
                         StatefulBuilder(
@@ -3271,37 +3631,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        // --- Vendor / Material details ---
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: vendorNameCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'Vendor Name',
-                                  border: OutlineInputBorder(),
-                                  prefixIcon: Icon(Icons.storefront_rounded),
-                                ),
-                                validator: (v) =>
-                                    v!.isEmpty ? 'Field required' : null,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: vendorLocCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'Vendor Location',
-                                  border: OutlineInputBorder(),
-                                  prefixIcon: Icon(Icons.place_rounded),
-                                ),
-                                validator: (v) =>
-                                    v!.isEmpty ? 'Field required' : null,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
+                        // --- Material / per-trip details (vendor set above) ---
                         Row(
                           children: [
                             Expanded(
@@ -3661,6 +3991,216 @@ class AdminHomeView extends GetView<AdminHomeController> {
           ),
         ),
       );
+      },
+    );
+  }
+
+  // 1b. ADD / EDIT VENDOR DIALOG
+  /// Create/edit a predefined vendor (minimal location details). Once saved,
+  /// admins just pick it in the trip form and its pickup info auto-fills.
+  void _showVendorFormDialog(BuildContext context, bool isDark,
+      {Map<String, dynamic>? editVendor}) {
+    final formKey = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController(text: editVendor?['name'] ?? '');
+    final locCtrl = TextEditingController(
+        text: (editVendor?['pickupLocation'] ?? editVendor?['location'] ?? '')
+            .toString());
+    final cityCtrl = TextEditingController(text: editVendor?['city'] ?? '');
+    final districtCtrl =
+        TextEditingController(text: editVendor?['district'] ?? '');
+    final latCtrl = TextEditingController(
+        text: editVendor?['latitude']?.toString() ?? '');
+    final lngCtrl = TextEditingController(
+        text: editVendor?['longitude']?.toString() ?? '');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return Material(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: 16,
+              left: 20,
+              right: 20,
+              bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : Colors.black12,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                AppText(editVendor != null ? 'Edit Vendor' : 'Add Vendor',
+                    style: AppTextStyle.headlineSmall,
+                    fontWeight: FontWeight.bold),
+                const Divider(height: 16),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Form(
+                      key: formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: nameCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Vendor Name',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.storefront_rounded),
+                            ),
+                            validator: (v) =>
+                                v!.trim().isEmpty ? 'Field required' : null,
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: locCtrl,
+                            decoration: InputDecoration(
+                              labelText: 'Pickup Location',
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.pin_drop_rounded),
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.search_rounded,
+                                    color: AppColors.primary),
+                                tooltip: 'Search Coordinates',
+                                onPressed: () async {
+                                  final query =
+                                      '${locCtrl.text.trim()}, ${cityCtrl.text.trim()}';
+                                  await _resolveCoordinates(
+                                      context, query, latCtrl, lngCtrl);
+                                },
+                              ),
+                            ),
+                            validator: (v) =>
+                                v!.trim().isEmpty ? 'Field required' : null,
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: cityCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'City',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon:
+                                        Icon(Icons.location_city_rounded),
+                                  ),
+                                  validator: (v) =>
+                                      v!.trim().isEmpty ? 'Required' : null,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: districtCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'District',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.map_rounded),
+                                  ),
+                                  validator: (v) =>
+                                      v!.trim().isEmpty ? 'Required' : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: latCtrl,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Latitude',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.my_location_rounded),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: lngCtrl,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Longitude',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.my_location_rounded),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: () =>
+                                    Navigator.of(sheetCtx).pop(),
+                                child: const AppText('Cancel',
+                                    style: AppTextStyle.bodyMedium),
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 24, vertical: 12),
+                                ),
+                                onPressed: () {
+                                  if (!formKey.currentState!.validate()) return;
+                                  final data = <String, dynamic>{
+                                    if (editVendor?['id'] != null)
+                                      'id': editVendor!['id'],
+                                    'name': nameCtrl.text.trim(),
+                                    'pickupLocation': locCtrl.text.trim(),
+                                    'city': cityCtrl.text.trim(),
+                                    'district': districtCtrl.text.trim(),
+                                    'latitude':
+                                        double.tryParse(latCtrl.text.trim()),
+                                    'longitude':
+                                        double.tryParse(lngCtrl.text.trim()),
+                                  };
+                                  Navigator.of(sheetCtx).pop();
+                                  controller.saveVendor(data);
+                                },
+                                child: const AppText('Save',
+                                    style: AppTextStyle.bodyMedium,
+                                    color: Colors.white),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
       },
     );
   }

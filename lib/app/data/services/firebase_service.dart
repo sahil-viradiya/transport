@@ -1734,6 +1734,95 @@ class FirebaseService extends GetxService {
     } catch (_) {}
   }
 
+  // ---------------------------------------------------------------------------
+  // VENDORS  (predefined pickup sources — admin creates once, then just assigns
+  // them to trips). A vendor holds its location details; per-trip fields like
+  // material / pass holder / royalty / loading pass are entered on the trip.
+  // ---------------------------------------------------------------------------
+
+  /// Live stream of all vendors for the admin vendor directory + trip form.
+  Stream<List<Map<String, dynamic>>> watchVendors() {
+    return _db.collection('vendors').snapshots().map((s) => s.docs.map((d) {
+          final m = d.data();
+          m['id'] = d.id;
+          return m;
+        }).toList());
+  }
+
+  Future<List<Map<String, dynamic>>> getVendors() async {
+    try {
+      final snap = await _db.collection('vendors').get();
+      return snap.docs.map((d) {
+        final m = d.data();
+        m['id'] = d.id;
+        return m;
+      }).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Create or update a vendor. Generates an id when one isn't supplied.
+  Future<String> saveVendor(Map<String, dynamic> vendorData) async {
+    final id = (vendorData['id'] ?? '').toString().isNotEmpty
+        ? vendorData['id'].toString()
+        : 'VEND-${DateTime.now().millisecondsSinceEpoch}';
+    vendorData['id'] = id;
+    vendorData.putIfAbsent('createdAt', () => FieldValue.serverTimestamp());
+    try {
+      await _db
+          .collection('vendors')
+          .doc(id)
+          .set(vendorData, SetOptions(merge: true));
+    } catch (_) {}
+    return id;
+  }
+
+  Future<void> deleteVendor(String id) async {
+    try {
+      await _db.collection('vendors').doc(id).delete();
+    } catch (_) {}
+  }
+
+  /// Admin marks a driver on leave (or back on duty). On-leave drivers are
+  /// excluded from the daily truck-assignment gate and from trip assignment.
+  Future<void> setDriverLeave(String phone, bool onLeave) async {
+    final p = SessionService.normalizePhone(phone);
+    if (p.isEmpty) return;
+    final data = {
+      'onLeave': onLeave,
+      if (onLeave) 'availability': 'on_leave',
+    };
+    try {
+      await _db.collection('users').doc(p).set(data, SetOptions(merge: true));
+      await _db.collection('drivers').doc(p).set(data, SetOptions(merge: true));
+    } catch (_) {}
+  }
+
+  /// Sequential-ish, human-readable trip id: `TRP-YYMMDD-XXX`, where XXX is the
+  /// next number for today (based on how many trips already exist for the date
+  /// prefix). Auto-generated so the admin never types a trip id.
+  Future<String> generateTripId() async {
+    final now = DateTime.now();
+    final y = (now.year % 100).toString().padLeft(2, '0');
+    final m = now.month.toString().padLeft(2, '0');
+    final d = now.day.toString().padLeft(2, '0');
+    final prefix = 'TRP-$y$m$d';
+    var maxSeq = 0;
+    try {
+      final snap = await _db.collection('trips').get();
+      for (final doc in snap.docs) {
+        if (doc.id.startsWith('$prefix-')) {
+          final seq = int.tryParse(doc.id.substring(prefix.length + 1)) ?? 0;
+          if (seq > maxSeq) maxSeq = seq;
+        }
+      }
+    } catch (_) {
+      return '$prefix-${(now.millisecondsSinceEpoch % 1000).toString().padLeft(3, '0')}';
+    }
+    return '$prefix-${(maxSeq + 1).toString().padLeft(3, '0')}';
+  }
+
   void _warnStorage(String what, Object e) {
     debugPrint('------------------------------------------------------------');
     debugPrint('WARNING: Firebase Storage upload failed for $what: $e');

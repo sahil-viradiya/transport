@@ -29,11 +29,13 @@ class AdminHomeController extends GetxController {
   final RxList<Map<String, dynamic>> trucks = <Map<String, dynamic>>[].obs;
   final RxList<Map<String, dynamic>> users = <Map<String, dynamic>>[].obs;
   final RxList<Map<String, dynamic>> expenses = <Map<String, dynamic>>[].obs;
+  final RxList<Map<String, dynamic>> vendors = <Map<String, dynamic>>[].obs;
 
   StreamSubscription? _tripsSub;
   StreamSubscription? _expensesSub;
   StreamSubscription? _usersSub;
   StreamSubscription? _trucksSub;
+  StreamSubscription? _vendorsSub;
 
   @override
   void onInit() {
@@ -47,6 +49,7 @@ class AdminHomeController extends GetxController {
     _tripsSub?.cancel();
     _expensesSub?.cancel();
     _usersSub?.cancel();
+    _vendorsSub?.cancel();
     _trucksSub?.cancel();
     super.onClose();
   }
@@ -70,6 +73,91 @@ class AdminHomeController extends GetxController {
     });
     _usersSub = _firebaseService.watchAllUsers().listen(users.assignAll);
     _trucksSub = _firebaseService.watchAllTrucks().listen(trucks.assignAll);
+    _vendorsSub = _firebaseService.watchVendors().listen(vendors.assignAll);
+  }
+
+  // ---------------------------------------------------------------------------
+  // DAILY TRUCK-ASSIGNMENT GATE + DRIVER ROSTER
+  // Admin's first daily task is to assign a truck to every driver. Until every
+  // on-duty (non-leave) driver has a truck, no trip can be created.
+  // ---------------------------------------------------------------------------
+
+  /// All non-admin users (drivers), leave or not.
+  List<Map<String, dynamic>> get allDrivers => users
+      .where((u) => (u['role'] ?? 'driver') != 'admin')
+      .toList();
+
+  bool isOnLeave(Map<String, dynamic> user) =>
+      user['onLeave'] == true || user['availability'] == 'on_leave';
+
+  /// Drivers expected to work today (not on leave).
+  List<Map<String, dynamic>> get rosterDrivers =>
+      allDrivers.where((u) => !isOnLeave(u)).toList();
+
+  bool driverHasTruck(String phone) =>
+      trucks.any((t) => (t['assignedTo'] ?? '').toString() == phone);
+
+  /// On-duty drivers who still don't have a truck assigned (the admin's pending
+  /// morning task). Drives the trip-creation gate + the warning message.
+  List<Map<String, dynamic>> get driversWithoutTruck => rosterDrivers
+      .where((u) => !driverHasTruck((u['phone'] ?? '').toString()))
+      .toList();
+
+  /// True once every on-duty driver has a truck — only then can trips be made.
+  bool get canCreateTrip =>
+      rosterDrivers.isNotEmpty && driversWithoutTruck.isEmpty;
+
+  /// Admin marks a driver on leave / back on duty.
+  Future<void> setDriverOnLeave(String phone, bool onLeave) async {
+    try {
+      await _firebaseService.setDriverLeave(phone, onLeave);
+      AppSnackBar.showSuccess(
+        title: onLeave ? 'Marked On Leave' : 'Back On Duty',
+        message: onLeave
+            ? 'Driver ko aaj ke liye leave par daal diya.'
+            : 'Driver wapas duty par hai.',
+      );
+    } catch (e) {
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // VENDORS  (predefined pickup sources)
+  // ---------------------------------------------------------------------------
+
+  Future<void> saveVendor(Map<String, dynamic> vendorData) async {
+    AppPopup.showLoading(message: 'Saving vendor...');
+    try {
+      await _firebaseService.saveVendor(vendorData);
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(
+          title: 'Vendor Saved', message: 'Vendor details save ho gaye.');
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
+  }
+
+  Future<void> deleteVendor(String id, {String name = ''}) async {
+    AppPopup.showConfirmation(
+      title: 'Delete Vendor?',
+      description:
+          'Kya aap ${name.isNotEmpty ? '"$name"' : 'is vendor'} ko delete karna chahte hain?',
+      confirmText: 'Delete',
+      onConfirm: () async {
+        AppPopup.showLoading(message: 'Deleting...');
+        try {
+          await _firebaseService.deleteVendor(id);
+          AppPopup.hideLoading();
+          AppSnackBar.showSuccess(
+              title: 'Deleted', message: 'Vendor hata diya gaya.');
+        } catch (e) {
+          AppPopup.hideLoading();
+          AppSnackBar.showError(title: 'Error', message: e.toString());
+        }
+      },
+    );
   }
 
   /// Set the drop destination for a trip (typically while the truck is
@@ -367,9 +455,14 @@ class AdminHomeController extends GetxController {
 
   // --- TRIP CRUD ACTIONS ---
   Future<void> createTrip(Map<String, dynamic> tripData) async {
-    final tripId = tripData['id'] as String;
-    AppPopup.showLoading(message: 'Assigning Trip $tripId...');
+    AppPopup.showLoading(message: 'Assigning Trip...');
     try {
+      // Trip id is auto-generated — the admin never types it.
+      var tripId = (tripData['id'] ?? '').toString();
+      if (tripId.isEmpty) {
+        tripId = await _firebaseService.generateTripId();
+        tripData['id'] = tripId;
+      }
       // Assign as PENDING and notify the driver to accept/reject — the trip only
       // becomes active after the driver confirms.
       await _firebaseService.assignTripToDriver(tripId, tripData);
