@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/app/data/services/storage_service.dart';
+import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/app/routes/app_pages.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
@@ -399,6 +400,11 @@ class AdminHomeController extends GetxController {
     return name.isEmpty ? phone : name;
   }
 
+  String driverAvatarFor(String phone) {
+    final u = users.firstWhereOrNull((u) => (u['phone'] ?? '') == phone);
+    return (u?['avatarUrl'] ?? '').toString();
+  }
+
   /// Admin marks a problem-truck active again (issue resolved).
   Future<void> markTruckActive(String truckNo) async {
     AppPopup.showLoading(message: 'Marking active...');
@@ -744,5 +750,26 @@ class AdminHomeController extends GetxController {
       selectedTripId.value = '';
       await loadData();
     } catch (_) {}
+  }
+
+  Future<void> updateAdminProfile(String phone, String name, String avatarUrl) async {
+    AppPopup.showLoading(message: 'Updating Profile...');
+    try {
+      await _firebaseService.saveUser(phone, {
+        'name': name,
+        'avatarUrl': avatarUrl,
+      });
+      final session = Get.find<SessionService>();
+      await session.updateCachedProfile(name: name, avatarUrl: avatarUrl);
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(title: 'Profile Updated', message: 'Admin profile updated successfully.');
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
+  }
+
+  Future<String> uploadAvatar(Uint8List bytes, String phone) async {
+    return await _firebaseService.uploadDriverAvatar(bytes, phone);
   }
 }

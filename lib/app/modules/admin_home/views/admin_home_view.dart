@@ -19,6 +19,8 @@ import '../../../core/utils/time_utils.dart';
 import '../../../core/utils/image_picker_helper.dart';
 import '../../../core/utils/image_url.dart';
 import '../../../data/notifications_controller.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:transport/app/data/services/session_service.dart';
 import 'admin_trip_details_view.dart';
 
 class AdminHomeView extends GetView<AdminHomeController> {
@@ -381,23 +383,44 @@ class AdminHomeView extends GetView<AdminHomeController> {
           const SizedBox(width: 12),
           const NotificationBell(color: Color(0xFF6B7280)),
           const SizedBox(width: 12),
-          Row(
-            children: [
-              const CircleAvatar(
-                radius: 18,
-                backgroundImage: NetworkImage('https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop'),
-              ),
-              const SizedBox(width: 8),
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppText('Admin User', style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
-                  AppText('Super Admin', style: AppTextStyle.labelMedium, color: Color(0xFF6B7280)),
-                ],
-              ),
-              Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: isDark ? Colors.white70 : Colors.black54),
-            ],
+          InkWell(
+            onTap: () {
+              final session = Get.find<SessionService>();
+              _showEditAdminProfileDialog(context, isDark, session);
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Obx(() {
+                final session = Get.find<SessionService>();
+                final avatar = session.avatarUrl.value.isNotEmpty
+                    ? session.avatarUrl.value
+                    : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop';
+                final name = session.name.value.isNotEmpty
+                    ? session.name.value
+                    : 'Admin User';
+                return Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundImage: NetworkImage(corsSafeImageUrl(avatar)),
+                      backgroundColor: Colors.grey.shade200,
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AppText(name, style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                        const AppText('Super Admin', style: AppTextStyle.labelMedium, color: Color(0xFF6B7280)),
+                      ],
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: isDark ? Colors.white70 : Colors.black54),
+                  ],
+                );
+              }),
+            ),
           ),
         ],
       ),
@@ -1176,6 +1199,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
         } catch (_) {}
       }
 
+      final avatar = controller.driverAvatarFor(rt['driverPhone'].toString());
       displayTrips.add({
         'id': rt['id'].toString(),
         'driverName': controller.driverNameFor(rt['driverPhone'].toString()),
@@ -1186,7 +1210,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
         'dropCity': rt['dropCity'] ?? '—',
         'startedTime': startedTime,
         'distance': '${rt['remainingDistance'] ?? '154'} km',
-        'avatar': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
+        'avatar': avatar.isNotEmpty ? avatar : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
       });
     }
 
@@ -6097,5 +6121,261 @@ class AdminHomeView extends GetView<AdminHomeController> {
       return 'https://images.weserv.nl/?url=${Uri.encodeComponent(url)}';
     }
     return url;
+  }
+
+  void _showEditAdminProfileDialog(BuildContext context, bool isDark, SessionService session) {
+    final nameCtrl = TextEditingController(text: session.name.value);
+    final avatarCtrl = TextEditingController(text: session.avatarUrl.value);
+    final formKey = GlobalKey<FormState>();
+
+    // Premium avatar options
+    final List<String> presetAvatars = [
+      'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+      'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
+      'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
+      'https://images.unsplash.com/photo-1628157582853-a796fa650a6a?w=150',
+    ];
+
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        child: StatefulBuilder(
+          builder: (context, setState) {
+            final currentUrl = avatarCtrl.text.isNotEmpty
+                ? avatarCtrl.text
+                : (session.avatarUrl.value.isNotEmpty
+                    ? session.avatarUrl.value
+                    : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150');
+
+            return Container(
+              width: 480,
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const AppText('Edit Profile', style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded),
+                            onPressed: () => Get.back(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      // Current Avatar Preview with click-to-upload capability
+                      Center(
+                        child: Stack(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppColors.primary, width: 2),
+                              ),
+                              child: CircleAvatar(
+                                radius: 48,
+                                backgroundImage: NetworkImage(corsSafeImageUrl(currentUrl)),
+                                backgroundColor: Colors.grey.shade100,
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () => _pickAndUploadImage(setState, avatarCtrl, session.phone.value),
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.primary,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.camera_alt_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const AppText('Choose a Preset Avatar:', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 52,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: presetAvatars.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 12),
+                          itemBuilder: (context, index) {
+                            final url = presetAvatars[index];
+                            final isSelected = avatarCtrl.text == url || (avatarCtrl.text.isEmpty && session.avatarUrl.value == url);
+                            return InkWell(
+                              onTap: () {
+                                setState(() {
+                                  avatarCtrl.text = url;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(26),
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isSelected ? AppColors.primary : Colors.transparent,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: CircleAvatar(
+                                  radius: 22,
+                                  backgroundImage: NetworkImage(corsSafeImageUrl(url)),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      TextFormField(
+                        controller: nameCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Full Name',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.person_outline_rounded),
+                        ),
+                        validator: (v) => v!.trim().isEmpty ? 'Name cannot be empty' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      // Read-only Phone Number field for identity context
+                      TextFormField(
+                        initialValue: session.phone.value,
+                        readOnly: true,
+                        enabled: false,
+                        decoration: const InputDecoration(
+                          labelText: 'Phone Number (ID)',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.phone_locked_rounded),
+                          helperText: 'Primary account identifier (read-only)',
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Get.back(),
+                            child: const AppText('Cancel', style: AppTextStyle.bodyMedium),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () async {
+                              if (!formKey.currentState!.validate()) return;
+                              Get.back();
+                              await controller.updateAdminProfile(
+                                session.phone.value,
+                                nameCtrl.text.trim(),
+                                avatarCtrl.text.trim(),
+                              );
+                            },
+                            child: const AppText('Save Changes', style: AppTextStyle.bodyMedium, color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndUploadImage(StateSetter setState, TextEditingController avatarCtrl, String phone) async {
+    final source = await Get.bottomSheet<ImageSource>(
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Get.isDarkMode ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(16),
+            topRight: Radius.circular(16),
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const AppText('Select Image Source', style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
+                title: const AppText('Choose from Gallery', style: AppTextStyle.bodyMedium),
+                onTap: () => Get.back(result: ImageSource.gallery),
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_rounded, color: AppColors.primary),
+                title: const AppText('Take Photo (Camera)', style: AppTextStyle.bodyMedium),
+                onTap: () => Get.back(result: ImageSource.camera),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    AppPopup.showLoading(message: 'Uploading Image...');
+    try {
+      final picked = source == ImageSource.gallery
+          ? await ImagePickerHelper.pickFromGallery()
+          : await ImagePickerHelper.captureFromCamera();
+
+      if (picked == null) {
+        AppPopup.hideLoading();
+        return;
+      }
+
+      final downloadUrl = await controller.uploadAvatar(picked.bytes, phone);
+      AppPopup.hideLoading();
+
+      if (downloadUrl.isNotEmpty) {
+        setState(() {
+          avatarCtrl.text = downloadUrl;
+        });
+        AppSnackBar.showSuccess(title: 'Image Uploaded', message: 'Photo uploaded successfully.');
+      } else {
+        AppSnackBar.showError(title: 'Upload Failed', message: 'Could not upload image to server.');
+      }
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
   }
 }
