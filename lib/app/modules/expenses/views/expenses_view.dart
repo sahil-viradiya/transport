@@ -325,14 +325,36 @@ class ExpensesView extends GetView<ExpensesController> {
                           validator: (v) => v!.isEmpty ? 'Field required' : null,
                         ),
                         const SizedBox(height: 16),
-                        TextFormField(
-                          controller: tripIdCtrl,
+                        DropdownButtonFormField<String>(
+                          value: tripIdCtrl.text.isEmpty
+                              ? null
+                              : (Get.isRegistered<TripsController>() &&
+                                      Get.find<TripsController>()
+                                          .allTrips
+                                          .any((t) => t.id == tripIdCtrl.text)
+                                  ? tripIdCtrl.text
+                                  : null),
                           decoration: const InputDecoration(
-                            labelText: 'Assigned Trip ID',
+                            labelText: 'Assigned Trip (Optional)',
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.tag_rounded),
                           ),
-                          validator: (v) => v!.isEmpty ? 'Field required' : null,
+                          items: [
+                            const DropdownMenuItem<String>(
+                              value: null,
+                              child: Text('None / Not Associated'),
+                            ),
+                            if (Get.isRegistered<TripsController>())
+                              ...Get.find<TripsController>().allTrips.map((t) {
+                                return DropdownMenuItem<String>(
+                                  value: t.id,
+                                  child: Text(t.id),
+                                );
+                              }),
+                          ],
+                          onChanged: (val) {
+                            tripIdCtrl.text = val ?? '';
+                          },
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
@@ -355,8 +377,42 @@ class ExpensesView extends GetView<ExpensesController> {
                         Obx(() => receiptBytes.value == null
                             ? OutlinedButton.icon(
                                 onPressed: () async {
+                                  final source = await Get.bottomSheet<ImageSource>(
+                                    Container(
+                                      padding: const EdgeInsets.all(20),
+                                      decoration: BoxDecoration(
+                                        color: Get.isDarkMode ? const Color(0xFF1E293B) : Colors.white,
+                                        borderRadius: const BorderRadius.only(
+                                          topLeft: Radius.circular(16),
+                                          topRight: Radius.circular(16),
+                                        ),
+                                      ),
+                                      child: SafeArea(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const AppText('Select Image Source', style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
+                                            const SizedBox(height: 16),
+                                            ListTile(
+                                              leading: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
+                                              title: const AppText('Choose from Gallery', style: AppTextStyle.bodyMedium),
+                                              onTap: () => Get.back(result: ImageSource.gallery),
+                                            ),
+                                            ListTile(
+                                              leading: const Icon(Icons.camera_alt_rounded, color: AppColors.primary),
+                                              title: const AppText('Take Photo (Camera)', style: AppTextStyle.bodyMedium),
+                                              onTap: () => Get.back(result: ImageSource.camera),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+
+                                  if (source == null) return;
+
                                   final x = await ImagePicker().pickImage(
-                                    source: ImageSource.camera,
+                                    source: source,
                                     imageQuality: 70,
                                   );
                                   if (x != null) {

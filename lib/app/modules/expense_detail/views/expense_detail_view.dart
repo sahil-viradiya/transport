@@ -4,6 +4,7 @@ import '../controllers/expense_detail_controller.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../../widgets/app_button.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/image_url.dart';
 
 class ExpenseDetailView extends GetView<ExpenseDetailController> {
   const ExpenseDetailView({super.key});
@@ -154,7 +155,7 @@ class ExpenseDetailView extends GetView<ExpenseDetailController> {
                               ),
                               clipBehavior: Clip.antiAlias,
                               child: Image.network(
-                                receipt,
+                                corsSafeImageUrl(receipt),
                                 fit: BoxFit.cover,
                                 width: double.infinity,
                                 errorBuilder: (_, __, ___) => const Center(

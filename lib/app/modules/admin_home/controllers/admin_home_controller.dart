@@ -24,6 +24,8 @@ class AdminHomeController extends GetxController {
   final RxString searchQuery = ''.obs;
   final RxString selectedStatus = 'All Status'.obs;
   final Rx<DateTime?> selectedDate = Rx<DateTime?>(null);
+  final RxString selectedExpenseDriver = ''.obs;
+  final RxString selectedExpenseTrip = ''.obs;
 
   // Database lists
   final RxList<Map<String, dynamic>> trips = <Map<String, dynamic>>[].obs;
@@ -52,6 +54,7 @@ class AdminHomeController extends GetxController {
     _usersSub?.cancel();
     _vendorsSub?.cancel();
     _trucksSub?.cancel();
+    tripSearchController.dispose();
     super.onClose();
   }
 
@@ -159,6 +162,148 @@ class AdminHomeController extends GetxController {
         }
       },
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // ADMIN TRIPS TAB: search + status filter + pagination
+  // ---------------------------------------------------------------------------
+  final RxString tripStatusFilter = 'All'.obs; // All|En Route|Pending|Completed|Cancelled
+  final RxString tripSearch = ''.obs;
+  final tripSearchController = TextEditingController();
+  final Rx<DateTime?> tripDateFilter = Rx<DateTime?>(null);
+  final RxInt tripPage = 0.obs;
+  final RxInt tripsPerPage = 10.obs;
+
+  static const _enRouteStatuses = {
+    'EN_ROUTE_VENDOR',
+    'LOADING',
+    'LOAD_REQUESTED',
+    'ACTIVE NOW',
+    'DELIVERY_REQUESTED',
+  };
+
+  static const _monthAbbr = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+
+  bool _tripMatchesFilter(Map<String, dynamic> t) {
+    final s = (t['status'] ?? '').toString();
+    switch (tripStatusFilter.value) {
+      case 'En Route':
+        return _enRouteStatuses.contains(s);
+      case 'Pending':
+        return s == 'PENDING' || s == 'ASSIGNED';
+      case 'Completed':
+        return s == 'DELIVERED';
+      case 'Cancelled':
+        return s == 'REJECTED';
+      default:
+        return true;
+    }
+  }
+
+  bool _tripMatchesSearch(Map<String, dynamic> t) {
+    final q = tripSearch.value.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    final driver =
+        driverNameFor((t['driverPhone'] ?? '').toString()).toLowerCase();
+    return [t['id'], t['vendorName'], t['truckNo'], t['pickupCity'], t['dropCity']]
+            .any((v) => (v ?? '').toString().toLowerCase().contains(q)) ||
+        driver.contains(q);
+  }
+
+  bool _tripMatchesDate(Map<String, dynamic> t) {
+    final d = tripDateFilter.value;
+    if (d == null) return true;
+    final tag = '${d.day} ${_monthAbbr[d.month - 1]}'; // e.g. "13 Jul"
+    return (t['date'] ?? '').toString().contains(tag);
+  }
+
+  /// Trips after applying the tab's search + status + date filters.
+  List<Map<String, dynamic>> get filteredTrips => trips
+      .where((t) =>
+          _tripMatchesFilter(t) && _tripMatchesSearch(t) && _tripMatchesDate(t))
+      .toList();
+
+  int get tripPageCount {
+    final per = tripsPerPage.value;
+    if (per <= 0) return 1;
+    final n = filteredTrips.length;
+    final pages = (n + per - 1) ~/ per;
+    return pages < 1 ? 1 : pages;
+  }
+
+  /// The current page of filtered trips.
+  List<Map<String, dynamic>> get pagedTrips {
+    final all = filteredTrips;
+    final per = tripsPerPage.value;
+    var page = tripPage.value;
+    if (page > tripPageCount - 1) page = tripPageCount - 1;
+    if (page < 0) page = 0;
+    final start = page * per;
+    if (start >= all.length) return const [];
+    final end = (start + per) > all.length ? all.length : (start + per);
+    return all.sublist(start, end);
+  }
+
+  /// Count of trips per status for the filter chips (uses the search + date
+  /// filters but ignores the status filter so each chip shows its own total).
+  int tripStatusCount(String filter) {
+    final base = trips
+        .where((t) => _tripMatchesSearch(t) && _tripMatchesDate(t))
+        .toList();
+    switch (filter) {
+      case 'En Route':
+        return base
+            .where((t) => _enRouteStatuses.contains((t['status'] ?? '')))
+            .length;
+      case 'Pending':
+        return base
+            .where((t) =>
+                (t['status'] ?? '') == 'PENDING' ||
+                (t['status'] ?? '') == 'ASSIGNED')
+            .length;
+      case 'Completed':
+        return base.where((t) => (t['status'] ?? '') == 'DELIVERED').length;
+      case 'Cancelled':
+        return base.where((t) => (t['status'] ?? '') == 'REJECTED').length;
+      default:
+        return base.length;
+    }
+  }
+
+  void setTripFilter(String f) {
+    tripStatusFilter.value = f;
+    tripPage.value = 0;
+  }
+
+  void setTripSearch(String q) {
+    tripSearch.value = q;
+    tripPage.value = 0;
+  }
+
+  void setTripDateFilter(DateTime? d) {
+    tripDateFilter.value = d;
+    tripPage.value = 0;
+  }
+
+  void setTripsPerPage(int n) {
+    tripsPerPage.value = n;
+    tripPage.value = 0;
+  }
+
+  void goToTripPage(int p) {
+    if (p < 0 || p > tripPageCount - 1) return;
+    tripPage.value = p;
+  }
+
+  void clearTripFilters() {
+    tripStatusFilter.value = 'All';
+    tripSearch.value = '';
+    tripSearchController.clear();
+    tripDateFilter.value = null;
+    tripPage.value = 0;
   }
 
   /// Set the drop destination for a trip (typically while the truck is
@@ -432,6 +577,7 @@ class AdminHomeController extends GetxController {
       // Fetch users
       final fetchedUsers = await _firebaseService.getUsers();
       users.assignAll(fetchedUsers);
+      _syncExistingAvatars(fetchedUsers);
 
       // Fetch trucks
       final fetchedTrucks = await _firebaseService.getTrucks();
@@ -448,6 +594,24 @@ class AdminHomeController extends GetxController {
       debugPrint('Error loading admin dashboard: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> _syncExistingAvatars(List<Map<String, dynamic>> fetchedUsers) async {
+    for (final u in fetchedUsers) {
+      if ((u['role'] ?? 'driver') == 'driver') {
+        final phone = (u['phone'] ?? '').toString();
+        if (phone.isNotEmpty) {
+          try {
+            final profile = await _firebaseService.getDriverProfile(phone);
+            final dbAvatar = (profile['avatarUrl'] ?? '').toString();
+            final currentAvatar = (u['avatarUrl'] ?? '').toString();
+            if (dbAvatar.isNotEmpty && dbAvatar != currentAvatar) {
+              await _firebaseService.saveUser(phone, {'avatarUrl': dbAvatar});
+            }
+          } catch (_) {}
+        }
+      }
     }
   }
 

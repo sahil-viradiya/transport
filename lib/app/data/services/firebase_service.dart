@@ -1118,7 +1118,22 @@ class FirebaseService extends GetxService {
 
   Future<void> updateDriverProfile(Map<String, dynamic> data, [String? key]) async {
     try {
-      await _ownerDoc(key).set(data, SetOptions(merge: true));
+      final id = (key == null || key.isEmpty) ? ownerKey : key;
+      await _ownerDoc(id).set(data, SetOptions(merge: true));
+      
+      final userUpdates = <String, dynamic>{};
+      if (data.containsKey('driverName')) {
+        userUpdates['name'] = data['driverName'];
+      }
+      if (data.containsKey('name')) {
+        userUpdates['name'] = data['name'];
+      }
+      if (data.containsKey('avatarUrl')) {
+        userUpdates['avatarUrl'] = data['avatarUrl'];
+      }
+      if (userUpdates.isNotEmpty) {
+        await _db.collection('users').doc(id).set(userUpdates, SetOptions(merge: true));
+      }
     } catch (_) {}
   }
 

@@ -4,6 +4,7 @@ import '../controllers/notification_detail_controller.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../../widgets/trip_progress_tracker.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/image_url.dart';
 
 class NotificationDetailView extends GetView<NotificationDetailController> {
   const NotificationDetailView({super.key});
@@ -262,7 +263,7 @@ class NotificationDetailView extends GetView<NotificationDetailController> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Image.network(
-                  issueImage,
+                  corsSafeImageUrl(issueImage),
                   height: 200,
                   width: double.infinity,
                   fit: BoxFit.cover,
@@ -335,7 +336,7 @@ class NotificationDetailView extends GetView<NotificationDetailController> {
               const SizedBox(height: 6),
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.network(receipt,
+                child: Image.network(corsSafeImageUrl(receipt),
                     height: 220,
                     width: double.infinity,
                     fit: BoxFit.cover,
