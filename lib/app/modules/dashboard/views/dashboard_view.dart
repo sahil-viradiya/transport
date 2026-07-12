@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/dashboard_controller.dart';
+import '../../../core/utils/image_url.dart';
 import '../../home/controllers/home_controller.dart';
 import '../../profile/controllers/profile_controller.dart';
 import '../../../../widgets/app_text.dart';
@@ -21,7 +22,7 @@ class DashboardView extends GetView<DashboardController> {
 
   ImageProvider _getImageProvider(String path) {
     if (path.startsWith('http://') || path.startsWith('https://')) {
-      return NetworkImage(path);
+      return NetworkImage(corsSafeImageUrl(path));
     } else if (!kIsWeb && path.isNotEmpty && File(path).existsSync()) {
       return FileImage(File(path));
     }

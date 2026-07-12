@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../../widgets/app_button.dart';
 import '../../dashboard/controllers/dashboard_controller.dart';
+import '../../../core/utils/image_url.dart';
 import '../../../core/theme/app_colors.dart';
 import '../controllers/profile_controller.dart';
 
@@ -13,7 +14,7 @@ class ProfileView extends GetView<ProfileController> {
 
   ImageProvider _getImageProvider(String path) {
     if (path.startsWith('http://') || path.startsWith('https://')) {
-      return NetworkImage(path);
+      return NetworkImage(corsSafeImageUrl(path));
     }
     // File() is unsupported on web — only touch it on mobile/desktop.
     if (!kIsWeb && path.isNotEmpty && File(path).existsSync()) {

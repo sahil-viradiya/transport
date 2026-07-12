@@ -17,6 +17,7 @@ import '../controllers/admin_home_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/time_utils.dart';
 import '../../../core/utils/image_picker_helper.dart';
+import '../../../core/utils/image_url.dart';
 import '../../../data/notifications_controller.dart';
 import 'admin_trip_details_view.dart';
 
@@ -2751,9 +2752,11 @@ class AdminHomeView extends GetView<AdminHomeController> {
   }
 
   /// Which documents are on file for a driver (photo / driving licence /
-  /// heavy-vehicle licence) — a quick record-completeness indicator.
-  Widget _driverDocsRow(Map<String, dynamic> user) {
-    bool has(String key) => (user[key] ?? '').toString().trim().isNotEmpty;
+  /// heavy-vehicle licence). Uploaded ones are tappable → open a full-screen
+  /// viewer so the admin can actually see the document.
+  Widget _driverDocsRow(BuildContext context, Map<String, dynamic> user) {
+    String url(String key) => (user[key] ?? '').toString().trim();
+    final name = (user['name'] ?? 'Driver').toString();
     return Row(
       children: [
         const AppText('Documents:',
@@ -2764,9 +2767,11 @@ class AdminHomeView extends GetView<AdminHomeController> {
             spacing: 8,
             runSpacing: 6,
             children: [
-              _docStatusChip('Photo', has('avatarUrl')),
-              _docStatusChip('Licence', has('drivingLicenceUrl')),
-              _docStatusChip('Heavy', has('heavyLicenceUrl')),
+              _docStatusChip(context, 'Photo', url('avatarUrl'), '$name — Photo'),
+              _docStatusChip(context, 'Licence', url('drivingLicenceUrl'),
+                  '$name — Driving Licence'),
+              _docStatusChip(context, 'Heavy', url('heavyLicenceUrl'),
+                  '$name — Heavy Vehicle Licence'),
             ],
           ),
         ),
@@ -2774,9 +2779,11 @@ class AdminHomeView extends GetView<AdminHomeController> {
     );
   }
 
-  Widget _docStatusChip(String label, bool present) {
+  Widget _docStatusChip(
+      BuildContext context, String label, String docUrl, String title) {
+    final present = docUrl.isNotEmpty && docUrl.startsWith('http');
     final color = present ? AppColors.success : AppColors.textHint;
-    return Container(
+    final chip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
@@ -2786,14 +2793,89 @@ class AdminHomeView extends GetView<AdminHomeController> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(present ? Icons.check_circle_rounded : Icons.remove_circle_outline_rounded,
-              size: 13, color: color),
+          Icon(
+              present
+                  ? Icons.visibility_rounded
+                  : Icons.remove_circle_outline_rounded,
+              size: 13,
+              color: color),
           const SizedBox(width: 4),
           AppText(label,
               style: AppTextStyle.labelMedium,
               color: color,
               fontWeight: FontWeight.w600),
         ],
+      ),
+    );
+    if (!present) return chip;
+    return InkWell(
+      borderRadius: BorderRadius.circular(6),
+      onTap: () => _showImageViewer(context, docUrl, title),
+      child: chip,
+    );
+  }
+
+  /// Full-screen image viewer (with proxy + graceful loading/error states).
+  void _showImageViewer(BuildContext context, String url, String title) {
+    Get.dialog(
+      Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: AppText(title,
+                        style: AppTextStyle.bodyMedium,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white),
+                    onPressed: () => Get.back(),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: InteractiveViewer(
+                child: Image.network(
+                  corsSafeImageUrl(url),
+                  fit: BoxFit.contain,
+                  loadingBuilder: (ctx, child, progress) {
+                    if (progress == null) return child;
+                    return const Padding(
+                      padding: EdgeInsets.all(40),
+                      child: CircularProgressIndicator(
+                          color: AppColors.primary),
+                    );
+                  },
+                  errorBuilder: (ctx, err, stack) => const Padding(
+                    padding: EdgeInsets.all(40),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.broken_image_rounded,
+                            color: Colors.white54, size: 48),
+                        SizedBox(height: 12),
+                        AppText('Image load nahi hui',
+                            style: AppTextStyle.bodyMedium,
+                            color: Colors.white70),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
       ),
     );
   }
@@ -2854,8 +2936,10 @@ class AdminHomeView extends GetView<AdminHomeController> {
                       children: [
                         CircleAvatar(
                           radius: 26,
-                          backgroundImage: NetworkImage(user['avatarUrl'] ??
-                              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'),
+                          backgroundImage: NetworkImage(corsSafeImageUrl(
+                              (user['avatarUrl'] ??
+                                      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150')
+                                  .toString())),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -2998,7 +3082,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                     // Document records — ties into driver registration uploads.
                     if (isDriver) ...[
                       const Divider(height: 20),
-                      _driverDocsRow(user),
+                      _driverDocsRow(context, user),
                     ],
                   ],
                 ),

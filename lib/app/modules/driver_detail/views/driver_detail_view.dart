@@ -4,6 +4,7 @@ import '../controllers/driver_detail_controller.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../../widgets/trip_progress_tracker.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/image_url.dart';
 import '../../../routes/app_pages.dart';
 
 class DriverDetailView extends GetView<DriverDetailController> {
@@ -73,8 +74,9 @@ class DriverDetailView extends GetView<DriverDetailController> {
               CircleAvatar(
                 radius: 32,
                 backgroundColor: AppColors.primaryLight,
-                backgroundImage:
-                    avatar.startsWith('http') ? NetworkImage(avatar) : null,
+                backgroundImage: avatar.startsWith('http')
+                    ? NetworkImage(corsSafeImageUrl(avatar))
+                    : null,
                 child: avatar.startsWith('http')
                     ? null
                     : const Icon(Icons.person_rounded,
