@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:transport/widgets/app_text.dart';
+import 'package:transport/widgets/trip_status_timeline.dart';
 import 'package:transport/widgets/notification_bell.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
@@ -2428,6 +2429,37 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 height: 28,
                 color: isDark ? Colors.white10 : Colors.grey.shade100),
             _tripFooter(context, isDark, trip, driver, material),
+            // Collapsible full stage-by-stage journey timeline.
+            Theme(
+              data: Theme.of(context).copyWith(
+                dividerColor: Colors.transparent,
+                splashColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(top: 4, bottom: 8),
+                  iconColor: AppColors.primary,
+                  collapsedIconColor: AppColors.textSecondary,
+                  title: const AppText('Trip Status Timeline',
+                      style: AppTextStyle.bodyMedium,
+                      fontWeight: FontWeight.bold),
+                  children: [
+                    TripStatusTimeline(
+                      tripId: tripId,
+                      status: status,
+                      driverName: driver,
+                      truckNo: truckNo,
+                      dropCity: (trip['dropCity'] ?? '').toString(),
+                      milestonesLog: trip['milestonesLog'] as List?,
+                      tripDate: (trip['date'] ?? '').toString(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
