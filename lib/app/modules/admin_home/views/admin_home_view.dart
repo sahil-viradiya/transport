@@ -3305,196 +3305,465 @@ class AdminHomeView extends GetView<AdminHomeController> {
             );
           }
 
-          return ListView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-            itemCount: controller.users.length,
-            itemBuilder: (context, index) {
-              final user = controller.users[index];
-              final isDriver = (user['role'] ?? 'driver') != 'admin';
+          final width = MediaQuery.of(context).size.width;
+          final isWide = width >= 900;
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color:
-                          Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Mockup Header Columns (only on web/wide screens)
+              if (isWide)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 16, 28, 12),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        flex: 4,
+                        child: AppText('PERSONNEL PROFILE',
+                            style: AppTextStyle.labelMedium,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey),
+                      ),
+                      const Expanded(
+                        flex: 2,
+                        child: Center(
+                          child: AppText('CURRENT STATUS',
+                              style: AppTextStyle.labelMedium,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey),
+                        ),
+                      ),
+                      const Expanded(
+                        flex: 3,
+                        child: AppText('ASSIGNED HUB',
+                            style: AppTextStyle.labelMedium,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey),
+                      ),
+                      const Expanded(
+                        flex: 3,
+                        child: Center(
+                          child: AppText('COMPLIANCE CHECKS',
+                              style: AppTextStyle.labelMedium,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey),
+                        ),
+                      ),
+                      const SizedBox(width: 48), // Align with more options menu
+                    ],
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 26,
-                          child: ClipOval(
-                            child: CachedNetworkImage(
-                              imageUrl: corsSafeImageUrl(
-                                  (user['avatarUrl'] ??
-                                          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150')
-                                      .toString()),
-                              fit: BoxFit.cover,
-                              width: 52,
-                              height: 52,
-                              errorWidget: (_, __, ___) => const Icon(Icons.person_rounded, size: 26),
-                            ),
+
+              Expanded(
+                child: ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: controller.users.length,
+                  itemBuilder: (context, index) {
+                    final user = controller.users[index];
+                    final isDriver = (user['role'] ?? 'driver') != 'admin';
+                    final phone = (user['phone'] ?? '').toString();
+                    final name = (user['name'] ?? '').toString();
+                    final avatarUrl = (user['avatarUrl'] ?? '').toString();
+
+                    // Initials for avatar fallback
+                    String initials = 'DR';
+                    if (name.isNotEmpty) {
+                      final parts = name.split(' ');
+                      if (parts.length > 1) {
+                        initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+                      } else {
+                        initials = name.substring(0, parts[0].length >= 2 ? 2 : parts[0].length).toUpperCase();
+                      }
+                    }
+
+                    // Status details
+                    final onLeave = controller.isOnLeave(user);
+                    final available = (user['availability'] ?? 'off_duty') == 'available';
+
+                    String statusText = 'OFF DUTY';
+                    Color statusColor = const Color(0xFF6B7280);
+                    Color statusBg = const Color(0xFFF1F5F9);
+                    if (onLeave) {
+                      statusText = 'ON LEAVE';
+                      statusColor = const Color(0xFFD97706);
+                      statusBg = const Color(0xFFFEF3C7);
+                    } else if (available) {
+                      statusText = 'AVAILABLE';
+                      statusColor = const Color(0xFF047857);
+                      statusBg = const Color(0xFFDCFCE7);
+                    }
+
+                    // Hub details representation (checked in address)
+                    final address = (user['checkInAddress'] ?? '').toString();
+                    final hubName = address.isNotEmpty ? address : 'Main Terminal';
+                    final hubId = 'ID: T-${phone.length >= 4 ? phone.substring(phone.length - 4) : "1000"}';
+
+                    // Wide Layout
+                    if (isWide) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isDark ? Colors.white10 : Colors.grey.shade200,
+                            width: 1,
                           ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: AppText(user['name'] ?? '',
-                                        style: AppTextStyle.bodyLarge,
-                                        fontWeight: FontWeight.bold,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _roleChip(user['role'] ?? 'driver'),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              AppText(user['phone'] ?? '',
-                                  style: AppTextStyle.labelMedium),
-                              if (isDriver) ...[
-                                const SizedBox(height: 6),
-                                Wrap(
-                                  spacing: 6,
-                                  runSpacing: 4,
-                                  crossAxisAlignment:
-                                      WrapCrossAlignment.center,
-                                  children: [
-                                    _availabilityBadge(user),
-                                    if (controller.isOnLeave(user))
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.tertiaryLight,
-                                          borderRadius:
-                                              BorderRadius.circular(6),
-                                        ),
-                                        child: const Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.beach_access_rounded,
-                                                size: 12,
-                                                color: AppColors.tertiaryDark),
-                                            SizedBox(width: 4),
-                                            AppText('On Leave',
-                                                style:
-                                                    AppTextStyle.labelMedium,
-                                                color: AppColors.tertiaryDark,
-                                                fontWeight: FontWeight.bold),
-                                          ],
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        // Role switch + leave toggle + delete.
-                        PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert_rounded,
-                              color: AppColors.textSecondary),
-                          onSelected: (value) {
-                            if (value == 'delete') {
-                              controller.deleteUser(user['phone']);
-                            } else if (value == 'leave') {
-                              controller.setDriverOnLeave(user['phone'], true);
-                            } else if (value == 'unleave') {
-                              controller.setDriverOnLeave(
-                                  user['phone'], false);
-                            } else if (value == 'admin' ||
-                                value == 'driver') {
-                              if (value != user['role']) {
-                                controller.editUserRole(user['phone'], value);
-                              }
-                            }
-                          },
-                          itemBuilder: (_) => [
-                            PopupMenuItem(
-                              value: isDriver ? 'admin' : 'driver',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                      isDriver
-                                          ? Icons.admin_panel_settings_rounded
-                                          : Icons.local_shipping_rounded,
-                                      size: 18,
-                                      color: AppColors.primary),
-                                  const SizedBox(width: 10),
-                                  AppText(
-                                      isDriver
-                                          ? 'Make Admin'
-                                          : 'Make Driver',
-                                      style: AppTextStyle.bodyMedium),
-                                ],
-                              ),
-                            ),
-                            if (isDriver)
-                              PopupMenuItem(
-                                value: controller.isOnLeave(user)
-                                    ? 'unleave'
-                                    : 'leave',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                        controller.isOnLeave(user)
-                                            ? Icons.event_available_rounded
-                                            : Icons.beach_access_rounded,
-                                        size: 18,
-                                        color: AppColors.tertiaryDark),
-                                    const SizedBox(width: 10),
-                                    AppText(
-                                        controller.isOnLeave(user)
-                                            ? 'Back On Duty'
-                                            : 'Mark On Leave',
-                                        style: AppTextStyle.bodyMedium),
-                                  ],
-                                ),
-                              ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.delete_outline_rounded,
-                                      size: 18, color: AppColors.error),
-                                  SizedBox(width: 10),
-                                  AppText('Delete',
-                                      style: AppTextStyle.bodyMedium,
-                                      color: AppColors.error),
-                                ],
-                              ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+                              blurRadius: 6,
+                              offset: const Offset(0, 3),
                             ),
                           ],
                         ),
+                        child: Row(
+                          children: [
+                            // Personnel Profile Column
+                            Expanded(
+                              flex: 4,
+                              child: Row(
+                                children: [
+                                  Stack(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 22,
+                                        backgroundColor: Colors.grey.shade200,
+                                        child: ClipOval(
+                                          child: avatarUrl.isNotEmpty
+                                              ? CachedNetworkImage(
+                                                  imageUrl: corsSafeImageUrl(avatarUrl),
+                                                  fit: BoxFit.cover,
+                                                  width: 44,
+                                                  height: 44,
+                                                  errorWidget: (_, __, ___) => const Icon(Icons.person_rounded, size: 22),
+                                                )
+                                              : Container(
+                                                  color: isDark ? const Color(0xFF059669).withOpacity(0.2) : const Color(0xFFD1FAE5),
+                                                  alignment: Alignment.center,
+                                                  child: Text(
+                                                    initials,
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      color: isDark ? Colors.green.shade200 : const Color(0xFF047857),
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        bottom: 0,
+                                        right: 0,
+                                        child: Container(
+                                          width: 10,
+                                          height: 10,
+                                          decoration: BoxDecoration(
+                                            color: available ? Colors.green : Colors.grey,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: isDark ? const Color(0xFF1E293B) : Colors.white, width: 1.5),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        AppText(name, style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.phone_rounded, size: 12, color: Colors.grey),
+                                            const SizedBox(width: 4),
+                                            AppText(phone, style: AppTextStyle.labelMedium, color: Colors.grey),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Current Status Column
+                            Expanded(
+                              flex: 2,
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: statusBg,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: AppText(statusText, style: AppTextStyle.labelMedium, color: statusColor, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+
+                            // Assigned Hub Column
+                            Expanded(
+                              flex: 3,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  AppText(hubName, style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  const SizedBox(height: 2),
+                                  AppText(hubId, style: AppTextStyle.labelMedium, color: Colors.grey),
+                                ],
+                              ),
+                            ),
+
+                            // Compliance Checks Column
+                            Expanded(
+                              flex: 3,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _buildComplianceCheckButton(context, 'PHOTO', Icons.portrait_rounded, avatarUrl, '$name — Photo', isDark),
+                                  const SizedBox(width: 8),
+                                  _buildComplianceCheckButton(context, 'LICENCE', Icons.credit_card_rounded, (user['drivingLicenceUrl'] ?? '').toString(), '$name — Licence', isDark),
+                                  const SizedBox(width: 8),
+                                  _buildComplianceCheckButton(context, 'HEAVY', Icons.local_shipping_rounded, (user['heavyLicenceUrl'] ?? '').toString(), '$name — Heavy Vehicle Licence', isDark),
+                                ],
+                              ),
+                            ),
+
+                            // Actions Column
+                            PopupMenuButton<String>(
+                              icon: const Icon(Icons.more_vert_rounded, color: AppColors.textSecondary),
+                              onSelected: (value) {
+                                if (value == 'delete') {
+                                  controller.deleteUser(phone);
+                                } else if (value == 'leave') {
+                                  controller.setDriverOnLeave(phone, true);
+                                } else if (value == 'unleave') {
+                                  controller.setDriverOnLeave(phone, false);
+                                } else if (value == 'admin' || value == 'driver') {
+                                  if (value != user['role']) {
+                                    controller.editUserRole(phone, value);
+                                  }
+                                }
+                              },
+                              itemBuilder: (_) => [
+                                PopupMenuItem(
+                                  value: isDriver ? 'admin' : 'driver',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                          isDriver
+                                              ? Icons.admin_panel_settings_rounded
+                                              : Icons.local_shipping_rounded,
+                                          size: 18,
+                                          color: AppColors.primary),
+                                      const SizedBox(width: 10),
+                                      AppText(
+                                          isDriver ? 'Make Admin' : 'Make Driver',
+                                          style: AppTextStyle.bodyMedium),
+                                    ],
+                                  ),
+                                ),
+                                if (isDriver)
+                                  PopupMenuItem(
+                                    value: onLeave ? 'unleave' : 'leave',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                            onLeave
+                                                ? Icons.event_available_rounded
+                                                : Icons.beach_access_rounded,
+                                            size: 18,
+                                            color: AppColors.tertiaryDark),
+                                        const SizedBox(width: 10),
+                                        AppText(
+                                            onLeave ? 'Back On Duty' : 'Mark On Leave',
+                                            style: AppTextStyle.bodyMedium),
+                                      ],
+                                    ),
+                                  ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete_outline_rounded,
+                                          size: 18, color: AppColors.error),
+                                      SizedBox(width: 10),
+                                      AppText('Delete',
+                                          style: AppTextStyle.bodyMedium,
+                                          color: AppColors.error),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // Mobile Layout (fallback)
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 22,
+                                backgroundColor: Colors.grey.shade200,
+                                child: ClipOval(
+                                  child: avatarUrl.isNotEmpty
+                                      ? CachedNetworkImage(
+                                          imageUrl: corsSafeImageUrl(avatarUrl),
+                                          fit: BoxFit.cover,
+                                          width: 44,
+                                          height: 44,
+                                          errorWidget: (_, __, ___) => const Icon(Icons.person_rounded, size: 22),
+                                        )
+                                      : Container(
+                                          color: const Color(0xFFD1FAE5),
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            initials,
+                                            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF047857), fontSize: 14),
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    AppText(name, style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
+                                    const SizedBox(height: 2),
+                                    AppText(phone, style: AppTextStyle.labelMedium, color: Colors.grey),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: statusBg,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: AppText(statusText, style: AppTextStyle.labelMedium, color: statusColor, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const AppText('HUB', style: AppTextStyle.labelMedium, color: Colors.grey),
+                                  const SizedBox(height: 2),
+                                  AppText(hubName, style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  _buildComplianceCheckButton(context, 'PHOTO', Icons.portrait_rounded, avatarUrl, '$name — Photo', isDark),
+                                  const SizedBox(width: 6),
+                                  _buildComplianceCheckButton(context, 'LICENCE', Icons.credit_card_rounded, (user['drivingLicenceUrl'] ?? '').toString(), '$name — Licence', isDark),
+                                  const SizedBox(width: 6),
+                                  _buildComplianceCheckButton(context, 'HEAVY', Icons.local_shipping_rounded, (user['heavyLicenceUrl'] ?? '').toString(), '$name — Heavy Vehicle Licence', isDark),
+                                ],
+                              )
+                            ],
+                          )
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              // Mockup Pagination Footer
+              Padding(
+                padding: const EdgeInsets.fromLTRB(28, 16, 28, 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    AppText('Showing 1-${controller.users.length} of ${controller.users.length} drivers', 
+                        style: AppTextStyle.bodyMedium, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.keyboard_arrow_left_rounded, size: 20),
+                          onPressed: () {},
+                          style: IconButton.styleFrom(
+                            side: BorderSide(color: isDark ? Colors.white24 : Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF0F172A),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text('1', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text('2', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text('3', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.keyboard_arrow_right_rounded, size: 20),
+                          onPressed: () {},
+                          style: IconButton.styleFrom(
+                            side: BorderSide(color: isDark ? Colors.white24 : Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
                       ],
                     ),
-                    // Document records — ties into driver registration uploads.
-                    if (isDriver) ...[
-                      const Divider(height: 20),
-                      _driverDocsRow(context, user),
-                    ],
                   ],
                 ),
-              );
-            },
+              ),
+            ],
           );
         }),
       ),
@@ -3505,6 +3774,50 @@ class AdminHomeView extends GetView<AdminHomeController> {
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
+  }
+
+  Widget _buildComplianceCheckButton(BuildContext context, String label, IconData icon, String url, String title, bool isDark) {
+    final present = url.isNotEmpty && url.startsWith('http');
+    final activeBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFEFF6FF);
+    final activeIconColor = isDark ? AppColors.primary : const Color(0xFF1E40AF);
+    final inactiveBg = isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFF1F5F9);
+    final inactiveIconColor = isDark ? Colors.white30 : const Color(0xFF9CA3AF);
+
+    Widget card = Container(
+      width: 58,
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        color: present ? activeBg : inactiveBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: present ? activeIconColor.withOpacity(0.2) : Colors.transparent,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: present ? activeIconColor : inactiveIconColor),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: TextStyle(
+              color: present ? activeIconColor : inactiveIconColor,
+              fontSize: 8,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (present) {
+      return InkWell(
+        onTap: () => _showImageViewer(context, url, title),
+        borderRadius: BorderRadius.circular(8),
+        child: card,
+      );
+    }
+    return card;
   }
 
   // --- TAB 5: VENDORS (predefined pickup sources) ---
@@ -6800,6 +7113,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
           final filteredExpenses = controller.expenses.where((exp) {
             final driverPhone = (exp['driverPhone'] ?? '').toString();
             final tripId = (exp['tripId'] ?? '').toString();
+            final status = (exp['status'] ?? 'Pending').toString();
 
             if (controller.selectedExpenseDriver.value.isNotEmpty &&
                 driverPhone != controller.selectedExpenseDriver.value) {
@@ -6809,16 +7123,56 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 tripId != controller.selectedExpenseTrip.value) {
               return false;
             }
+            if (controller.selectedExpenseStatus.value != 'All' &&
+                status.toLowerCase() != controller.selectedExpenseStatus.value.toLowerCase()) {
+              return false;
+            }
             return true;
           }).toList();
+
+          final width = MediaQuery.of(context).size.width;
+          final crossAxisCount = width >= 1200 ? 3 : (width >= 800 ? 2 : 1);
 
           return ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             children: [
+              // Header Row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const AppText('Expense Overview', style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
+                        const SizedBox(height: 4),
+                        AppText('Monitoring real-time operational costs across the fleet.', 
+                            style: AppTextStyle.bodyMedium, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
+                      ],
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      AppSnackBar.showSuccess(title: 'Export', message: 'CSV Export started successfully.');
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
+                      side: BorderSide(color: isDark ? Colors.white24 : Colors.grey.shade300),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.download_rounded, size: 16),
+                    label: const AppText('Export CSV', style: AppTextStyle.labelLarge),
+                  )
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Filter controls card
               Container(
                 padding: const EdgeInsets.all(16),
-                margin: const EdgeInsets.only(bottom: 16),
+                margin: const EdgeInsets.only(bottom: 24),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -6833,63 +7187,135 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const AppText('Filter Expenses', style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
-                    const SizedBox(height: 12),
                     Row(
                       children: [
+                        // Driver Filter Dropdown
                         Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: controller.selectedExpenseDriver.value.isEmpty ? null : controller.selectedExpenseDriver.value,
-                            decoration: const InputDecoration(
-                              labelText: 'Filter by Driver',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            ),
-                            items: [
-                              const DropdownMenuItem<String>(
-                                value: null,
-                                child: Text('All Drivers'),
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const AppText('DRIVER', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                              const SizedBox(height: 6),
+                              DropdownButtonFormField<String>(
+                                value: controller.selectedExpenseDriver.value.isEmpty ? null : controller.selectedExpenseDriver.value,
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                ),
+                                items: [
+                                  const DropdownMenuItem<String>(
+                                    value: null,
+                                    child: Text('All Drivers'),
+                                  ),
+                                  ...drivers.map((d) {
+                                    final phone = (d['phone'] ?? '').toString();
+                                    final name = (d['name'] ?? phone).toString();
+                                    return DropdownMenuItem<String>(
+                                      value: phone,
+                                      child: Text(name),
+                                    );
+                                  }),
+                                ],
+                                onChanged: (val) {
+                                  controller.selectedExpenseDriver.value = val ?? '';
+                                },
                               ),
-                              ...drivers.map((d) {
-                                final phone = (d['phone'] ?? '').toString();
-                                final name = (d['name'] ?? phone).toString();
-                                return DropdownMenuItem<String>(
-                                  value: phone,
-                                  child: Text(name),
-                                );
-                              }),
                             ],
-                            onChanged: (val) {
-                              controller.selectedExpenseDriver.value = val ?? '';
-                            },
                           ),
                         ),
                         const SizedBox(width: 16),
+                        // Trip Filter Dropdown
                         Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: controller.selectedExpenseTrip.value.isEmpty ? null : controller.selectedExpenseTrip.value,
-                            decoration: const InputDecoration(
-                              labelText: 'Filter by Trip ID',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            ),
-                            items: [
-                              const DropdownMenuItem<String>(
-                                value: null,
-                                child: Text('All Trips'),
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const AppText('TRIP ID', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                              const SizedBox(height: 6),
+                              DropdownButtonFormField<String>(
+                                value: controller.selectedExpenseTrip.value.isEmpty ? null : controller.selectedExpenseTrip.value,
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                ),
+                                items: [
+                                  const DropdownMenuItem<String>(
+                                    value: null,
+                                    child: Text('All Trips'),
+                                  ),
+                                  ...tripIds.map((id) {
+                                    return DropdownMenuItem<String>(
+                                      value: id,
+                                      child: Text(id),
+                                    );
+                                  }),
+                                ],
+                                onChanged: (val) {
+                                  controller.selectedExpenseTrip.value = val ?? '';
+                                },
                               ),
-                              ...tripIds.map((id) {
-                                return DropdownMenuItem<String>(
-                                  value: id,
-                                  child: Text(id),
-                                );
-                              }),
                             ],
-                            onChanged: (val) {
-                              controller.selectedExpenseTrip.value = val ?? '';
-                            },
                           ),
                         ),
+                        const SizedBox(width: 16),
+                        // Status segments filter
+                        Expanded(
+                          flex: 4,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const AppText('STATUS', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: isDark ? Colors.black26 : Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: ['All', 'Pending', 'Approved', 'Rejected'].map((statusOption) {
+                                    final isSelected = controller.selectedExpenseStatus.value == statusOption;
+                                    return Expanded(
+                                      child: GestureDetector(
+                                        onTap: () => controller.selectedExpenseStatus.value = statusOption,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: isSelected
+                                                ? (isDark ? AppColors.primary : const Color(0xFF0F172A))
+                                                : Colors.transparent,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: AppText(
+                                            statusOption,
+                                            style: AppTextStyle.labelMedium,
+                                            color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        IconButton(
+                          style: IconButton.styleFrom(
+                            side: BorderSide(color: isDark ? Colors.white24 : Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.all(12),
+                          ),
+                          onPressed: () {
+                            AppSnackBar.showSuccess(title: 'Filters', message: 'More filters features are coming soon.');
+                          },
+                          icon: const Icon(Icons.tune_rounded),
+                        )
                       ],
                     ),
                   ],
@@ -6910,181 +7336,305 @@ class AdminHomeView extends GetView<AdminHomeController> {
                   ),
                 )
               else
-                ...filteredExpenses.map((exp) {
-                  final title = (exp['title'] ?? 'Expense').toString();
-                  final amount = (exp['amount'] ?? '').toString();
-                  final desc = (exp['description'] ?? '').toString();
-                  final status = (exp['status'] ?? 'Pending').toString();
-                  final date = (exp['date'] ?? 'Today').toString();
-                  final driverPhone = (exp['driverPhone'] ?? '').toString();
-                  final driverName = controller.driverNameFor(driverPhone);
-                  final driverAvatar = controller.driverAvatarFor(driverPhone);
-                  final tripId = (exp['tripId'] ?? '').toString();
-                  final receiptUrl = (exp['receiptUrl'] ?? '').toString();
-                  final locationName = (exp['locationName'] ?? '').toString();
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    mainAxisExtent: 380,
+                  ),
+                  itemCount: filteredExpenses.length,
+                  itemBuilder: (context, index) {
+                    final exp = filteredExpenses[index];
+                    final title = (exp['title'] ?? 'Expense').toString();
+                    final amount = (exp['amount'] ?? '').toString();
+                    final desc = (exp['description'] ?? '').toString();
+                    final status = (exp['status'] ?? 'Pending').toString();
+                    final date = (exp['date'] ?? 'Today').toString();
+                    final driverPhone = (exp['driverPhone'] ?? '').toString();
+                    final driverName = controller.driverNameFor(driverPhone);
+                    final driverAvatar = controller.driverAvatarFor(driverPhone);
+                    final tripId = (exp['tripId'] ?? '').toString();
+                    final receiptUrl = (exp['receiptUrl'] ?? '').toString();
+                    final locationName = (exp['locationName'] ?? '').toString();
 
-                  Color statusColor = const Color(0xFF6B7280);
-                  Color statusBg = const Color(0xFFF1F5F9);
-                  if (status == 'Approved') {
-                    statusColor = const Color(0xFF047857);
-                    statusBg = const Color(0xFFDCFCE7);
-                  } else if (status == 'Rejected') {
-                    statusColor = const Color(0xFFDC2626);
-                    statusBg = const Color(0xFFFEE2E2);
-                  }
+                    Color statusColor = const Color(0xFFD97706);
+                    Color statusBg = const Color(0xFFFEF3C7);
+                    if (status == 'Approved') {
+                      statusColor = const Color(0xFF047857);
+                      statusBg = const Color(0xFFDCFCE7);
+                    } else if (status == 'Rejected') {
+                      statusColor = const Color(0xFFDC2626);
+                      statusBg = const Color(0xFFFEE2E2);
+                    }
 
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
+                    IconData categoryIcon = Icons.receipt_long_rounded;
+                    if (title.toLowerCase().contains('fuel') || title.toLowerCase().contains('gas')) {
+                      categoryIcon = Icons.local_gas_station_rounded;
+                    } else if (title.toLowerCase().contains('toll')) {
+                      categoryIcon = Icons.toll_rounded;
+                    } else if (title.toLowerCase().contains('food') || title.toLowerCase().contains('meal')) {
+                      categoryIcon = Icons.restaurant_rounded;
+                    } else if (title.toLowerCase().contains('repair')) {
+                      categoryIcon = Icons.construction_rounded;
+                    }
+
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark ? Colors.white10 : Colors.grey.shade200,
+                          width: 1.5,
                         ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 20,
-                              child: ClipOval(
-                                child: CachedNetworkImage(
-                                  imageUrl: corsSafeImageUrl(driverAvatar.isNotEmpty
-                                      ? driverAvatar
-                                      : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'),
-                                  fit: BoxFit.cover,
-                                  width: 40,
-                                  height: 40,
-                                  errorWidget: (_, __, ___) => const Icon(Icons.person_rounded, size: 20),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  AppText(driverName, style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
-                                  AppText(driverPhone, style: AppTextStyle.labelMedium, color: AppColors.textSecondary),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: statusBg,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: AppText(status, style: AppTextStyle.labelMedium, color: statusColor, fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            AppText(title, style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
-                            AppText(amount, style: AppTextStyle.headlineSmall, fontWeight: FontWeight.w800, color: AppColors.primary),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        if (desc.isNotEmpty) ...[
-                          AppText(desc, style: AppTextStyle.bodyMedium, color: AppColors.textSecondary),
-                          const SizedBox(height: 8),
-                        ],
-                        Row(
-                          children: [
-                            const Icon(Icons.tag_rounded, size: 16, color: AppColors.textSecondary),
-                            const SizedBox(width: 4),
-                            AppText('Trip: ${tripId.isNotEmpty ? tripId : "Not Associated"}', style: AppTextStyle.labelMedium),
-                            const Spacer(),
-                            const Icon(Icons.access_time_rounded, size: 16, color: AppColors.textSecondary),
-                            const SizedBox(width: 4),
-                            AppText(date, style: AppTextStyle.labelMedium),
-                          ],
-                        ),
-                        if (locationName.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              const Icon(Icons.location_on_rounded, size: 16, color: AppColors.error),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: AppText(locationName, style: AppTextStyle.labelMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
-                              ),
-                            ],
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
                         ],
-                        if (receiptUrl.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          const AppText('RECEIPT PROOF', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
-                          const SizedBox(height: 8),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                           child: CachedNetworkImage(
-                             imageUrl: corsSafeImageUrl(receiptUrl),
-                             height: 220,
-                             width: double.infinity,
-                             fit: BoxFit.cover,
-                             placeholder: (context, url) => Container(
-                               height: 220,
-                               color: Colors.grey.shade100,
-                               child: const Center(child: CircularProgressIndicator()),
-                             ),
-                             errorWidget: (_, __, ___) => Container(
-                               height: 120,
-                               color: Colors.grey.shade200,
-                               alignment: Alignment.center,
-                               child: const Icon(Icons.broken_image_rounded, color: AppColors.textHint, size: 36),
-                             ),
-                           ),
-                          ),
-                        ],
-                        if (status == 'Pending') ...[
-                          const SizedBox(height: 16),
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.error,
-                                  side: const BorderSide(color: AppColors.error),
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              CircleAvatar(
+                                radius: 20,
+                                backgroundColor: Colors.grey.shade200,
+                                child: ClipOval(
+                                  child: CachedNetworkImage(
+                                    imageUrl: corsSafeImageUrl(driverAvatar.isNotEmpty
+                                        ? driverAvatar
+                                        : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'),
+                                    fit: BoxFit.cover,
+                                    width: 40,
+                                    height: 40,
+                                    errorWidget: (_, __, ___) => const Icon(Icons.person_rounded, size: 20),
+                                  ),
                                 ),
-                                onPressed: () => controller.rejectExpense(exp),
-                                icon: const Icon(Icons.close_rounded, size: 16),
-                                label: const Text('Reject Claim'),
                               ),
                               const SizedBox(width: 12),
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    AppText(driverName, style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    AppText('ID: ${driverPhone.replaceAll("+91", "")}', 
+                                        style: AppTextStyle.labelMedium, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
+                                  ],
                                 ),
-                                onPressed: () => controller.approveExpense(exp),
-                                icon: const Icon(Icons.check_rounded, size: 16),
-                                label: const Text('Approve Claim'),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: statusBg,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: AppText(status.toUpperCase(), 
+                                    style: AppTextStyle.labelMedium, color: statusColor, fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
+                          const SizedBox(height: 16),
+
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.black26 : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      AppText('EXPENSE TYPE', 
+                                          style: AppTextStyle.labelMedium, color: isDark ? Colors.white38 : const Color(0xFF6B7280), fontSize: 10, fontWeight: FontWeight.bold),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Icon(categoryIcon, size: 16, color: isDark ? Colors.white70 : const Color(0xFF1E293B)),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: AppText(title, 
+                                                style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.black26 : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      AppText('AMOUNT', 
+                                          style: AppTextStyle.labelMedium, color: isDark ? Colors.white38 : const Color(0xFF6B7280), fontSize: 10, fontWeight: FontWeight.bold),
+                                      const SizedBox(height: 4),
+                                      AppText('₹$amount', 
+                                          style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold, color: AppColors.primary, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              AppText('Trip ID', style: AppTextStyle.labelMedium, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
+                              AppText(tripId.isNotEmpty ? tripId : 'Not Associated', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              AppText('Date/Time', style: AppTextStyle.labelMedium, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
+                              AppText(date, style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              AppText('Location', style: AppTextStyle.labelMedium, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
+                              Expanded(
+                                child: AppText(locationName.isNotEmpty ? locationName : 'N/A', 
+                                    style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis),
+                              ),
+                            ],
+                          ),
+                          
+                          const Spacer(),
+                          const Divider(height: 12),
+                          const SizedBox(height: 8),
+
+                          Row(
+                            children: [
+                              if (receiptUrl.isNotEmpty)
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.grey.shade300),
+                                    ),
+                                    child: CachedNetworkImage(
+                                      imageUrl: corsSafeImageUrl(receiptUrl),
+                                      fit: BoxFit.cover,
+                                      placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                      errorWidget: (_, __, ___) => const Icon(Icons.broken_image, size: 20),
+                                    ),
+                                  ),
+                                )
+                              else
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.image_not_supported_rounded, color: Colors.grey, size: 20),
+                                ),
+                              const Spacer(),
+                              if (status == 'Pending') ...[
+                                OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.error,
+                                    side: const BorderSide(color: AppColors.error),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  onPressed: () => controller.rejectExpense(exp),
+                                  child: const AppText('Reject', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  onPressed: () => controller.approveExpense(exp),
+                                  child: const AppText('Approve', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+                                ),
+                              ] else ...[
+                                if (receiptUrl.isNotEmpty)
+                                  TextButton.icon(
+                                    onPressed: () => _showImagePreviewDialog(context, receiptUrl),
+                                    icon: const Icon(Icons.visibility_rounded, size: 16, color: AppColors.primary),
+                                    label: const Text('View Receipt', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
+                                  )
+                                else if (status == 'Rejected')
+                                  const Text('Duplicate claim detected', 
+                                      style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic, fontSize: 12)),
+                              ],
+                            ],
+                          ),
                         ],
-                      ],
-                    ),
-                  );
-                }),
+                      ),
+                    );
+                  },
+                ),
             ],
           );
         }),
+      ),
+    );
+  }
+
+  void _showImagePreviewDialog(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white, size: 30),
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                ),
+              ],
+            ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: InteractiveViewer(
+                child: CachedNetworkImage(
+                  imageUrl: corsSafeImageUrl(imageUrl),
+                  fit: BoxFit.contain,
+                  placeholder: (context, url) => const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  ),
+                  errorWidget: (context, url, error) => const Icon(Icons.broken_image_outlined, size: 80, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

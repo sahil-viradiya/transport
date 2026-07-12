@@ -26,6 +26,7 @@ class AdminHomeController extends GetxController {
   final Rx<DateTime?> selectedDate = Rx<DateTime?>(null);
   final RxString selectedExpenseDriver = ''.obs;
   final RxString selectedExpenseTrip = ''.obs;
+  final RxString selectedExpenseStatus = 'All'.obs;
 
   // Database lists
   final RxList<Map<String, dynamic>> trips = <Map<String, dynamic>>[].obs;
