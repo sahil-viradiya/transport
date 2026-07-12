@@ -77,6 +77,10 @@ class MyApp extends StatelessWidget {
       // Routes Setup
       initialRoute: AppPages.INITIAL,
       getPages: AppPages.routes,
+
+      // Smoother, consistent screen-to-screen transitions app-wide.
+      defaultTransition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 260),
     );
   }
 }

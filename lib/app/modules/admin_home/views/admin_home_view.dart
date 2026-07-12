@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:transport/widgets/app_text.dart';
 import 'package:transport/widgets/trip_status_timeline.dart';
 import 'package:transport/widgets/notification_bell.dart';
+import 'package:transport/widgets/animations.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 import '../controllers/admin_home_controller.dart';
@@ -2116,10 +2117,20 @@ class AdminHomeView extends GetView<AdminHomeController> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
                   children: [
-                    ...pageTrips.map((t) => Padding(
+                    ...pageTrips.asMap().entries.map((e) {
+                      final i = e.key;
+                      final t = e.value;
+                      // Keyed by trip id so cards animate only when they first
+                      // appear (not on every search/filter rebuild).
+                      return FadeSlideIn(
+                        key: ValueKey('trip-${t['id']}'),
+                        delay: Duration(milliseconds: (i * 45).clamp(0, 360)),
+                        child: Padding(
                           padding: const EdgeInsets.only(bottom: 16),
                           child: _tripCard(context, isDark, t),
-                        )),
+                        ),
+                      );
+                    }),
                     const SizedBox(height: 4),
                     _tripsPagination(context, isDark),
                   ],
@@ -2337,7 +2348,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
         controller.driverNameFor((trip['driverPhone'] ?? '').toString());
     final material = (trip['materialName'] ?? '').toString();
 
-    return Container(
+    return HoverLift(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -2462,6 +2475,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
