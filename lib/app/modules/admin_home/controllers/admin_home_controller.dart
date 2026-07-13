@@ -65,15 +65,35 @@ class AdminHomeController extends GetxController {
   /// 0 trips with no hint that anything was wrong.
   final RxString dataError = ''.obs;
 
+  /// Every collection whose stream is currently failing. Tracked as a set (not
+  /// a single message) because each stream errors separately — reporting only
+  /// the last one hid the fact that several were blocked at once.
+  final Set<String> _deniedCollections = {};
+  final Set<String> _erroredCollections = {};
+
   void _onStreamError(String what, Object e) {
     final msg = e.toString();
-    if (msg.contains('permission-denied') || msg.contains('PERMISSION_DENIED')) {
-      dataError.value =
-          'Firestore ne $what read block kiya (permission-denied). '
-          'Rules deploy karein: firebase deploy --only firestore:rules';
+    final denied =
+        msg.contains('permission-denied') || msg.contains('PERMISSION_DENIED');
+    if (denied) {
+      _deniedCollections.add(what);
     } else {
-      dataError.value = '$what load nahi hua: $msg';
+      _erroredCollections.add(what);
     }
+
+    final parts = <String>[];
+    if (_deniedCollections.isNotEmpty) {
+      final list = (_deniedCollections.toList()..sort()).join(', ');
+      parts.add('Firestore ne in collections ko block kiya '
+          '(permission-denied): $list. '
+          'Rules deploy karein: firebase deploy --only firestore:rules');
+    }
+    if (_erroredCollections.isNotEmpty) {
+      final list = (_erroredCollections.toList()..sort()).join(', ');
+      parts.add('Load nahi hua: $list.');
+    }
+    dataError.value = parts.join('  •  ');
+
     // ignore: avoid_print
     print('[AdminHome] $what stream error: $e');
   }

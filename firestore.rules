@@ -70,6 +70,15 @@ service cloud.firestore {
       allow delete: if isSignedIn() && (ownsExisting() || isAdmin());
     }
 
+    // Vendors — a shared master list (pickup points / material suppliers) that
+    // the admin maintains and every signed-in driver reads while a trip is
+    // being assigned. This block was missing entirely, so `vendors` fell
+    // through to the default deny and the dashboard reported permission-denied.
+    match /vendors/{vendorId} {
+      allow read:  if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     // Notifications — a user reads only their own (toPhone == their phone) and
     // may mark them read. Any signed-in user can create one addressed to
     // someone else (e.g. driver ⇄ admin trip updates).

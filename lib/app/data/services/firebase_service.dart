@@ -1836,19 +1836,18 @@ class FirebaseService extends GetxService {
         : 'VEND-${DateTime.now().millisecondsSinceEpoch}';
     vendorData['id'] = id;
     vendorData.putIfAbsent('createdAt', () => FieldValue.serverTimestamp());
-    try {
-      await _db
-          .collection('vendors')
-          .doc(id)
-          .set(vendorData, SetOptions(merge: true));
-    } catch (_) {}
+    await _write(
+        'Vendor save nahi hua',
+        () => _db
+            .collection('vendors')
+            .doc(id)
+            .set(vendorData, SetOptions(merge: true)));
     return id;
   }
 
-  Future<void> deleteVendor(String id) async {
-    try {
-      await _db.collection('vendors').doc(id).delete();
-    } catch (_) {}
+  Future<void> deleteVendor(String id) {
+    return _write('Vendor delete nahi hua',
+        () => _db.collection('vendors').doc(id).delete());
   }
 
   /// Admin marks a driver on leave (or back on duty). On-leave drivers are
