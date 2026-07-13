@@ -5,6 +5,7 @@ import 'package:transport/app/core/utils/image_picker_helper.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import '../../../data/services/firebase_service.dart';
 import '../../../data/services/location_service.dart';
+import '../../../data/services/session_service.dart';
 
 class ProofOfDeliveryController extends GetxController {
   final remarksController = TextEditingController();
@@ -108,8 +109,19 @@ class ProofOfDeliveryController extends GetxController {
         longitude: currentLng,
       );
       
-      // Note: the trip is NOT delivered yet — the admin still has to verify the
-      // uploaded proof and approve. The live trips stream reflects any change.
+      String driverName = '';
+      try {
+        driverName = Get.find<SessionService>().name.value;
+      } catch (_) {}
+
+      // Formally request delivery approval to transition status to DELIVERY_REQUESTED
+      await firebaseService.requestDelivery(
+        tripId.value,
+        location: currentAddr,
+        latitude: currentLat,
+        longitude: currentLng,
+        driverName: driverName,
+      );
     } catch (_) {}
 
     uploadProgress.value = 1.0;
