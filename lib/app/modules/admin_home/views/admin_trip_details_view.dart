@@ -198,6 +198,75 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                         ],
                       ),
                     ),
+                    if (status == 'DELIVERY_REQUESTED') ...[
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          final confirm = await Get.dialog<bool>(
+                            AlertDialog(
+                              title: const Text('Approve Delivery?'),
+                              content: Text('Are you sure you want to approve delivery and complete trip ${trip['id']}?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Get.back(result: false),
+                                  child: const Text('No'),
+                                ),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                                  onPressed: () => Get.back(result: true),
+                                  child: const Text('Approve & Complete', style: TextStyle(color: Colors.white)),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            await controller.approveTripDelivery(trip['id']);
+                            Get.back();
+                          }
+                        },
+                        icon: const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
+                        label: const Text('Approve Delivery', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final confirm = await Get.dialog<bool>(
+                            AlertDialog(
+                              title: const Text('Reject Delivery?'),
+                              content: Text('Are you sure you want to reject the delivery for trip ${trip['id']}?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Get.back(result: false),
+                                  child: const Text('No'),
+                                ),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                                  onPressed: () => Get.back(result: true),
+                                  child: const Text('Reject', style: TextStyle(color: Colors.white)),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            await controller.rejectTripDelivery(trip['id'], 'Delivery rejected by admin.');
+                            Get.back();
+                          }
+                        },
+                        icon: const Icon(Icons.cancel_rounded, size: 16),
+                        label: const AppText('Reject Delivery', style: AppTextStyle.labelMedium),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                          side: const BorderSide(color: AppColors.error),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
                     // Action Buttons: Print & Cancel
                     OutlinedButton.icon(
                       onPressed: () {

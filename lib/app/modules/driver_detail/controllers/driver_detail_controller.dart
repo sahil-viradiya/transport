@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:get/get.dart';
 import '../../../data/services/firebase_service.dart';
 
@@ -13,12 +14,57 @@ class DriverDetailController extends GetxController {
   final Rxn<Map<String, dynamic>> activeTrip = Rxn<Map<String, dynamic>>();
   final RxList<Map<String, dynamic>> expenses = <Map<String, dynamic>>[].obs;
 
+  StreamSubscription? _tripsSub;
+  StreamSubscription? _profileSub;
+  StreamSubscription? _expensesSub;
+  bool _inFlight = false;
+  bool _queued = false;
+
   @override
   void onInit() {
     super.onInit();
     final args = Get.arguments;
     phone = (args is Map ? args['phone']?.toString() : args?.toString()) ?? '';
     load();
+
+    if (phone.isEmpty) return;
+    // Keep the admin's view of this driver live: their trips, profile
+    // (availability / last location) and expense claims all update in place
+    // instead of showing a stale snapshot from when the screen was opened.
+    _tripsSub = _fb.watchTripsForOwner(phone).listen((_) => _reload());
+    _profileSub = _fb.watchDriverProfile(phone).listen((_) => _reload());
+    _expensesSub = _fb.watchExpensesForDriver(phone).listen((list) {
+      final sorted = [...list]..sort((a, b) =>
+          (b['id'] ?? '').toString().compareTo((a['id'] ?? '').toString()));
+      expenses.assignAll(sorted);
+    });
+  }
+
+  /// Re-runs [load] without letting concurrent stream events pile up into
+  /// overlapping reads; if one lands mid-flight we just re-run once after.
+  Future<void> _reload() async {
+    if (_inFlight) {
+      _queued = true;
+      return;
+    }
+    _inFlight = true;
+    try {
+      await load();
+    } finally {
+      _inFlight = false;
+      if (_queued) {
+        _queued = false;
+        await _reload();
+      }
+    }
+  }
+
+  @override
+  void onClose() {
+    _tripsSub?.cancel();
+    _profileSub?.cancel();
+    _expensesSub?.cancel();
+    super.onClose();
   }
 
   Future<void> load() async {

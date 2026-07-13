@@ -1007,21 +1007,15 @@ class AdminHomeView extends GetView<AdminHomeController> {
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(20),
-        // Obx so the dashboard stats + inspection/assignment panels rebuild the
-        // moment the live Firestore streams push an update (new inspection
-        // submitted, truck/driver counts change, trip status moves) — otherwise
-        // these panels are built once and go stale.
         child: Obx(
           () => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildWebStatsGrid(isDark),
+              _buildMockupStatsGrid(isDark),
               const SizedBox(height: 20),
-              _buildWorkflowOverviewCard(isDark),
+              _buildOperationsPipelineCard(isDark),
               const SizedBox(height: 20),
-              _buildTodaysTripsOverview(context, isDark),
-              const SizedBox(height: 20),
-              _buildBottomGrid(context, isDark),
+              _buildBottomLayout(context, isDark),
             ],
           ),
         ),
@@ -1029,171 +1023,236 @@ class AdminHomeView extends GetView<AdminHomeController> {
     );
   }
 
-  Widget _buildWebStatsGrid(bool isDark) {
+  Widget _buildMockupStatsGrid(bool isDark) {
     final totalTrucks = controller.trucks.length;
     final assignedTrucks = controller.assignedTrucks.length;
     final totalDrivers = controller.users.where((u) => (u['role'] ?? 'driver') == 'driver').length;
     final tripsToday = controller.trips.length;
-    final tripsOnWay = controller.trips.where((t) => t['status'] != 'DELIVERED' && t['status'] != 'REJECTED' && t['status'] != 'PENDING').length;
     final completedCount = controller.completedTripsCount;
 
-    final assignedPercent = totalTrucks == 0 ? 0.0 : (assignedTrucks / totalTrucks * 100);
-
-    final stats = [
-      ('Total Trucks', '$totalTrucks', 'All Registered', '↑ 8% from last month', Icons.local_shipping_rounded, const Color(0xFFDCFCE7), const Color(0xFF15803D)),
-      ('Assigned Trucks', '$assignedTrucks', '${assignedPercent.toStringAsFixed(1)}% Assigned', '↑ 10% from last month', Icons.assignment_turned_in_rounded, const Color(0xFFE0F2FE), const Color(0xFF0369A1)),
-      ('Drivers', '$totalDrivers', 'All Active', '↑ 5% from last month', Icons.people_rounded, const Color(0xFFF3E8FF), const Color(0xFF7E22CE)),
-      ('Trips Today', '${tripsToday.toString().padLeft(2, '0')}', 'Total Trips', '↑ 14% from yesterday', Icons.route_rounded, const Color(0xFFFFEDD5), const Color(0xFFEA580C)),
-      ('Trips On Way', '${tripsOnWay.toString().padLeft(2, '0')}', 'Currently On Way', '', Icons.explore_rounded, const Color(0xFFE0F2FE), const Color(0xFF2563EB)),
-      ('Trips Completed', '${completedCount.toString().padLeft(2, '0')}', 'Today Completed', '↑ 18% from yesterday', Icons.check_circle_rounded, const Color(0xFFE3FCEF), const Color(0xFF006644)),
-    ];
+    Widget statCard({
+      required String title,
+      required String value,
+      required String trend,
+      required IconData icon,
+      required Color iconColor,
+      required Color iconBg,
+    }) {
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade100, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.25 : 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: AppText(title,
+                      style: AppTextStyle.labelMedium,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.bold,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: iconColor, size: 16),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            AppText(value,
+                style: AppTextStyle.headlineMedium,
+                fontWeight: FontWeight.w800,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 4),
+            AppText(trend, style: AppTextStyle.labelMedium, color: trend.contains('Critical') || trend.contains('--') ? Colors.grey : const Color(0xFF10B981), fontWeight: FontWeight.bold),
+          ],
+        ),
+      );
+    }
 
     return LayoutBuilder(builder: (context, cons) {
-      final cols = cons.maxWidth >= 1100 ? 6 : (cons.maxWidth >= 700 ? 3 : 2);
+      final cols = cons.maxWidth >= 1100 ? 5 : (cons.maxWidth >= 700 ? 3 : 2);
       final w = (cons.maxWidth - (cols - 1) * 16) / cols;
       return Wrap(
         spacing: 16,
         runSpacing: 16,
-        children: stats.map((s) {
-          return SizedBox(
+        children: [
+          SizedBox(
             width: w,
-            child: _buildStatCard(s.$1, s.$2, s.$3, s.$4, s.$5, s.$6, s.$7, isDark),
-          );
-        }).toList(),
+            child: statCard(
+              title: 'TOTAL TRUCKS',
+              value: '$totalTrucks',
+              trend: '⬈ +8% from last month',
+              icon: Icons.local_shipping_rounded,
+              iconColor: const Color(0xFF1E40AF),
+              iconBg: const Color(0xFFDBEAFE),
+            ),
+          ),
+          SizedBox(
+            width: w,
+            child: statCard(
+              title: 'ASSIGNED',
+              value: '$assignedTrucks',
+              trend: '⬈ +10% from last month',
+              icon: Icons.check_circle_rounded,
+              iconColor: const Color(0xFF047857),
+              iconBg: const Color(0xFFD1FAE5),
+            ),
+          ),
+          SizedBox(
+            width: w,
+            child: statCard(
+              title: 'DRIVERS',
+              value: '$totalDrivers',
+              trend: '⬈ +5% from last month',
+              icon: Icons.people_rounded,
+              iconColor: const Color(0xFF7E22CE),
+              iconBg: const Color(0xFFF3E8FF),
+            ),
+          ),
+          SizedBox(
+            width: w,
+            child: statCard(
+              title: 'TRIPS TODAY',
+              value: tripsToday.toString().padLeft(2, '0'),
+              trend: '⬈ +14% from yesterday',
+              icon: Icons.route_rounded,
+              iconColor: const Color(0xFFEA580C),
+              iconBg: const Color(0xFFFFEDD5),
+            ),
+          ),
+          SizedBox(
+            width: w,
+            child: statCard(
+              title: 'COMPLETED',
+              value: completedCount.toString().padLeft(2, '0'),
+              trend: '--',
+              icon: Icons.verified_rounded,
+              iconColor: const Color(0xFF10B981),
+              iconBg: const Color(0xFFE6F4EA),
+            ),
+          ),
+        ],
       );
     });
   }
 
-  Widget _buildStatCard(String label, String value, String subtitle, String trend, IconData icon, Color iconBg, Color iconColor, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE5EAE7)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AppText(label, style: AppTextStyle.labelMedium, color: const Color(0xFF6B7280), fontWeight: FontWeight.bold),
-                const SizedBox(height: 8),
-                AppText(value, style: AppTextStyle.headlineMedium, fontWeight: FontWeight.bold),
-                const SizedBox(height: 4),
-                AppText(subtitle, style: AppTextStyle.labelMedium, color: const Color(0xFF9CA3AF)),
-                if (trend.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(Icons.arrow_upward_rounded, color: Color(0xFF10B981), size: 12),
-                      const SizedBox(width: 2),
-                      AppText(trend, style: AppTextStyle.labelMedium, fontSize: 11, color: const Color(0xFF10B981), fontWeight: FontWeight.bold),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: iconBg,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWorkflowOverviewCard(bool isDark) {
+  Widget _buildOperationsPipelineCard(bool isDark) {
     final steps = [
-      ('Assign Truck', 'Admin assigns\ntruck to driver', Icons.local_shipping_rounded, '01'),
-      ('Inspection', 'Driver inspects\n& submits', Icons.fact_check_rounded, '02'),
-      ('Admin Review', 'Admin reviews\ninspection', Icons.rate_review_rounded, '03'),
-      ('Accept Truck', 'Driver accepts\ntruck', Icons.thumb_up_rounded, '04'),
-      ('Assign Trip', 'Admin assigns\ntrip', Icons.assignment_rounded, '05'),
-      ('On Way', 'Trip is on the\nway', Icons.explore_rounded, '06'),
-      ('Completed', 'Trip completed\nsuccessfully', Icons.task_alt_rounded, '07'),
+      ('Assign Truck', 'Completed', Icons.local_shipping_rounded, true, false),
+      ('Inspection', 'In Progress', Icons.playlist_add_check_rounded, false, true),
+      ('Admin Review', 'Pending', Icons.rate_review_outlined, false, false),
+      ('Accept Truck', 'Pending', Icons.thumb_up_alt_outlined, false, false),
+      ('Assign Trip', 'Pending', Icons.assignment_ind_outlined, false, false),
+      ('On Way', 'Pending', Icons.explore_outlined, false, false),
+      ('Completed', 'Pending', Icons.verified_outlined, false, false),
     ];
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE5EAE7)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade100, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.25 : 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const AppText('Workflow Overview',
-              style: AppTextStyle.bodyLarge,
-              fontWeight: FontWeight.bold),
+          const AppText(
+            'Operations Pipeline',
+            style: AppTextStyle.bodyLarge,
+            fontWeight: FontWeight.bold,
+          ),
           const SizedBox(height: 20),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: List.generate(steps.length * 2 - 1, (i) {
                 if (i.isOdd) {
+                  final idx = i ~/ 2;
+                  final isDone = steps[idx].$4;
                   return Container(
-                    width: 60,
-                    height: 2,
-                    margin: const EdgeInsets.only(top: 24),
-                    color: const Color(0xFFE5EAE7),
+                    width: 50,
+                    height: 3,
+                    color: isDone ? const Color(0xFF1E40AF) : Colors.grey.shade200,
                   );
                 }
+
                 final idx = i ~/ 2;
                 final step = steps[idx];
+                final isDone = step.$4;
+                final isActive = step.$5;
+
+                Color circleBg = isDark ? Colors.black26 : Colors.grey.shade50;
+                Color borderCol = Colors.grey.shade300;
+                Color iconCol = Colors.grey;
+
+                if (isDone) {
+                  circleBg = const Color(0xFF1E40AF);
+                  borderCol = const Color(0xFF1E40AF);
+                  iconCol = Colors.white;
+                } else if (isActive) {
+                  circleBg = const Color(0xFFE6F4EA);
+                  borderCol = const Color(0xFF10B981);
+                  iconCol = const Color(0xFF10B981);
+                }
+
                 return SizedBox(
-                  width: 130,
+                  width: 100,
                   child: Column(
                     children: [
                       Container(
-                        width: 48,
-                        height: 48,
+                        width: 44,
+                        height: 44,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
+                          color: circleBg,
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3), width: 1.5),
+                          border: Border.all(color: borderCol, width: 2),
                         ),
-                        child: Icon(step.$3, color: const Color(0xFF047857), size: 22),
+                        child: Icon(step.$3, color: iconCol, size: 20),
                       ),
-                      const SizedBox(height: 12),
-                      AppText(step.$1,
-                          style: AppTextStyle.bodyMedium,
-                          fontWeight: FontWeight.bold,
-                          textAlign: TextAlign.center),
-                      const SizedBox(height: 4),
-                      AppText(step.$2,
-                          style: AppTextStyle.labelMedium,
-                          fontSize: 10,
-                          color: const Color(0xFF6B7280),
-                          textAlign: TextAlign.center),
                       const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(12),
+                      Text(
+                        step.$1,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        step.$2,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: isDone ? const Color(0xFF1E40AF) : (isActive ? const Color(0xFF10B981) : Colors.grey),
+                          fontWeight: FontWeight.w600,
                         ),
-                        child: AppText(step.$4,
-                            style: AppTextStyle.labelMedium,
-                            fontSize: 11,
-                            color: const Color(0xFF475569),
-                            fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
@@ -1206,297 +1265,15 @@ class AdminHomeView extends GetView<AdminHomeController> {
     );
   }
 
-  Widget _buildTodaysTripsOverview(BuildContext context, bool isDark) {
+  Widget _buildMockupTodaysTripsOverview(BuildContext context, bool isDark) {
     final realTrips = controller.trips.where((t) => t['status'] != 'DELIVERED').toList();
 
-    final displayTrips = <Map<String, dynamic>>[];
-    for (final rt in realTrips) {
-      final ts = rt['createdAt'] ?? rt['date'];
-      String startedTime = '08:30 AM';
-      if (ts != null) {
-        try {
-          final dt = ts is Timestamp ? ts.toDate() : (ts is DateTime ? ts : DateTime.parse(ts.toString()));
-          final hr = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
-          startedTime = "${hr.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} ${dt.hour >= 12 ? 'PM' : 'AM'}";
-        } catch (_) {}
-      }
-
-      final avatar = controller.driverAvatarFor(rt['driverPhone'].toString());
-      displayTrips.add({
-        'id': rt['id'].toString(),
-        'driverName': controller.driverNameFor(rt['driverPhone'].toString()),
-        'truckNo': rt['truckNo'] ?? 'No Truck',
-        'status': rt['status'] == 'EN_ROUTE_VENDOR' || rt['status'] == 'ACTIVE NOW' ? 'On Way' : (rt['status'] == 'LOADING' ? 'Inspection' : rt['status']),
-        'loadingPassId': rt['loadingPassId'] ?? '—',
-        'pickupLocation': rt['pickupCity'] ?? rt['pickupLocation'] ?? '—',
-        'dropCity': rt['dropCity'] ?? '—',
-        'startedTime': startedTime,
-        'distance': '${rt['remainingDistance'] ?? '154'} km',
-        'avatar': avatar.isNotEmpty ? avatar : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
-      });
-    }
-
-    if (displayTrips.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE5EAE7)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.route_rounded, size: 48, color: isDark ? Colors.white24 : Colors.grey.shade300),
-            const SizedBox(height: 12),
-            const AppText("No active trips today", style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold, color: Colors.grey),
-            const SizedBox(height: 4),
-            const AppText("New trips will show up here once assigned.", style: AppTextStyle.labelMedium, color: Colors.grey),
-          ],
-        ),
-      );
-    }
-
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE5EAE7)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const AppText("Today's Trips Overview", style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: () => controller.changeTabIndex(1),
-                    child: const AppText('View All Trips', style: AppTextStyle.labelMedium, color: Color(0xFF047857), fontWeight: FontWeight.bold),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left_rounded, size: 18),
-                    onPressed: () {},
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right_rounded, size: 18),
-                    onPressed: () {},
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: displayTrips.map((t) {
-                final status = t['status']?.toString() ?? 'Pending';
-                Color statusColor = const Color(0xFF6B7280);
-                Color statusBg = const Color(0xFFF1F5F9);
-                if (status == 'On Way') {
-                  statusColor = const Color(0xFF047857);
-                  statusBg = const Color(0xFFDCFCE7);
-                } else if (status == 'Assigned') {
-                  statusColor = const Color(0xFF2563EB);
-                  statusBg = const Color(0xFFDBEAFE);
-                } else if (status == 'Inspection') {
-                  statusColor = const Color(0xFFD97706);
-                  statusBg = const Color(0xFFFEF3C7);
-                }
-
-                return Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () {
-                      controller.selectedTripId.value = t['id'].toString();
-                      AppSnackBar.showSuccess(title: 'Trip Selected', message: 'Tracking selected trip ${t['id']} on dashboard.');
-                    },
-                    onDoubleTap: () {
-                      Get.to(() => const AdminTripDetailsView(), arguments: {'tripId': t['id']});
-                    },
-                    borderRadius: BorderRadius.circular(14),
-                    child: Container(
-                      width: 280,
-                      margin: const EdgeInsets.only(right: 16),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE5EAE7)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 18,
-                                child: ClipOval(
-                                  child: CachedNetworkImage(
-                                    imageUrl: corsSafeImageUrl(t['avatar'] ?? ''),
-                                    fit: BoxFit.cover,
-                                    width: 36,
-                                    height: 36,
-                                    errorWidget: (_, __, ___) => const Icon(Icons.person_rounded, size: 18),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    AppText(t['driverName'], style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
-                                    AppText(t['truckNo'], style: AppTextStyle.labelMedium, fontSize: 11, color: const Color(0xFF6B7280)),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: statusBg,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: AppText(status, style: AppTextStyle.labelMedium, fontSize: 11, color: statusColor, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                          const Divider(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  AppText(t['id'], style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
-                                  const SizedBox(width: 4),
-                                  IconButton(
-                                    icon: const Icon(Icons.copy_rounded, size: 12, color: Color(0xFF9CA3AF)),
-                                    constraints: const BoxConstraints(),
-                                    padding: EdgeInsets.zero,
-                                    onPressed: () {
-                                      Clipboard.setData(ClipboardData(text: t['id']));
-                                      AppSnackBar.showSuccess(title: 'Copied', message: 'Trip ID copied to clipboard');
-                                    },
-                                  ),
-                                ],
-                              ),
-                              AppText(t['loadingPassId'], style: AppTextStyle.labelMedium, color: const Color(0xFFEA580C), fontWeight: FontWeight.bold),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              AppText(t['pickupLocation'], style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
-                              const SizedBox(width: 6),
-                              const Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF9CA3AF)),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: AppText(t['dropCity'], style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold, maxLines: 1, overflow: TextOverflow.ellipsis),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              AppText('Started: ${t['startedTime']}', style: AppTextStyle.labelMedium, fontSize: 11, color: const Color(0xFF9CA3AF)),
-                              Row(
-                                children: [
-                                  const Icon(Icons.location_on_rounded, size: 12, color: Color(0xFF2563EB)),
-                                  const SizedBox(width: 2),
-                                  AppText(t['distance'], style: AppTextStyle.labelMedium, fontSize: 11, color: const Color(0xFF2563EB), fontWeight: FontWeight.bold),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomGrid(BuildContext context, bool isDark) {
-    final isWide = MediaQuery.of(context).size.width >= 1100;
-    if (isWide) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: _buildTruckAssignmentsPanel(context, isDark)),
-          const SizedBox(width: 16),
-          Expanded(child: _buildTruckInspectionPendingPanel(context, isDark)),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              children: [
-                _buildQuickActionsPanel(context, isDark),
-                const SizedBox(height: 16),
-                _buildRecentNotificationsPanel(isDark),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-    return Column(
-      children: [
-        _buildTruckAssignmentsPanel(context, isDark),
-        const SizedBox(height: 16),
-        _buildTruckInspectionPendingPanel(context, isDark),
-        const SizedBox(height: 16),
-        _buildQuickActionsPanel(context, isDark),
-        const SizedBox(height: 16),
-        _buildRecentNotificationsPanel(isDark),
-      ],
-    );
-  }
-
-  Widget _buildTruckAssignmentsPanel(BuildContext context, bool isDark) {
-    final assigned = controller.trucks.where((t) => (t['assignedTo'] ?? '').toString().isNotEmpty).toList();
-    
-    final displayAssignments = <Map<String, dynamic>>[];
-    for (final t in assigned) {
-      final driverPhone = t['assignedTo'].toString();
-      final driverName = controller.driverNameFor(driverPhone);
-      final driverTrip = controller.trips.firstWhereOrNull((trip) =>
-          trip['driverPhone'].toString() == driverPhone && trip['status'] != 'DELIVERED');
-      String status = 'Assigned';
-      if (driverTrip != null) {
-        final ts = driverTrip['status']?.toString() ?? '';
-        status = ts == 'EN_ROUTE_VENDOR' || ts == 'ACTIVE NOW' ? 'On Way' : (ts == 'LOADING' ? 'Inspection' : ts);
-      }
-      displayAssignments.add({
-        'driverName': driverName,
-        'truckNo': t['truckNo'],
-        'status': status,
-        'date': '11-07-2026 08:30 AM',
-        'tripId': driverTrip != null ? driverTrip['id'].toString() : '',
-      });
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE5EAE7)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade100, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1505,12 +1282,180 @@ class AdminHomeView extends GetView<AdminHomeController> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Expanded(
-                child: AppText(
-                  'Truck Assignments',
-                  style: AppTextStyle.bodyLarge,
-                  fontWeight: FontWeight.bold,
+                child: AppText("Today's Trips Overview",
+                    style: AppTextStyle.bodyLarge,
+                    fontWeight: FontWeight.bold,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ),
+              TextButton(
+                onPressed: () => controller.changeTabIndex(1),
+                child: const Row(
+                  children: [
+                    Text('View All Trips', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                    SizedBox(width: 4),
+                    Icon(Icons.arrow_forward_rounded, size: 14, color: AppColors.primary),
+                  ],
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (realTrips.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.route_rounded, size: 40, color: Colors.grey.shade300),
+                    const SizedBox(height: 8),
+                    const AppText("No active trips today", style: AppTextStyle.bodyMedium, color: Colors.grey),
+                  ],
+                ),
+              ),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: realTrips.map((rt) {
+                  final driverPhone = rt['driverPhone']?.toString() ?? '';
+                  final driverName = controller.driverNameFor(driverPhone);
+                  final driverAvatar = controller.driverAvatarFor(driverPhone);
+                  final tripId = (rt['id'] ?? '').toString();
+                  final truckNo = (rt['truckNo'] ?? 'GJ 21 CB 3305').toString();
+                  final loadingPass = (rt['loadingPassId'] ?? '87654321').toString();
+                  final pickup = (rt['pickupCity'] ?? 'Rajkot').toString();
+                  final status = (rt['status'] ?? '').toString();
+
+                  final isEnRoute = status == 'EN_ROUTE_VENDOR' || status == 'ACTIVE NOW';
+
+                  return Container(
+                    width: 280,
+                    margin: const EdgeInsets.only(right: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade100),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundColor: Colors.grey.shade200,
+                              child: ClipOval(
+                                child: CachedNetworkImage(
+                                  imageUrl: corsSafeImageUrl(driverAvatar.isNotEmpty
+                                      ? driverAvatar
+                                      : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'),
+                                  fit: BoxFit.cover,
+                                  width: 36,
+                                  height: 36,
+                                  errorWidget: (_, __, ___) => const Icon(Icons.person_rounded, size: 18),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  AppText(driverName.isNotEmpty ? driverName : 'DEEP', style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                                  AppText(truckNo, style: AppTextStyle.labelMedium, color: Colors.grey),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: isEnRoute ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                isEnRoute ? 'ON WAY' : 'PENDING',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: isEnRoute ? const Color(0xFF047857) : const Color(0xFFD97706),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const AppText('TRIP ID', style: AppTextStyle.labelMedium, color: Colors.grey),
+                            AppText(tripId, style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const AppText('L. PASS', style: AppTextStyle.labelMedium, color: Colors.grey),
+                            AppText(loadingPass, style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+                          ],
+                        ),
+                        const Divider(height: 24),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on_rounded, size: 14, color: Colors.grey),
+                            const SizedBox(width: 4),
+                            AppText(pickup, style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: () => Get.to(() => const AdminTripDetailsView(), arguments: {'tripId': tripId}),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.map_rounded, size: 14, color: AppColors.primary),
+                                  SizedBox(width: 4),
+                                  Text('Map View', style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMockupRecentAssignments(BuildContext context, bool isDark) {
+    final assigned = controller.trucks.where((t) => (t['assignedTo'] ?? '').toString().isNotEmpty).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade100, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Expanded(
+                child: AppText('Recent Assignments',
+                    style: AppTextStyle.bodyLarge,
+                    fontWeight: FontWeight.bold,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ),
+              const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: () {
                   if (controller.trucks.isNotEmpty) {
@@ -1518,17 +1463,16 @@ class AdminHomeView extends GetView<AdminHomeController> {
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF047857),
+                  backgroundColor: const Color(0xFF0F172A),
                   foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 ),
                 child: const Text('Assign Truck', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Table(
             defaultVerticalAlignment: TableCellVerticalAlignment.middle,
             children: [
@@ -1537,41 +1481,28 @@ class AdminHomeView extends GetView<AdminHomeController> {
                   border: Border(bottom: BorderSide(color: isDark ? Colors.white10 : Colors.grey.shade200)),
                 ),
                 children: const [
-                  Padding(padding: EdgeInsets.symmetric(vertical: 8), child: AppText('Driver Name', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold)),
-                  Padding(padding: EdgeInsets.symmetric(vertical: 8), child: AppText('Truck Number', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold)),
-                  Padding(padding: EdgeInsets.symmetric(vertical: 8), child: AppText('Status', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold)),
-                  Padding(padding: EdgeInsets.symmetric(vertical: 8), child: AppText('Assigned On', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold)),
+                  Padding(padding: EdgeInsets.symmetric(vertical: 10), child: AppText('DRIVER DETAILS', style: AppTextStyle.labelMedium, color: Colors.grey, fontWeight: FontWeight.bold)),
+                  Padding(padding: EdgeInsets.symmetric(vertical: 10), child: AppText('STATUS', style: AppTextStyle.labelMedium, color: Colors.grey, fontWeight: FontWeight.bold)),
+                  Padding(padding: EdgeInsets.symmetric(vertical: 10), child: AppText('ASSIGNED DATE', style: AppTextStyle.labelMedium, color: Colors.grey, fontWeight: FontWeight.bold)),
                 ],
               ),
-              if (displayAssignments.isEmpty)
+              if (assigned.isEmpty)
                 TableRow(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      child: AppText('No active assignments', style: AppTextStyle.bodyMedium, color: Colors.grey.shade500),
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: AppText('No recent assignments', style: AppTextStyle.bodyMedium, color: Colors.grey.shade400),
                     ),
-                    const SizedBox(),
                     const SizedBox(),
                     const SizedBox(),
                   ],
                 ),
-              ...displayAssignments.map((a) {
-                final status = a['status']?.toString() ?? 'Pending';
-                Color statusColor = const Color(0xFF6B7280);
-                Color statusBg = const Color(0xFFF1F5F9);
-                if (status == 'On Way') {
-                  statusColor = const Color(0xFF047857);
-                  statusBg = const Color(0xFFDCFCE7);
-                } else if (status == 'Assigned') {
-                  statusColor = const Color(0xFF2563EB);
-                  statusBg = const Color(0xFFDBEAFE);
-                } else if (status == 'Inspection') {
-                  statusColor = const Color(0xFFD97706);
-                  statusBg = const Color(0xFFFEF3C7);
-                }
-
-                final tripId = a['tripId']?.toString() ?? '';
-                final hasTrip = tripId.isNotEmpty;
+              ...assigned.take(3).map((a) {
+                final driverPhone = a['assignedTo'].toString();
+                final driverName = controller.driverNameFor(driverPhone);
+                final trip = controller.trips.firstWhereOrNull((t) => t['driverPhone'].toString() == driverPhone && t['status'] != 'DELIVERED');
+                
+                final isEnRoute = trip != null && (trip['status'] == 'EN_ROUTE_VENDOR' || trip['status'] == 'ACTIVE NOW');
 
                 return TableRow(
                   decoration: BoxDecoration(
@@ -1579,205 +1510,117 @@ class AdminHomeView extends GetView<AdminHomeController> {
                   ),
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: InkWell(
-                        onTap: hasTrip ? () {
-                          controller.selectedTripId.value = tripId;
-                          AppSnackBar.showSuccess(title: 'Trip Selected', message: 'Tracking selected trip $tripId.');
-                        } : null,
-                        child: AppText(
-                          a['driverName'],
-                          style: AppTextStyle.bodyMedium,
-                          color: hasTrip ? const Color(0xFF047857) : null,
-                          fontWeight: hasTrip ? FontWeight.bold : null,
-                        ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor: AppColors.primaryLight,
+                            child: Text(
+                              driverName.isNotEmpty ? driverName[0].toUpperCase() : 'D',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                AppText(driverName.isNotEmpty ? driverName : 'DEEP', style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                                AppText(a['truckNo'] ?? '', style: AppTextStyle.labelMedium, color: Colors.grey),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: AppText(a['truckNo'], style: AppTextStyle.bodyMedium)),
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: statusBg,
-                            borderRadius: BorderRadius.circular(4),
+                            color: isEnRoute ? const Color(0xFFDCFCE7) : const Color(0xFFDBEAFE),
+                            borderRadius: BorderRadius.circular(6),
                           ),
-                          child: AppText(status, style: AppTextStyle.labelMedium, fontSize: 11, color: statusColor, fontWeight: FontWeight.bold),
+                          child: Text(
+                            isEnRoute ? 'ON WAY' : 'ASSIGNED',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: isEnRoute ? const Color(0xFF047857) : const Color(0xFF1E40AF),
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                    Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: AppText(a['date'], style: AppTextStyle.labelMedium, color: const Color(0xFF6B7280))),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const AppText('11-07-2026', style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                          AppText('08:30 AM', style: AppTextStyle.labelMedium, color: Colors.grey),
+                        ],
+                      ),
+                    ),
                   ],
                 );
               }),
             ],
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () => controller.changeTabIndex(2),
-            child: const Align(
-              alignment: Alignment.centerLeft,
-              child: AppText('View All Assignments', style: AppTextStyle.labelMedium, color: Color(0xFF047857), fontWeight: FontWeight.bold),
-            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTruckInspectionPendingPanel(BuildContext context, bool isDark) {
+  Widget _buildMockupOperationsHub(BuildContext context, bool isDark) {
     final pending = controller.trucks.where((t) {
       final status = (t['inspectionStatus'] ?? '').toString();
       final hasDriver = (t['assignedTo'] ?? '').toString().isNotEmpty;
-      return hasDriver && (status == 'inspected_pending_review' || status == 'pending');
+      if (!hasDriver) return false;
+
+      // A submitted inspection is BLOCKING its driver (they sit on "Pending
+      // Review" until the admin acts), so it must always surface — even when
+      // that driver already has a trip running.
+      if (status == 'inspected_pending_review') return true;
+
+      // Not-yet-inspected trucks are only nagged about when the driver is free;
+      // no point chasing an inspection for someone already out on a trip.
+      if (status != 'pending') return false;
+      final driverPhone = (t['assignedTo'] ?? '').toString();
+      final hasActiveTrip = controller.trips.any((trip) =>
+          (trip['driverPhone'] ?? '').toString() == driverPhone &&
+          trip['status'] != 'DELIVERED' &&
+          trip['status'] != 'CANCELLED');
+      return !hasActiveTrip;
     }).toList();
-    
-    final displayInspections = <Map<String, dynamic>>[];
-    for (final t in pending) {
-      final driverPhone = t['assignedTo'].toString();
-      displayInspections.add({
-        'truckNo': t['truckNo'],
-        'driverName': controller.driverNameFor(driverPhone),
-        'inspectionStatus': t['inspectionStatus'] == 'inspected_pending_review' ? 'Pending Review' : 'Pending Driver',
-        'rawTruck': t,
-      });
-    }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE5EAE7)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: AppText(
-                  'Truck Inspection',
-                  style: AppTextStyle.bodyLarge,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: AppText('${displayInspections.length} Pending', style: AppTextStyle.labelMedium, fontSize: 11, color: const Color(0xFFD97706), fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Table(
-            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-            children: [
-              TableRow(
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: isDark ? Colors.white10 : Colors.grey.shade200)),
-                ),
-                children: const [
-                  Padding(padding: EdgeInsets.symmetric(vertical: 8), child: AppText('Truck No.', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold)),
-                  Padding(padding: EdgeInsets.symmetric(vertical: 8), child: AppText('Driver Name', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold)),
-                  Padding(padding: EdgeInsets.symmetric(vertical: 8), child: AppText('Status', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              if (displayInspections.isEmpty)
-                TableRow(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      child: AppText('No pending inspections', style: AppTextStyle.bodyMedium, color: Colors.grey.shade500),
-                    ),
-                    const SizedBox(),
-                    const SizedBox(),
-                  ],
-                ),
-              ...displayInspections.map((i) {
-                final rawTruck = i['rawTruck'] as Map<String, dynamic>;
-                return TableRow(
-                  decoration: BoxDecoration(
-                    border: Border(bottom: BorderSide(color: isDark ? Colors.white10 : Colors.grey.shade100)),
-                  ),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: InkWell(
-                        onTap: () => _showInspectionReviewDialog(context, isDark, rawTruck),
-                        child: Text(
-                          i['truckNo'],
-                          style: const TextStyle(
-                            color: Color(0xFF047857),
-                            fontWeight: FontWeight.bold,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: AppText(i['driverName'], style: AppTextStyle.bodyMedium)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: i['inspectionStatus'] == 'Pending Review' ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: AppText(
-                            i['inspectionStatus'] == 'Pending Review' ? 'Review' : 'Pending',
-                            style: AppTextStyle.labelMedium,
-                            fontSize: 11,
-                            color: i['inspectionStatus'] == 'Pending Review' ? const Color(0xFFD97706) : const Color(0xFF475569),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              }),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () => controller.changeTabIndex(2),
-            child: const Align(
-              alignment: Alignment.centerLeft,
-              child: AppText('View All Inspections', style: AppTextStyle.labelMedium, color: Color(0xFF047857), fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActionsPanel(BuildContext context, bool isDark) {
-    Widget actionCard(IconData icon, String label, Color color, VoidCallback onTap) {
+    Widget actionButton(IconData icon, String label, Color color, VoidCallback onTap) {
       return Expanded(
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: color.withOpacity(0.2)),
+              color: isDark ? Colors.black26 : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade100),
             ),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, color: color, size: 24),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 20),
+                ),
                 const SizedBox(height: 8),
-                AppText(label, style: AppTextStyle.labelMedium, color: color, fontWeight: FontWeight.bold),
+                AppText(label, style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
               ],
             ),
           ),
@@ -1786,37 +1629,141 @@ class AdminHomeView extends GetView<AdminHomeController> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE5EAE7)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade100, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const AppText('Quick Actions', style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
-          const SizedBox(height: 12),
+          const Row(
+            children: [
+              Icon(Icons.grid_view_rounded, color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
+              AppText('Operations Hub', style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
+            ],
+          ),
+          const SizedBox(height: 20),
+          const AppText('QUICK ACTIONS', style: AppTextStyle.labelMedium, color: Colors.grey, fontWeight: FontWeight.bold),
+          const SizedBox(height: 10),
           Row(
             children: [
-              actionCard(Icons.local_shipping_rounded, 'Add Truck', const Color(0xFF047857), () => _showTruckFormDialog(context, isDark)),
-              const SizedBox(width: 8),
-              actionCard(Icons.explore_rounded, 'Assign Trip', const Color(0xFF2563EB), () => _assignTripGuarded(context, isDark)),
-              const SizedBox(width: 8),
-              actionCard(Icons.person_add_rounded, 'Add Driver', const Color(0xFF7E22CE), () => _showUserFormDialog(context, isDark)),
-              const SizedBox(width: 8),
-              actionCard(Icons.assignment_rounded, 'Loading Pass', const Color(0xFFEA580C), () {
+              actionButton(Icons.local_shipping_rounded, 'Add Truck', const Color(0xFF10B981), () => _showTruckFormDialog(context, isDark)),
+              const SizedBox(width: 10),
+              actionButton(Icons.explore_rounded, 'Assign Trip', const Color(0xFF3B82F6), () => _assignTripGuarded(context, isDark)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              actionButton(Icons.person_add_rounded, 'Add Driver', const Color(0xFF8B5CF6), () => _showUserFormDialog(context, isDark)),
+              const SizedBox(width: 10),
+              actionButton(Icons.description_rounded, 'Loading Pass', const Color(0xFFF59E0B), () {
                 final withPass = controller.trips.where((t) => (t['loadingPassId'] ?? '').toString().isNotEmpty).toList();
                 if (withPass.isNotEmpty) {
                   _showSetDestinationDialog(withPass.first);
                 } else {
-                  AppSnackBar.showInfo(title: 'Loading Pass', message: 'No active trips with loading passes to approve right now.');
+                  Get.snackbar('Loading Pass', 'No active trips with loading passes to approve right now.', snackPosition: SnackPosition.BOTTOM);
                 }
               }),
             ],
           ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const AppText('PENDING INSPECTIONS', style: AppTextStyle.labelMedium, color: Colors.grey, fontWeight: FontWeight.bold),
+              if (pending.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFECE6),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${pending.length} Task',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFBF2600)),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (pending.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: AppText('No pending inspections', style: AppTextStyle.bodyMedium, color: Colors.grey.shade400),
+            )
+          else
+            ...pending.map((t) {
+              final driverPhone = t['assignedTo'].toString();
+              final driverName = controller.driverNameFor(driverPhone);
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.black26 : const Color(0xFFFFFAF8),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFFE4E6).withOpacity(0.5)),
+                ),
+                child: ListTile(
+                  dense: true,
+                  onTap: () => _showInspectionReviewDialog(context, isDark, t),
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFFECE6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.playlist_add_check_rounded, color: Color(0xFFBF2600), size: 18),
+                  ),
+                  title: Text(t['truckNo'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('Driver: $driverName', style: TextStyle(color: Colors.grey.shade600)),
+                  trailing: const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                ),
+              );
+            }),
         ],
       ),
+    );
+  }
+
+  Widget _buildBottomLayout(BuildContext context, bool isDark) {
+    final isWide = MediaQuery.of(context).size.width >= 1100;
+
+    if (isWide) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 7,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildMockupTodaysTripsOverview(context, isDark),
+                const SizedBox(height: 20),
+                _buildMockupRecentAssignments(context, isDark),
+              ],
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            flex: 4,
+            child: _buildMockupOperationsHub(context, isDark),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildMockupTodaysTripsOverview(context, isDark),
+        const SizedBox(height: 20),
+        _buildMockupRecentAssignments(context, isDark),
+        const SizedBox(height: 20),
+        _buildMockupOperationsHub(context, isDark),
+      ],
     );
   }
 
@@ -2111,20 +2058,31 @@ class AdminHomeView extends GetView<AdminHomeController> {
                   );
                 }
 
-                final width = MediaQuery.of(context).size.width;
-                final crossAxisCount = width >= 1200 ? 3 : (width >= 800 ? 2 : 1);
+                // Size the grid from the space this list ACTUALLY has, not the
+                // screen width — the sidebar + max-width cap make the content
+                // column much narrower than the window, which previously
+                // produced cells too small for a trip card (overflow).
+                return LayoutBuilder(builder: (context, cons) {
+                  const hPad = 20.0;
+                  const spacing = 16.0;
+                  final avail = cons.maxWidth - hPad * 2;
+                  // Keep every card at least ~300px wide, else drop a column.
+                  var crossAxisCount =
+                      ((avail + spacing) / (300 + spacing)).floor();
+                  if (crossAxisCount < 1) crossAxisCount = 1;
+                  if (crossAxisCount > 3) crossAxisCount = 3;
 
-                return ListView(
+                  return ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
+                  padding: const EdgeInsets.fromLTRB(hPad, 4, hPad, 40),
                   children: [
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: crossAxisCount,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
+                        crossAxisSpacing: spacing,
+                        mainAxisSpacing: spacing,
                         mainAxisExtent: 440,
                       ),
                       itemCount: pageTrips.length,
@@ -2140,7 +2098,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                     const SizedBox(height: 16),
                     _tripsPagination(context, isDark),
                   ],
-                );
+                  );
+                });
               }),
             ),
           ),
@@ -2218,9 +2177,13 @@ class AdminHomeView extends GetView<AdminHomeController> {
           ),
         ),
 
-        // Date selection, Search, tune/clear filters
-        Row(
-          mainAxisSize: MainAxisSize.min,
+        // Date selection, Search, tune/clear filters. A Wrap (not a Row) so
+        // these controls flow onto the next line on narrow/mobile widths
+        // instead of overflowing the header.
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             // Search Input
             SizedBox(
@@ -2247,7 +2210,6 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
             // Date Filter
             Obx(() {
               final d = controller.tripDateFilter.value;
@@ -2274,7 +2236,6 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 ),
               );
             }),
-            const SizedBox(width: 8),
             // Clear / Filter Action
             IconButton(
               onPressed: controller.clearTripFilters,
@@ -2413,27 +2374,42 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AppText(driver.isNotEmpty ? driver : 'Deep', style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
+                    AppText(driver.isNotEmpty ? driver : 'Deep',
+                        style: AppTextStyle.bodyLarge,
+                        fontWeight: FontWeight.bold,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 2),
                     Row(
                       children: [
                         const Icon(Icons.local_shipping_outlined, size: 12, color: Colors.grey),
                         const SizedBox(width: 4),
-                        AppText(truckNo, style: AppTextStyle.labelMedium, color: Colors.grey),
+                        Flexible(
+                          child: AppText(truckNo,
+                              style: AppTextStyle.labelMedium,
+                              color: Colors.grey,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusBg,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  statusLabel.toUpperCase(),
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusFg),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusBg,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    statusLabel.toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusFg),
+                  ),
                 ),
               ),
             ],
@@ -2557,22 +2533,39 @@ class AdminHomeView extends GetView<AdminHomeController> {
           const Divider(),
           const SizedBox(height: 4),
 
-          // Footer
+          // Footer — must survive narrow cards, so the label shrinks/ellipsises
+          // rather than overflowing the row.
           Row(
             children: [
-              TextButton(
-                onPressed: () => Get.to(() => const AdminTripDetailsView(), arguments: {'tripId': tripId}),
-                child: const Row(
-                  children: [
-                    Text('View Details', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
-                    SizedBox(width: 4),
-                    Icon(Icons.arrow_forward_rounded, size: 14, color: AppColors.primary),
-                  ],
+              Flexible(
+                child: TextButton(
+                  onPressed: () => Get.to(() => const AdminTripDetailsView(), arguments: {'tripId': tripId}),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text('View Details',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                      ),
+                      SizedBox(width: 4),
+                      Icon(Icons.arrow_forward_rounded, size: 14, color: AppColors.primary),
+                    ],
+                  ),
                 ),
               ),
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.edit_rounded, size: 16, color: Colors.grey),
+                padding: const EdgeInsets.all(6),
+                constraints: const BoxConstraints(),
+                visualDensity: VisualDensity.compact,
                 onPressed: () => _showTripFormDialog(context, isDark, editModeTrip: trip),
               ),
               _tripMenu(context, isDark, trip),
@@ -2760,8 +2753,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
       String? badgeText,
       Color? badgeColor,
     }) {
-      return Expanded(
-        child: Container(
+      return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: cardBg ?? (isDark ? const Color(0xFF1E293B) : Colors.white),
@@ -2777,7 +2769,15 @@ class AdminHomeView extends GetView<AdminHomeController> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  AppText(title, style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey),
+                  Expanded(
+                    child: AppText(title,
+                        style: AppTextStyle.labelMedium,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                  const SizedBox(width: 8),
                   Icon(icon, color: iconColor, size: 20),
                 ],
               ),
@@ -2786,7 +2786,13 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  AppText(value, style: AppTextStyle.headlineMedium, fontWeight: FontWeight.w800),
+                  Flexible(
+                    child: AppText(value,
+                        style: AppTextStyle.headlineMedium,
+                        fontWeight: FontWeight.w800,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                  ),
                   if (badgeText != null) ...[
                     const SizedBox(width: 8),
                     Container(
@@ -2809,12 +2815,20 @@ class AdminHomeView extends GetView<AdminHomeController> {
               ),
             ],
           ),
-        ),
-      );
+        );
     }
 
-    return Row(
-      children: [
+    // Responsive: four across on desktop, but they reflow to 2-up / 1-up on
+    // narrow widths instead of being squeezed into unreadable slivers.
+    return LayoutBuilder(builder: (context, cons) {
+      const spacing = 16.0;
+      var perRow = ((cons.maxWidth + spacing) / (200 + spacing)).floor();
+      if (perRow < 1) perRow = 1;
+      if (perRow > 4) perRow = 4;
+      final cardWidth =
+          (cons.maxWidth - spacing * (perRow - 1)) / perRow;
+
+      final cards = [
         statCard(
           title: 'TOTAL VEHICLES',
           value: '$totalVehicles',
@@ -2823,21 +2837,18 @@ class AdminHomeView extends GetView<AdminHomeController> {
           badgeText: '↑ 2.4%',
           badgeColor: Colors.green,
         ),
-        const SizedBox(width: 16),
         statCard(
           title: 'ACTIVE DEPLOYMENTS',
           value: '$activeDeployments / $totalVehicles',
           icon: Icons.directions_car_filled_rounded,
           iconColor: Colors.green,
         ),
-        const SizedBox(width: 16),
         statCard(
           title: 'IDLE UNITS',
           value: '$idleUnits',
           icon: Icons.pause_circle_filled_rounded,
           iconColor: Colors.blueGrey,
         ),
-        const SizedBox(width: 16),
         statCard(
           title: 'MAINTENANCE REQ',
           value: '$maintenanceReq',
@@ -2846,8 +2857,16 @@ class AdminHomeView extends GetView<AdminHomeController> {
           badgeText: '! Critical: 1',
           badgeColor: Colors.red,
         ),
-      ],
-    );
+      ];
+
+      return Wrap(
+        spacing: spacing,
+        runSpacing: spacing,
+        children: cards
+            .map((c) => SizedBox(width: cardWidth, child: c))
+            .toList(),
+      );
+    });
   }
 
   Widget _buildMockupTruckCard(BuildContext context, bool isDark, Map<String, dynamic> truck) {
@@ -2907,12 +2926,17 @@ class AdminHomeView extends GetView<AdminHomeController> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              AppText(
-                truckNo,
-                style: AppTextStyle.bodyLarge,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF1E40AF),
+              Expanded(
+                child: AppText(
+                  truckNo,
+                  style: AppTextStyle.bodyLarge,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF1E40AF),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -3131,59 +3155,88 @@ class AdminHomeView extends GetView<AdminHomeController> {
             );
           }
 
-          final width = MediaQuery.of(context).size.width;
-          final crossAxisCount = width >= 1200 ? 4 : (width >= 800 ? 2 : 1);
+          // Size from the real available width (not the screen) — the sidebar
+          // and max-width cap make this column much narrower than the window.
+          return LayoutBuilder(builder: (context, cons) {
+          const hPad = 20.0;
+          const spacing = 16.0;
+          final avail = cons.maxWidth - hPad * 2;
+          var crossAxisCount = ((avail + spacing) / (280 + spacing)).floor();
+          if (crossAxisCount < 1) crossAxisCount = 1;
+          if (crossAxisCount > 4) crossAxisCount = 4;
 
           return ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+            padding: const EdgeInsets.fromLTRB(hPad, 20, hPad, 100),
             children: [
-              // Header title section
-              Row(
-                children: [
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        AppText(
-                          'Fleet Tracker Overview',
-                          style: AppTextStyle.headlineMedium,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        SizedBox(height: 4),
-                        AppText(
-                          'Real-time status and deployment metrics for all ground units.',
-                          style: AppTextStyle.labelMedium,
-                          color: AppColors.textSecondary,
-                        ),
-                      ],
+              // Header title section. The title + both action buttons can't fit
+              // side-by-side on a phone, so they stack there instead of
+              // overflowing.
+              Builder(builder: (context) {
+                const title = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppText(
+                      'Fleet Tracker Overview',
+                      style: AppTextStyle.headlineMedium,
+                      fontWeight: FontWeight.w800,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.filter_list_rounded, size: 16),
-                    label: const AppText('Filter', style: AppTextStyle.labelMedium),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: isDark ? Colors.white : Colors.black87,
-                      side: BorderSide(color: isDark ? Colors.white24 : Colors.grey.shade300),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    SizedBox(height: 4),
+                    AppText(
+                      'Real-time status and deployment metrics for all ground units.',
+                      style: AppTextStyle.labelMedium,
+                      color: AppColors.textSecondary,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    onPressed: () => _showTruckFormDialog(context, isDark),
-                    icon: const Icon(Icons.add_rounded, size: 16),
-                    label: const Text('Register Vehicle'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ],
+                );
+
+                final actions = Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () {},
+                      icon: const Icon(Icons.filter_list_rounded, size: 16),
+                      label: const AppText('Filter', style: AppTextStyle.labelMedium),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: isDark ? Colors.white : Colors.black87,
+                        side: BorderSide(color: isDark ? Colors.white24 : Colors.grey.shade300),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                    ElevatedButton.icon(
+                      onPressed: () => _showTruckFormDialog(context, isDark),
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      label: const Text('Register Vehicle'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
+                );
+
+                if (avail < 640) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [title, const SizedBox(height: 12), actions],
+                  );
+                }
+                return Row(
+                  children: [
+                    const Expanded(child: title),
+                    const SizedBox(width: 8),
+                    actions,
+                  ],
+                );
+              }),
               const SizedBox(height: 24),
 
               // Stats Cards
@@ -3234,6 +3287,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
               ),
             ],
           );
+          });
         }),
       ),
     );

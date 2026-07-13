@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:get/get.dart';
 import 'package:transport/app/data/services/session_service.dart';
@@ -16,10 +17,33 @@ class ExpensesController extends GetxController {
   final RxString approvedExpenses = '₹0'.obs;
   final RxString pendingExpenses = '₹0'.obs;
 
+  StreamSubscription? _expensesSub;
+
   @override
   void onInit() {
     super.onInit();
-    loadExpenses();
+    _bind();
+    // Re-subscribe if the signed-in user changes.
+    ever(_session.phone, (_) => _bind());
+  }
+
+  /// Live expenses for this driver, so an admin's approve/reject shows up
+  /// immediately instead of waiting for a manual refresh.
+  void _bind() {
+    _expensesSub?.cancel();
+    final phone = _session.ownerKey;
+    if (phone.isEmpty) {
+      expenses.clear();
+      _calculateStats();
+      return;
+    }
+    isLoading.value = true;
+    _expensesSub =
+        _firebaseService.watchExpensesForDriver(phone).listen((list) {
+      expenses.assignAll(list);
+      _calculateStats();
+      isLoading.value = false;
+    }, onError: (_) => isLoading.value = false);
   }
 
   Future<void> loadExpenses() async {
@@ -42,7 +66,10 @@ class ExpensesController extends GetxController {
     double pending = 0;
 
     for (var exp in expenses) {
-      final amtStr = (exp['amount'] as String).replaceAll(RegExp(r'[^\d]'), '');
+      // `amount` may be stored as a String ("₹1,200") or a raw number — don't
+      // assume, or a numeric amount blows up the whole stats calculation.
+      final amtStr =
+          (exp['amount'] ?? '').toString().replaceAll(RegExp(r'[^\d]'), '');
       final amt = double.tryParse(amtStr) ?? 0;
       total += amt;
       if (exp['status'] == 'Approved') {
@@ -82,10 +109,16 @@ class ExpensesController extends GetxController {
       AppSnackBar.showSuccess(
           title: 'Claim Submitted',
           message: 'Expense sent to admin for approval.');
-      await loadExpenses();
+      // The live stream picks the new claim up on its own.
     } catch (e) {
       AppPopup.hideLoading();
       AppSnackBar.showError(title: 'Submission Failed', message: e.toString());
     }
+  }
+
+  @override
+  void onClose() {
+    _expensesSub?.cancel();
+    super.onClose();
   }
 }

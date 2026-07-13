@@ -405,7 +405,7 @@ void main() {
     expect(find.text('Assign Trip'), findsOneWidget);
   });
 
-  testWidgets('Trip detail dialog renders long-address milestones without overflow',
+  testWidgets('Trip details page renders long-address milestones without overflow',
       (tester) async {
     tester.view.devicePixelRatio = 1.0;
     tester.view.physicalSize = const Size(1300, 900);
@@ -419,8 +419,9 @@ void main() {
       for (var i = 0; i < 6; i++) {
         await tester.pump(const Duration(milliseconds: 120));
       }
-      // Open the audit dialog from the first trip card.
-      await tester.tap(find.byIcon(Icons.visibility_rounded).first);
+      // The trip card opens the audit via its "View Details" action (the old
+      // eye-icon button was replaced by this in the card redesign).
+      await tester.tap(find.text('View Details').first);
       await tester.pumpAndSettle();
     });
 

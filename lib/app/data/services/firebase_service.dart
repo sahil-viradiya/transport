@@ -1075,7 +1075,7 @@ class FirebaseService extends GetxService {
       return await task.ref.getDownloadURL();
     } catch (e) {
       _warnStorage('Proof of Delivery', e);
-      return '';
+      return placeholder;
     }
   }
 
@@ -1593,6 +1593,23 @@ class FirebaseService extends GetxService {
           data['id'] = d.id;
           return data;
         }).toList());
+  }
+
+  /// Live driver-scoped expenses. The driver's list must reflect an admin's
+  /// approve/reject the moment it happens — a one-shot read left the status
+  /// stale until a manual refresh.
+  Stream<List<Map<String, dynamic>>> watchExpensesForDriver(String phone) {
+    final p = SessionService.normalizePhone(phone);
+    if (p.isEmpty) return Stream.value(const []);
+    return _db
+        .collection('expenses')
+        .where('driverPhone', isEqualTo: p)
+        .snapshots()
+        .map((s) => s.docs.map((d) {
+              final data = d.data();
+              data['id'] = d.id;
+              return data;
+            }).toList());
   }
 
   Future<List<Map<String, dynamic>>> getExpensesForDriver(String phone) async {

@@ -681,6 +681,42 @@ class AdminHomeController extends GetxController {
     );
   }
 
+  Future<void> approveTripDelivery(String tripId) async {
+    AppPopup.showLoading(message: 'Approving Delivery...');
+    try {
+      // Force transition to DELIVERY_REQUESTED if not set (fallback safety)
+      final doc = await _firebaseService.getTripData(tripId) ?? {};
+      if (doc['status'] != 'DELIVERY_REQUESTED') {
+        await _firebaseService.saveTrip(tripId, {'status': 'DELIVERY_REQUESTED'});
+      }
+      await _firebaseService.approveDelivery(tripId);
+      AppPopup.hideLoading();
+      Get.snackbar('Approved', 'Trip delivery has been approved successfully.', snackPosition: SnackPosition.BOTTOM);
+      await loadData();
+    } catch (e) {
+      AppPopup.hideLoading();
+      Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.BOTTOM);
+    }
+  }
+
+  Future<void> rejectTripDelivery(String tripId, String reason) async {
+    AppPopup.showLoading(message: 'Rejecting Delivery...');
+    try {
+      // Force transition to DELIVERY_REQUESTED if not set (fallback safety)
+      final doc = await _firebaseService.getTripData(tripId) ?? {};
+      if (doc['status'] != 'DELIVERY_REQUESTED') {
+        await _firebaseService.saveTrip(tripId, {'status': 'DELIVERY_REQUESTED'});
+      }
+      await _firebaseService.rejectDelivery(tripId, reason: reason);
+      AppPopup.hideLoading();
+      Get.snackbar('Rejected', 'Trip delivery has been rejected.', snackPosition: SnackPosition.BOTTOM);
+      await loadData();
+    } catch (e) {
+      AppPopup.hideLoading();
+      Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.BOTTOM);
+    }
+  }
+
   // --- TRUCK CRUD ACTIONS ---
   Future<void> createTruck(Map<String, dynamic> truckData) async {
     final truckNo = truckData['truckNo'] as String;
