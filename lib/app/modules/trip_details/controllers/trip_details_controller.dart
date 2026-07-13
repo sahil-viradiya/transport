@@ -785,12 +785,17 @@ class TripDetailsController extends GetxController {
               longitude: fix.lng,
               driverName: driverName,
             );
-          } catch (_) {}
-          AppSnackBar.showSuccess(
-            title: 'Delivery Sent 📍',
-            message: 'Admin ko approval ke liye bhej diya. Approve hone par '
-                'trip complete ho jayegi.',
-          );
+            AppSnackBar.showSuccess(
+              title: 'Delivery Sent 📍',
+              message: 'Admin ko approval ke liye bhej diya. Approve hone par '
+                  'trip complete ho jayegi.',
+            );
+          } catch (e) {
+            AppSnackBar.showError(
+              title: 'Delivery Request Failed',
+              message: 'Could not send request: ${e.toString()}',
+            );
+          }
         }
       });
       return;

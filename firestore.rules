@@ -24,12 +24,18 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(phone())).data.role == 'admin';
     }
 
+    function isPhoneMatch(dbPhone) {
+      return dbPhone == phone() ||
+             '+91' + dbPhone == phone() ||
+             '91' + dbPhone == phone();
+    }
+
     function ownsIncoming() {
-      return request.resource.data.ownerId == phone();
+      return isPhoneMatch(request.resource.data.ownerId);
     }
 
     function ownsExisting() {
-      return resource.data.ownerId == phone();
+      return resource.data != null && isPhoneMatch(resource.data.ownerId);
     }
 
     // Login directory — each user owns their own row. An admin must also be
@@ -38,14 +44,14 @@ service cloud.firestore {
     // silently fails because the admin is writing users/{driverPhone}, which
     // is not their own id.
     match /users/{phoneId} {
-      allow read:           if isSignedIn() && (phoneId == phone() || isAdmin());
-      allow create, update: if isSignedIn() && (phoneId == phone() || isAdmin());
+      allow read:           if isSignedIn() && (isPhoneMatch(phoneId) || isAdmin());
+      allow create, update: if isSignedIn() && (isPhoneMatch(phoneId) || isAdmin());
       allow delete:         if isAdmin();
     }
 
     // Owner profile (license, vehicle, emergency contact, documents, location).
     match /drivers/{ownerId} {
-      allow read, write: if isSignedIn() && (ownerId == phone() || isAdmin());
+      allow read, write: if isSignedIn() && (isPhoneMatch(ownerId) || isAdmin());
     }
 
     // Trips, trucks, expenses — private to the owner named in `ownerId`.
