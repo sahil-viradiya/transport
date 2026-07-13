@@ -32,11 +32,15 @@ service cloud.firestore {
       return resource.data.ownerId == phone();
     }
 
-    // Login directory — each user owns only their own row; admin can read all.
+    // Login directory — each user owns their own row. An admin must also be
+    // able to REGISTER other people (add a driver) and change their role, so
+    // create/update is allowed for admins too — without this, "Add Driver"
+    // silently fails because the admin is writing users/{driverPhone}, which
+    // is not their own id.
     match /users/{phoneId} {
-      allow read:          if isSignedIn() && (phoneId == phone() || isAdmin());
-      allow create, update: if isSignedIn() && phoneId == phone();
-      allow delete:        if isAdmin();
+      allow read:           if isSignedIn() && (phoneId == phone() || isAdmin());
+      allow create, update: if isSignedIn() && (phoneId == phone() || isAdmin());
+      allow delete:         if isAdmin();
     }
 
     // Owner profile (license, vehicle, emergency contact, documents, location).

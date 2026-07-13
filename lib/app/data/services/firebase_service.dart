@@ -38,6 +38,30 @@ class FirebaseService extends GetxService {
     return this;
   }
 
+  /// Runs a Firestore write and turns a failure into a readable error instead
+  /// of swallowing it.
+  ///
+  /// Writes used to be wrapped in `catch (_) {}`, so a rejected write (most
+  /// often `permission-denied` from security rules that aren't deployed, or an
+  /// expired test-mode rule) looked like success: the row simply never
+  /// appeared, with no error anywhere. Callers already show an error snackbar —
+  /// they just never received one. Now they do.
+  Future<T> _write<T>(String action, Future<T> Function() op) async {
+    try {
+      return await op();
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        throw Exception(
+            '$action: Firestore ne permission deny kiya (permission-denied). '
+            'Rules deploy karein: firebase deploy --only firestore:rules');
+      }
+      if (e.code == 'unavailable') {
+        throw Exception('$action: Firestore reachable nahi hai — internet check karein.');
+      }
+      throw Exception('$action: ${e.message ?? e.code}');
+    }
+  }
+
   /// The current owner's document key (normalised phone). Resolved from the
   /// injected resolver (tests) or the live [SessionService] (app).
   String get ownerKey {
@@ -173,11 +197,15 @@ class FirebaseService extends GetxService {
       if (actingUser.isNotEmpty) {
         tripData.putIfAbsent('assignedBy', () => actingUser);
       }
-      await _db
-          .collection('trips')
-          .doc(tripId)
-          .set(tripData, SetOptions(merge: true));
-    } catch (_) {}
+      await _write(
+          'Trip save nahi hua',
+          () => _db
+              .collection('trips')
+              .doc(tripId)
+              .set(tripData, SetOptions(merge: true)));
+    } on FirebaseException catch (e) {
+      throw Exception('Trip save nahi hua: ${e.message ?? e.code}');
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1245,22 +1273,27 @@ class FirebaseService extends GetxService {
     }
   }
 
-  Future<void> saveUser(String phone, Map<String, dynamic> userData) async {
-    try {
-      await _db.collection('users').doc(phone).set(userData, SetOptions(merge: true));
-    } catch (_) {}
+  Future<void> saveUser(String phone, Map<String, dynamic> userData) {
+    return _write(
+        'User save nahi hua',
+        () => _db
+            .collection('users')
+            .doc(phone)
+            .set(userData, SetOptions(merge: true)));
   }
 
-  Future<void> updateUserRole(String phone, String newRole) async {
-    try {
-      await _db.collection('users').doc(phone).set({'role': newRole}, SetOptions(merge: true));
-    } catch (_) {}
+  Future<void> updateUserRole(String phone, String newRole) {
+    return _write(
+        'Role update nahi hua',
+        () => _db
+            .collection('users')
+            .doc(phone)
+            .set({'role': newRole}, SetOptions(merge: true)));
   }
 
-  Future<void> deleteUser(String phone) async {
-    try {
-      await _db.collection('users').doc(phone).delete();
-    } catch (_) {}
+  Future<void> deleteUser(String phone) {
+    return _write('User delete nahi hua',
+        () => _db.collection('users').doc(phone).delete());
   }
 
   // ---------------------------------------------------------------------------
@@ -1556,17 +1589,19 @@ class FirebaseService extends GetxService {
     });
   }
 
-  Future<void> saveTruck(String truckId, Map<String, dynamic> truckData) async {
-    try {
-      truckData.putIfAbsent('ownerId', () => ownerKey);
-      await _db.collection('trucks').doc(truckId).set(truckData, SetOptions(merge: true));
-    } catch (_) {}
+  Future<void> saveTruck(String truckId, Map<String, dynamic> truckData) {
+    truckData.putIfAbsent('ownerId', () => ownerKey);
+    return _write(
+        'Truck save nahi hua',
+        () => _db
+            .collection('trucks')
+            .doc(truckId)
+            .set(truckData, SetOptions(merge: true)));
   }
 
-  Future<void> deleteTruck(String truckId) async {
-    try {
-      await _db.collection('trucks').doc(truckId).delete();
-    } catch (_) {}
+  Future<void> deleteTruck(String truckId) {
+    return _write('Truck delete nahi hua',
+        () => _db.collection('trucks').doc(truckId).delete());
   }
 
   // ---------------------------------------------------------------------------

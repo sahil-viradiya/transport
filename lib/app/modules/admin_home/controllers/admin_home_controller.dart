@@ -59,6 +59,25 @@ class AdminHomeController extends GetxController {
     super.onClose();
   }
 
+  /// Set when the live streams are being rejected by Firestore (almost always
+  /// security rules that haven't been deployed). Without this, a denied read
+  /// just left every list empty — the dashboard showed 0 trucks / 0 drivers /
+  /// 0 trips with no hint that anything was wrong.
+  final RxString dataError = ''.obs;
+
+  void _onStreamError(String what, Object e) {
+    final msg = e.toString();
+    if (msg.contains('permission-denied') || msg.contains('PERMISSION_DENIED')) {
+      dataError.value =
+          'Firestore ne $what read block kiya (permission-denied). '
+          'Rules deploy karein: firebase deploy --only firestore:rules';
+    } else {
+      dataError.value = '$what load nahi hua: $msg';
+    }
+    // ignore: avoid_print
+    print('[AdminHome] $what stream error: $e');
+  }
+
   // Live admin dashboard: trips + expenses + users (driver availability) stay
   // current — no manual refresh needed.
   void _startLiveUpdates() {
@@ -72,13 +91,19 @@ class AdminHomeController extends GetxController {
           selectedTripId.value = trips.first['id'].toString();
         }
       }
-    });
+    }, onError: (e) => _onStreamError('trips', e));
     _expensesSub = _firebaseService.watchAllExpenses().listen((list) {
       expenses.assignAll(list);
-    });
-    _usersSub = _firebaseService.watchAllUsers().listen(users.assignAll);
-    _trucksSub = _firebaseService.watchAllTrucks().listen(trucks.assignAll);
-    _vendorsSub = _firebaseService.watchVendors().listen(vendors.assignAll);
+    }, onError: (e) => _onStreamError('expenses', e));
+    _usersSub = _firebaseService
+        .watchAllUsers()
+        .listen(users.assignAll, onError: (e) => _onStreamError('drivers', e));
+    _trucksSub = _firebaseService
+        .watchAllTrucks()
+        .listen(trucks.assignAll, onError: (e) => _onStreamError('trucks', e));
+    _vendorsSub = _firebaseService
+        .watchVendors()
+        .listen(vendors.assignAll, onError: (e) => _onStreamError('vendors', e));
   }
 
   // ---------------------------------------------------------------------------

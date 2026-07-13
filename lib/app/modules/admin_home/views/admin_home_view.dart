@@ -1001,6 +1001,41 @@ class AdminHomeView extends GetView<AdminHomeController> {
 
   // --- TAB 1: ANALYTICS & LIVE TRACKING ---
   // --- TAB 1: ANALYTICS & GRID VIEW (DESKTOP DITTO MATCH) ---
+  /// Loud banner shown when Firestore is rejecting the dashboard's reads, so a
+  /// rules/permissions problem doesn't masquerade as "no data yet".
+  Widget _buildDataErrorBanner(String message) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.cloud_off_rounded, color: AppColors.error, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const AppText('Firebase se data load nahi ho raha',
+                    style: AppTextStyle.bodyMedium,
+                    color: AppColors.error,
+                    fontWeight: FontWeight.bold),
+                const SizedBox(height: 2),
+                AppText(message,
+                    style: AppTextStyle.labelMedium,
+                    color: AppColors.error),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAnalyticsTab(BuildContext context, bool isDark) {
     return RefreshIndicator(
       onRefresh: controller.loadData,
@@ -1011,6 +1046,13 @@ class AdminHomeView extends GetView<AdminHomeController> {
           () => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // If Firestore is rejecting reads, say so loudly — otherwise the
+              // dashboard just shows 0 everywhere and looks "empty" rather
+              // than broken.
+              if (controller.dataError.value.isNotEmpty) ...[
+                _buildDataErrorBanner(controller.dataError.value),
+                const SizedBox(height: 16),
+              ],
               _buildMockupStatsGrid(isDark),
               const SizedBox(height: 20),
               _buildOperationsPipelineCard(isDark),
