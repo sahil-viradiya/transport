@@ -63,16 +63,16 @@ service cloud.firestore {
     }
 
     match /trucks/{truckId} {
-      allow read:   if isSignedIn() && (ownsExisting() || isPhoneMatch(resource.data.assignedTo) || isAdmin());
-      allow create: if isSignedIn() && (ownsIncoming() || isPhoneMatch(request.resource.data.assignedTo) || isAdmin());
-      allow update: if isSignedIn() && (ownsExisting() || isPhoneMatch(resource.data.assignedTo) || isAdmin());
+      allow read:   if isSignedIn() && (ownsExisting() || resource.data.assignedTo == phone() || isAdmin());
+      allow create: if isSignedIn() && (ownsIncoming() || request.resource.data.assignedTo == phone() || isAdmin());
+      allow update: if isSignedIn() && (ownsExisting() || resource.data.assignedTo == phone() || isAdmin());
       allow delete: if isSignedIn() && (ownsExisting() || isAdmin());
     }
 
     match /expenses/{expenseId} {
-      allow read:   if isSignedIn() && (ownsExisting() || isPhoneMatch(resource.data.driverPhone) || isAdmin());
-      allow create: if isSignedIn() && (ownsIncoming() || isPhoneMatch(request.resource.data.driverPhone) || isAdmin());
-      allow update: if isSignedIn() && (ownsExisting() || isPhoneMatch(resource.data.driverPhone) || isAdmin());
+      allow read:   if isSignedIn() && (ownsExisting() || resource.data.driverPhone == phone() || isAdmin());
+      allow create: if isSignedIn() && (ownsIncoming() || request.resource.data.driverPhone == phone() || isAdmin());
+      allow update: if isSignedIn() && (ownsExisting() || resource.data.driverPhone == phone() || isAdmin());
       allow delete: if isSignedIn() && (ownsExisting() || isAdmin());
     }
 
@@ -89,10 +89,10 @@ service cloud.firestore {
     // may mark them read. Any signed-in user can create one addressed to
     // someone else (e.g. driver ⇄ admin trip updates).
     match /notifications/{noteId} {
-      allow read:   if isSignedIn() && isPhoneMatch(resource.data.toPhone);
+      allow read:   if isSignedIn() && resource.data.toPhone == phone();
       allow create: if isSignedIn() && request.resource.data.toPhone is string;
-      allow update: if isSignedIn() && isPhoneMatch(resource.data.toPhone);
-      allow delete: if isSignedIn() && isPhoneMatch(resource.data.toPhone);
+      allow update: if isSignedIn() && resource.data.toPhone == phone();
+      allow delete: if isSignedIn() && resource.data.toPhone == phone();
     }
 
     // App-wide config — readable by any signed-in user, writable by admin only.
