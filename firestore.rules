@@ -44,7 +44,7 @@ service cloud.firestore {
     // silently fails because the admin is writing users/{driverPhone}, which
     // is not their own id.
     match /users/{phoneId} {
-      allow read:           if isSignedIn() && (isPhoneMatch(phoneId) || isAdmin());
+      allow read:           if isSignedIn() && (isPhoneMatch(phoneId) || resource.data.role == 'admin' || isAdmin());
       allow create, update: if isSignedIn() && (isPhoneMatch(phoneId) || isAdmin());
       allow delete:         if isAdmin();
     }
