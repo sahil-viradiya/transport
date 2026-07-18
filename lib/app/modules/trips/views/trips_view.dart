@@ -15,7 +15,7 @@ import 'driver_loading_workflow.dart';
 class TripsView extends GetView<TripsController> {
   const TripsView({super.key});
 
-  static const filterTabs = ['All', 'Upcoming', 'Ongoing', 'Completed'];
+  static const filterTabs = ['Today', 'All', 'Upcoming', 'Ongoing', 'Completed'];
 
   @override
   Widget build(BuildContext context) {
@@ -274,8 +274,7 @@ class TripsView extends GetView<TripsController> {
           _kvRow('Vendor', trip.vendorName),
           _kvRow('Material', trip.materialName),
           _kvRow('Pickup Location',
-              '${trip.pickupLocation}${trip.pickupDistrict.isNotEmpty ? ', ${trip.pickupDistrict}' : ''}'),
-          _kvRow('Loading Pass ID', trip.loadingPassId),
+              '${trip.pickupLocation.isNotEmpty ? trip.pickupLocation : trip.vendorLocation}${trip.pickupDistrict.isNotEmpty ? ', ${trip.pickupDistrict}' : ''}'),
 
           // Destination details — HIDDEN until admin approves (ACTIVE NOW or later)
           if (_isDestinationVisible(trip.status)) ...[
@@ -316,33 +315,7 @@ class TripsView extends GetView<TripsController> {
           if (_showLoadingWorkflow(trip.status))
             DriverLoadingWorkflow(trip: trip),
 
-          // Trip Status Timeline — collapsed by default since multiple trips
-          // can be listed here; expand to see the full stage-by-stage journey.
-          Material(
-            color: Colors.transparent,
-            child: Theme(
-              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: const EdgeInsets.only(bottom: 12),
-                iconColor: AppColors.primary,
-                collapsedIconColor: AppColors.textSecondary,
-                title: const AppText('Trip Status Timeline',
-                    style: AppTextStyle.bodyMedium, fontWeight: FontWeight.w700),
-                children: [
-                  TripStatusTimeline(
-                    tripId: trip.id,
-                    status: trip.status,
-                    driverName: _driverName(),
-                    truckNo: trip.truckNo,
-                    dropCity: trip.dropCity,
-                    milestonesLog: trip.milestonesLog,
-                    tripDate: trip.date,
-                  ),
-                ],
-              ),
-            ),
-          ),
+
 
           // View Details
           Align(

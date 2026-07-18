@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:math';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:transport/widgets/app_text.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
@@ -324,7 +325,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           ),
           const SizedBox(height: 10),
           SizedBox(
-            height: 400,
+            height: 440,
             child: assignedTrucks.isEmpty
                 ? _buildEmptyPlaceholder('No trucks assigned yet. Assign a truck from above.')
                 : SingleChildScrollView(
@@ -539,13 +540,14 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             _buildActiveTripStatusWidget(truck),
             const SizedBox(height: 10),
           ],
-
-          // Primary Interactive Button
-          SizedBox(
-            width: double.infinity,
-            height: 36,
-            child: _buildInteractiveButton(truck),
-          ),
+          if (!(truck.hasActiveTrip && truck.hasDestinationSetup)) ...[
+            // Primary Interactive Button
+            SizedBox(
+              width: double.infinity,
+              height: 36,
+              child: _buildInteractiveButton(truck),
+            ),
+          ],
         ],
       ),
     );
@@ -1134,7 +1136,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         return ElevatedButton.icon(
           onPressed: () => _showLoadingPassDialog(context, truck),
           icon: const Icon(Icons.note_add_rounded, size: 14),
-          label: const Text('Enter Loading Pass', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+          label: const Text('Generate Loading Pass', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
@@ -1197,6 +1199,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                       'vendorLocation': pass['vendorSite'],
                       'itemName': pass['itemName'],
                       'royaltyName': pass['royaltyName'],
+                      'loadingPassId': pass['loadingPassId'] ?? '',
+                      'loadingPassGeneratedAt': pass['generatedAt'] ?? '',
                       'dropCity': dest['customerName'],
                       'dropLocation': dest['customerSite'],
                       'remarks': dest['additionalDetails'],
@@ -1549,7 +1553,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Loading Pass Details: ${truck.truckNo}',
+                'Generate Loading Pass: ${truck.truckNo}',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
             ),
@@ -1718,12 +1722,14 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               final now = DateTime.now();
               final formatted = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
 
+              final passId = (10000000 + Random().nextInt(90000000)).toString();
               final data = {
                 'vendorName': vendorNameCtrl.text.trim(),
                 'vendorSite': vendorSiteCtrl.text.trim(),
                 'itemName': itemNameCtrl.text.trim(),
                 'royaltyName': royaltyNameCtrl.text.trim(),
                 'generatedAt': formatted,
+                'loadingPassId': passId,
               };
               Get.back();
               AppPopup.showLoading(message: 'Saving & Assigning Trip...');
@@ -1739,6 +1745,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                     'vendorLocation': data['vendorSite'],
                     'itemName': data['itemName'],
                     'royaltyName': data['royaltyName'],
+                    'loadingPassId': data['loadingPassId'],
+                    'loadingPassGeneratedAt': data['generatedAt'],
                     'dropCity': '',
                     'dropLocation': '',
                     'remarks': '',
@@ -1752,7 +1760,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent);
               }
             },
-            child: const Text('Save & Assign Trip'),
+            child: const Text('Generate Loading Pass'),
           ),
         ],
       ),
@@ -1952,6 +1960,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         'driverPhone': data['driverPhone'],
         'vendorName': data['vendorName'],
         'vendorLocation': data['vendorLocation'],
+        'pickupLocation': data['vendorLocation'],
         'materialName': data['itemName'],
         'royaltyName': data['royaltyName'],
         'dropCity': data['dropCity'],
@@ -1970,6 +1979,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         'remainingDistance': '',
         'estimatedTime': '',
         'currentAddress': '',
+        'loadingPassId': data['loadingPassId'] ?? '',
+        'loadingPassGeneratedAt': data['loadingPassGeneratedAt'] ?? '',
       };
       await _firebaseService.assignTripToDriver(tripId, tripData);
       AppPopup.hideLoading();

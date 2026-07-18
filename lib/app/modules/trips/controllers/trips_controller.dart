@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/services/firebase_service.dart';
 import '../../../data/services/session_service.dart';
+import '../../../data/services/location_service.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../../../widgets/dialogs/app_popup.dart';
 import '../../../../widgets/dialogs/app_snackbar.dart';
 
 class TripsController extends GetxController {
   final searchController = TextEditingController();
-  final RxString activeTab = 'All'.obs;
+  final RxString activeTab = 'Today'.obs;
   final RxString searchQuery = ''.obs;
 
   // Static stats
@@ -31,6 +33,11 @@ class TripsController extends GetxController {
 
   bool _matchesTab(TripItemModel trip) {
     switch (activeTab.value) {
+      case 'Today':
+        final todayStr = DateTime.now().toString().split(' ')[0];
+        final isToday = trip.date == todayStr;
+        final isCurrent = trip.status != 'DELIVERED' && trip.status != 'REJECTED';
+        return isToday || isCurrent;
       case 'Upcoming':
         return trip.status == 'PENDING' || trip.status == 'ASSIGNED';
       case 'Ongoing':
@@ -42,7 +49,26 @@ class TripsController extends GetxController {
     }
   }
 
-  // Filtered trips list getter — priority (PENDING) trips float to the top.
+  int _statusSortWeight(String status) {
+    switch (status) {
+      case 'ACTIVE NOW':
+      case 'DELIVERY_REQUESTED':
+      case 'EN_ROUTE_VENDOR':
+      case 'LOADING':
+      case 'LOAD_REQUESTED':
+        return 0; // Active / Ongoing
+      case 'PENDING':
+      case 'ASSIGNED':
+        return 1; // Scheduled / Upcoming
+      case 'DELIVERED':
+      case 'REJECTED':
+        return 2; // Completed / Rejected
+      default:
+        return 3;
+    }
+  }
+
+  // Filtered trips list getter — active/ongoing first, then scheduled/upcoming, then completed.
   List<TripItemModel> get filteredTrips {
     final list = allTrips.where((trip) {
       final matchesSearch = searchQuery.value.isEmpty ||
@@ -53,11 +79,15 @@ class TripsController extends GetxController {
       return _matchesTab(trip) && matchesSearch;
     }).toList();
     list.sort((a, b) {
-      // Priority first, then still-pending (needs action) above the rest.
-      if (a.priority != b.priority) return a.priority ? -1 : 1;
-      final aPending = a.status == 'PENDING' ? 0 : 1;
-      final bPending = b.status == 'PENDING' ? 0 : 1;
-      return aPending.compareTo(bPending);
+      final weightA = _statusSortWeight(a.status);
+      final weightB = _statusSortWeight(b.status);
+      if (weightA != weightB) {
+        return weightA.compareTo(weightB);
+      }
+      if (a.priority != b.priority) {
+        return a.priority ? -1 : 1;
+      }
+      return 0;
     });
     return list;
   }
@@ -184,9 +214,20 @@ class TripsController extends GetxController {
   Future<void> startTrip(String tripId) async {
     final fb = Get.find<FirebaseService>();
     final session = Get.find<SessionService>();
+    final locationService = Get.find<LocationService>();
     AppPopup.showLoading(message: 'Starting trip...');
     try {
-      await fb.startToVendor(tripId, driverName: session.name.value);
+      await locationService.checkLocationAccess();
+      final pos = await locationService.getCurrentPosition();
+      final address = await locationService.getAddressFromCoordinates(pos.latitude, pos.longitude);
+
+      await fb.startToVendor(
+        tripId,
+        location: address,
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        driverName: session.name.value,
+      );
       await fetchTripsFromFirebase();
       AppPopup.hideLoading();
       AppSnackBar.showSuccess(
@@ -202,9 +243,20 @@ class TripsController extends GetxController {
   Future<void> markReachedLoading(String tripId) async {
     final fb = Get.find<FirebaseService>();
     final session = Get.find<SessionService>();
+    final locationService = Get.find<LocationService>();
     AppPopup.showLoading(message: 'Marking reached...');
     try {
-      await fb.startLoading(tripId, driverName: session.name.value);
+      await locationService.checkLocationAccess();
+      final pos = await locationService.getCurrentPosition();
+      final address = await locationService.getAddressFromCoordinates(pos.latitude, pos.longitude);
+
+      await fb.startLoading(
+        tripId,
+        location: address,
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        driverName: session.name.value,
+      );
       await fetchTripsFromFirebase();
       AppPopup.hideLoading();
       AppSnackBar.showSuccess(
@@ -220,12 +272,20 @@ class TripsController extends GetxController {
   Future<void> markTruckLoaded(String tripId, Uint8List photoBytes, Uint8List gatePassBytes) async {
     final fb = Get.find<FirebaseService>();
     final session = Get.find<SessionService>();
+    final locationService = Get.find<LocationService>();
     AppPopup.showLoading(message: 'Uploading photos & requesting approval...');
     try {
+      await locationService.checkLocationAccess();
+      final pos = await locationService.getCurrentPosition();
+      final address = await locationService.getAddressFromCoordinates(pos.latitude, pos.longitude);
+
       final photoUrl = await fb.uploadLoadingPhoto(tripId, photoBytes);
       final gatePassUrl = await fb.uploadGatePassPhoto(tripId, gatePassBytes);
       await fb.requestLoadApproval(
         tripId,
+        pickupLocation: address,
+        latitude: pos.latitude,
+        longitude: pos.longitude,
         driverName: session.name.value,
         loadingPhotoUrl: photoUrl,
         gatePassPhotoUrl: gatePassUrl,

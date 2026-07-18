@@ -296,7 +296,13 @@ class FirebaseService extends GetxService {
 
   /// Driver accepted the trip and is leaving for the vendor to collect the
   /// material — admin sees "on the way" and gets pinged.
-  Future<void> startToVendor(String tripId, {String? driverName}) async {
+  Future<void> startToVendor(
+    String tripId, {
+    String? location,
+    double? latitude,
+    double? longitude,
+    String? driverName,
+  }) async {
     try {
       final data =
           (await _db.collection('trips').doc(tripId).get()).data() ?? {};
@@ -312,9 +318,9 @@ class FirebaseService extends GetxService {
                 .split('T')
                 .join(' ')
                 .substring(0, 16),
-            'address': data['vendorLocation'] ?? '',
-            'latitude': 0.0,
-            'longitude': 0.0,
+            'address': location ?? data['vendorLocation'] ?? '',
+            'latitude': latitude ?? 0.0,
+            'longitude': longitude ?? 0.0,
           }
         ]),
       }, SetOptions(merge: true));
@@ -501,6 +507,9 @@ class FirebaseService extends GetxService {
           'loadingPhotoUrl': loadingPhotoUrl,
         if (gatePassPhotoUrl != null && gatePassPhotoUrl.isNotEmpty)
           'gatePassPhotoUrl': gatePassPhotoUrl,
+        if (latitude != null) 'pickupLatitude': latitude,
+        if (longitude != null) 'pickupLongitude': longitude,
+        if (pickupLocation != null) 'pickupLocation': pickupLocation,
         'milestonesLog': FieldValue.arrayUnion([
           {
             'milestone': 3,
@@ -552,6 +561,8 @@ class FirebaseService extends GetxService {
         3,
         status: 'ACTIVE NOW',
         locationName: (data['pickupLocation'] ?? 'Approved by admin').toString(),
+        latitude: (data['pickupLatitude'] as num?)?.toDouble(),
+        longitude: (data['pickupLongitude'] as num?)?.toDouble(),
       );
       final driverPhone =
           (data['driverPhone'] ?? data['ownerId'])?.toString() ?? '';
@@ -669,6 +680,8 @@ class FirebaseService extends GetxService {
         status: 'DELIVERED',
         locationName: (data['currentAddress'] ?? data['dropLocation'] ?? '')
             .toString(),
+        latitude: (data['currentLatitude'] as num?)?.toDouble(),
+        longitude: (data['currentLongitude'] as num?)?.toDouble(),
       );
       final driverPhone =
           (data['driverPhone'] ?? data['ownerId'])?.toString() ?? '';

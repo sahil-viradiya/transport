@@ -266,11 +266,46 @@ class AdminHomeController extends GetxController {
     return (t['date'] ?? '').toString().contains(tag);
   }
 
+  int _statusSortWeight(String status) {
+    switch (status) {
+      case 'ACTIVE NOW':
+      case 'DELIVERY_REQUESTED':
+      case 'EN_ROUTE_VENDOR':
+      case 'LOADING':
+      case 'LOAD_REQUESTED':
+        return 0; // Active / Ongoing
+      case 'PENDING':
+      case 'ASSIGNED':
+        return 1; // Scheduled / Upcoming
+      case 'DELIVERED':
+      case 'REJECTED':
+        return 2; // Completed / Rejected
+      default:
+        return 3;
+    }
+  }
+
   /// Trips after applying the tab's search + status + date filters.
-  List<Map<String, dynamic>> get filteredTrips => trips
-      .where((t) =>
-          _tripMatchesFilter(t) && _tripMatchesSearch(t) && _tripMatchesDate(t))
-      .toList();
+  List<Map<String, dynamic>> get filteredTrips {
+    final list = trips
+        .where((t) =>
+            _tripMatchesFilter(t) && _tripMatchesSearch(t) && _tripMatchesDate(t))
+        .toList();
+    list.sort((a, b) {
+      final weightA = _statusSortWeight((a['status'] ?? '').toString());
+      final weightB = _statusSortWeight((b['status'] ?? '').toString());
+      if (weightA != weightB) {
+        return weightA.compareTo(weightB);
+      }
+      final priorityA = a['priority'] == true;
+      final priorityB = b['priority'] == true;
+      if (priorityA != priorityB) {
+        return priorityA ? -1 : 1;
+      }
+      return 0;
+    });
+    return list;
+  }
 
   int get tripPageCount {
     final per = tripsPerPage.value;

@@ -109,7 +109,7 @@ class TripDetailsView extends GetView<TripDetailsController> {
                     _kv('Truck Number', controller.vehicleNo.value),
                     _kv('Driver Name', _driverDisplayName()),
                     _kv('Pickup Location',
-                        (ex['pickupLocation'] ?? '—').toString()),
+                        (ex['pickupLocation'] ?? ex['vendorLocation'] ?? '—').toString()),
                     _kv('Pickup District',
                         (ex['pickupDistrict'] ?? '—').toString()),
                     _kv('Pass Holder Name',

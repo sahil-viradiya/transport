@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:transport/app/routes/app_pages.dart';
 import '../controllers/trips_controller.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../core/theme/app_colors.dart';
@@ -120,9 +121,8 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
             actionLabel: 'Start Trip',
             actionIcon: Icons.play_arrow_rounded,
             actionColor: AppColors.primary,
-            onAction: step == 0
-                ? () => controller.startTrip(widget.trip.id)
-                : null,
+            onAction:
+                step == 0 ? () => controller.startTrip(widget.trip.id) : null,
           ),
           _buildConnector(isDark, step > 0),
 
@@ -163,36 +163,57 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
             actionLabel: 'Mark Loaded',
             actionIcon: Icons.camera_alt_rounded,
             actionColor: const Color(0xFFF59E0B),
-            customContent: step == 2 ? _buildStep3Content(controller, isDark) : null,
+            customContent:
+                step == 2 ? _buildStep3Content(controller, isDark) : null,
           ),
           _buildConnector(isDark, step > 3),
 
-          // Step 4: Start Delivery (Locked until approved)
+          // Step 4: Deliver & Submit POD
           _StepTile(
             stepNumber: 4,
-            title: 'Start Delivery',
-            subtitle: step >= 4
-                ? 'Destination unlocked — delivery shuru!'
-                : 'Destination unlocks after approval',
-            isCompleted: step >= 4 && widget.trip.status != 'ACTIVE NOW',
-            isCurrent: step >= 4 && widget.trip.status == 'ACTIVE NOW',
+            title: 'Deliver & Submit POD',
+            subtitle: widget.trip.status == 'DELIVERED'
+                ? 'Delivered successfully'
+                : widget.trip.status == 'DELIVERY_REQUESTED'
+                    ? 'Proof submitted — waiting for admin approval'
+                    : widget.trip.status == 'ACTIVE NOW'
+                        ? 'Upload proof of delivery at destination'
+                        : 'Destination unlocks after approval',
+            isCompleted: widget.trip.status == 'DELIVERED',
+            isCurrent: widget.trip.status == 'ACTIVE NOW',
+            isWaiting: widget.trip.status == 'DELIVERY_REQUESTED',
             isLocked: step < 4,
             isDark: isDark,
-            actionLabel: step >= 4 ? 'Start Delivery' : 'Locked',
-            actionIcon: step >= 4
-                ? Icons.delivery_dining_rounded
-                : Icons.lock_rounded,
+            actionLabel: widget.trip.status == 'DELIVERED'
+                ? 'Completed'
+                : widget.trip.status == 'DELIVERY_REQUESTED'
+                    ? 'Pending Approval'
+                    : widget.trip.status == 'ACTIVE NOW'
+                        ? 'Submit Proof of Delivery'
+                        : 'Locked',
+            actionIcon: widget.trip.status == 'DELIVERED'
+                ? Icons.check_circle_rounded
+                : widget.trip.status == 'DELIVERY_REQUESTED'
+                    ? Icons.hourglass_empty_rounded
+                    : widget.trip.status == 'ACTIVE NOW'
+                        ? Icons.upload_file_rounded
+                        : Icons.lock_rounded,
             actionColor: const Color(0xFF10B981),
-            onAction: step >= 4 && widget.trip.status == 'ACTIVE NOW'
+            onAction: widget.trip.status == 'ACTIVE NOW'
                 ? () {
-                    Get.snackbar(
-                      'Delivery Started! 🚛',
-                      'Destination: ${widget.trip.dropCity} — ${widget.trip.dropLocation}',
-                      snackPosition: SnackPosition.BOTTOM,
-                      backgroundColor: const Color(0xFF10B981),
-                      colorText: Colors.white,
-                    );
+                    Get.toNamed(
+                      Routes.PROOF_OF_DELIVERY,
+                      arguments: {'tripId': widget.trip.id},
+                    )?.then((value) {
+                      if (value == true) {
+                        controller.fetchTripsFromFirebase();
+                      }
+                    });
                   }
+                : null,
+            customContent: {'ACTIVE NOW', 'DELIVERY_REQUESTED', 'DELIVERED'}
+                    .contains(widget.trip.status)
+                ? _buildDestinationInfoCard(isDark)
                 : null,
           ),
         ],
@@ -203,14 +224,17 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
   Widget _buildConnector(bool isDark, bool isActive) {
     return Padding(
       padding: const EdgeInsets.only(left: 19),
-      child: Container(
-        width: 2,
-        height: 20,
-        decoration: BoxDecoration(
-          color: isActive
-              ? const Color(0xFF10B981)
-              : (isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
-          borderRadius: BorderRadius.circular(1),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          width: 2,
+          height: 20,
+          decoration: BoxDecoration(
+            color: isActive
+                ? const Color(0xFF10B981)
+                : (isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+            borderRadius: BorderRadius.circular(1),
+          ),
         ),
       ),
     );
@@ -237,49 +261,97 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                   }
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                  height: 110,
                   decoration: BoxDecoration(
-                    color: hasLoading ? const Color(0xFF10B981).withOpacity(0.08) : (isDark ? Colors.white10 : Colors.grey.shade50),
-                    borderRadius: BorderRadius.circular(10),
+                    color:
+                        isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: hasLoading ? const Color(0xFF10B981).withOpacity(0.4) : (isDark ? Colors.white24 : Colors.grey.shade300),
+                      color: hasLoading
+                          ? const Color(0xFF10B981)
+                          : (isDark ? Colors.white24 : Colors.grey.shade300),
+                      width: 1.5,
                     ),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        hasLoading ? Icons.check_circle_rounded : Icons.add_a_photo_rounded,
-                        color: hasLoading ? const Color(0xFF10B981) : (isDark ? Colors.white60 : Colors.grey.shade600),
-                        size: 20,
-                      ),
-                      const SizedBox(height: 6),
-                      AppText(
-                        hasLoading ? 'Loading Proof ✅' : 'Loading Photo 📷',
-                        style: AppTextStyle.labelMedium,
-                        fontWeight: FontWeight.bold,
-                        color: hasLoading ? const Color(0xFF10B981) : (isDark ? Colors.white70 : Colors.black87),
-                      ),
-                      if (hasLoading) ...[
-                        const SizedBox(height: 6),
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _loadingPhotoBytes = null;
-                            });
-                          },
-                          child: const Text(
-                            'Retake',
-                            style: TextStyle(
-                              color: Colors.redAccent,
-                              fontSize: 10,
-                              decoration: TextDecoration.underline,
+                  child: hasLoading
+                      ? Stack(
+                          children: [
+                            Positioned.fill(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(10.5),
+                                child: Image.memory(
+                                  _loadingPhotoBytes!,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
                             ),
-                          ),
+                            Positioned(
+                              top: 6,
+                              right: 6,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Colors.green,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.check_rounded,
+                                    color: Colors.white, size: 12),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  borderRadius: const BorderRadius.only(
+                                    bottomLeft: Radius.circular(10.5),
+                                    bottomRight: Radius.circular(10.5),
+                                  ),
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 4),
+                                child: const Text(
+                                  'Retake',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.add_a_photo_rounded,
+                              color: isDark
+                                  ? Colors.white60
+                                  : Colors.grey.shade600,
+                              size: 24,
+                            ),
+                            const SizedBox(height: 6),
+                            const AppText(
+                              'Loading Photo',
+                              style: AppTextStyle.labelMedium,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            const SizedBox(height: 2),
+                            AppText(
+                              'Click to take',
+                              style: AppTextStyle.labelMedium,
+                              fontSize: 10,
+                              color: isDark
+                                  ? Colors.white30
+                                  : Colors.grey.shade400,
+                            ),
+                          ],
                         ),
-                      ],
-                    ],
-                  ),
                 ),
               ),
             ),
@@ -295,49 +367,98 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                   }
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                  height: 110,
                   decoration: BoxDecoration(
-                    color: hasGatePass ? const Color(0xFF10B981).withOpacity(0.08) : (isDark ? Colors.white10 : Colors.grey.shade50),
-                    borderRadius: BorderRadius.circular(10),
+                    color:
+                        isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: hasGatePass ? const Color(0xFF10B981).withOpacity(0.4) : (isDark ? Colors.white24 : Colors.grey.shade300),
+                      color: hasGatePass
+                          ? const Color(0xFF10B981)
+                          : (isDark ? Colors.white24 : Colors.grey.shade300),
+                      width: 1.5,
                     ),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        hasGatePass ? Icons.check_circle_rounded : Icons.assignment_rounded,
-                        color: hasGatePass ? const Color(0xFF10B981) : (isDark ? Colors.white60 : Colors.grey.shade600),
-                        size: 20,
-                      ),
-                      const SizedBox(height: 6),
-                      AppText(
-                        hasGatePass ? 'Gate Pass ✅' : 'Gate Pass Photo 📷',
-                        style: AppTextStyle.labelMedium,
-                        fontWeight: FontWeight.bold,
-                        color: hasGatePass ? const Color(0xFF10B981) : (isDark ? Colors.white70 : Colors.black87),
-                      ),
-                      if (hasGatePass) ...[
-                        const SizedBox(height: 6),
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _gatePassPhotoBytes = null;
-                            });
-                          },
-                          child: const Text(
-                            'Retake',
-                            style: TextStyle(
-                              color: Colors.redAccent,
-                              fontSize: 10,
-                              decoration: TextDecoration.underline,
+                  child: hasGatePass
+                      ? Stack(
+                          children: [
+                            Positioned.fill(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(10.5),
+                                child: Image.memory(
+                                  _gatePassPhotoBytes!,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
                             ),
-                          ),
+                            Positioned(
+                              top: 6,
+                              right: 6,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Colors.green,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.check_rounded,
+                                    color: Colors.white, size: 12),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  borderRadius: const BorderRadius.only(
+                                    bottomLeft: Radius.circular(10.5),
+                                    bottomRight: Radius.circular(10.5),
+                                  ),
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 4),
+                                child: const Text(
+                                  'Retake',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.assignment_rounded,
+                              color: isDark
+                                  ? Colors.white60
+                                  : Colors.grey.shade600,
+                              size: 24,
+                            ),
+                            const SizedBox(height: 6),
+                            const AppText(
+                              'Gate Pass Photo',
+                              style: AppTextStyle.labelMedium,
+                              fontWeight: FontWeight.bold,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 2),
+                            AppText(
+                              'Click to take',
+                              style: AppTextStyle.labelMedium,
+                              fontSize: 10,
+                              color: isDark
+                                  ? Colors.white30
+                                  : Colors.grey.shade400,
+                            ),
+                          ],
                         ),
-                      ],
-                    ],
-                  ),
                 ),
               ),
             ),
@@ -365,15 +486,101 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF10B981),
-            disabledBackgroundColor: isDark ? Colors.white10 : Colors.grey.shade200,
-            disabledForegroundColor: isDark ? Colors.white24 : Colors.grey.shade400,
+            disabledBackgroundColor:
+                isDark ? Colors.white10 : Colors.grey.shade200,
+            disabledForegroundColor:
+                isDark ? Colors.white24 : Colors.grey.shade400,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             elevation: 0,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildDestinationInfoCard(bool isDark) {
+    final dropCity = widget.trip.dropCity;
+    final dropLocation = widget.trip.dropLocation;
+    if (dropCity.isEmpty && dropLocation.isEmpty) return const SizedBox();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.location_on_rounded,
+                color: Color(0xFF3B82F6),
+                size: 16,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: AppText(
+                  'Destination / Delivery Address',
+                  style: AppTextStyle.labelMedium,
+                  fontWeight: FontWeight.bold,
+                  overflow: TextOverflow.ellipsis,
+                  color: isDark ? Colors.blue.shade300 : Colors.blue.shade900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (dropCity.isNotEmpty) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppText(
+                  'City: ',
+                  style: AppTextStyle.bodyMedium,
+                  color: isDark ? Colors.white60 : Colors.grey.shade600,
+                ),
+                Expanded(
+                  child: AppText(
+                    dropCity,
+                    style: AppTextStyle.bodyMedium,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+          ],
+          if (dropLocation.isNotEmpty) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppText(
+                  'Location: ',
+                  style: AppTextStyle.bodyMedium,
+                  color: isDark ? Colors.white60 : Colors.grey.shade600,
+                ),
+                Expanded(
+                  child: AppText(
+                    dropLocation,
+                    style: AppTextStyle.bodyMedium,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -449,7 +656,9 @@ class _StepTile extends StatelessWidget {
                         style: TextStyle(
                           color: isCurrent
                               ? Colors.white
-                              : (isDark ? Colors.white38 : const Color(0xFF94A3B8)),
+                              : (isDark
+                                  ? Colors.white38
+                                  : const Color(0xFF94A3B8)),
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -486,7 +695,8 @@ class _StepTile extends StatelessWidget {
               if (customContent != null) ...[
                 const SizedBox(height: 10),
                 customContent!,
-              ] else if (isCurrent && onAction != null) ...[
+              ],
+              if (isCurrent && onAction != null) ...[
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
@@ -509,13 +719,17 @@ class _StepTile extends StatelessWidget {
                   ),
                 ),
               ],
-              if (isLocked && !isWaiting && !isCompleted && customContent == null) ...[
+              if (isLocked &&
+                  !isWaiting &&
+                  !isCompleted &&
+                  customContent == null) ...[
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: null,
-                    icon: Icon(actionIcon, size: 14,
+                    icon: Icon(actionIcon,
+                        size: 14,
                         color: isDark ? Colors.white24 : Colors.grey.shade400),
                     label: Text(
                       actionLabel,
@@ -530,7 +744,8 @@ class _StepTile extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
                       side: BorderSide(
-                          color: isDark ? Colors.white12 : Colors.grey.shade300),
+                          color:
+                              isDark ? Colors.white12 : Colors.grey.shade300),
                     ),
                   ),
                 ),
@@ -556,8 +771,8 @@ class _StepTile extends StatelessWidget {
                         height: 14,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                              Color(0xFFF59E0B)),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Color(0xFFF59E0B)),
                         ),
                       ),
                       SizedBox(width: 8),

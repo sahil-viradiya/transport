@@ -329,8 +329,8 @@ class TripDetailsController extends GetxController {
               driverName = Get.find<SessionService>().name.value;
             } catch (_) {}
             AppPopup.showLoading(message: 'Requesting delivery approval...');
-            final fix = await _realFix();
             try {
+              final fix = await _realFix();
               final fb = Get.find<FirebaseService>();
               await fb.requestDelivery(
                 tripId,
@@ -370,8 +370,8 @@ class TripDetailsController extends GetxController {
           cancelText: 'Cancel',
           onConfirm: () async {
             AppPopup.showLoading(message: 'Capturing location...');
-            final fix = await _realFix();
             try {
+              final fix = await _realFix();
               await Get.find<FirebaseService>().startLoading(
                 tripId,
                 location: fix.address,
@@ -379,12 +379,15 @@ class TripDetailsController extends GetxController {
                 longitude: fix.lng,
                 driverName: _driverName,
               );
-            } catch (_) {}
-            AppPopup.hideLoading();
-            AppSnackBar.showSuccess(
-              title: 'Loading Shuru 📦',
-              message: 'Admin ko bata diya — wo destination set karega.',
-            );
+              AppPopup.hideLoading();
+              AppSnackBar.showSuccess(
+                title: 'Loading Shuru 📦',
+                message: 'Admin ko bata diya — wo destination set karega.',
+              );
+            } catch (e) {
+              AppPopup.hideLoading();
+              AppSnackBar.showError(title: 'Error', message: e.toString());
+            }
           },
         );
         return;
@@ -400,8 +403,8 @@ class TripDetailsController extends GetxController {
           cancelText: 'Cancel',
           onConfirm: () async {
             AppPopup.showLoading(message: 'Capturing location...');
-            final fix = await _realFix();
             try {
+              final fix = await _realFix();
               await Get.find<FirebaseService>().requestLoadApproval(
                 tripId,
                 pickupLocation: fix.address,
@@ -409,12 +412,15 @@ class TripDetailsController extends GetxController {
                 latitude: fix.lat,
                 longitude: fix.lng,
               );
-            } catch (_) {}
-            AppPopup.hideLoading();
-            AppSnackBar.showSuccess(
-              title: 'Request Sent 📦',
-              message: 'Admin approve karega tabhi trip active hogi.',
-            );
+              AppPopup.hideLoading();
+              AppSnackBar.showSuccess(
+                title: 'Request Sent 📦',
+                message: 'Admin approve karega tabhi trip active hogi.',
+              );
+            } catch (e) {
+              AppPopup.hideLoading();
+              AppSnackBar.showError(title: 'Error', message: e.toString());
+            }
           },
         );
         return;
@@ -431,14 +437,23 @@ class TripDetailsController extends GetxController {
           onConfirm: () async {
             AppPopup.showLoading(message: 'Starting...');
             try {
-              await Get.find<FirebaseService>()
-                  .startToVendor(tripId, driverName: _driverName);
-            } catch (_) {}
-            AppPopup.hideLoading();
-            AppSnackBar.showSuccess(
-              title: 'On The Way 🛻',
-              message: 'Admin ko inform kar diya. Safe driving!',
-            );
+              final fix = await _realFix();
+              await Get.find<FirebaseService>().startToVendor(
+                tripId,
+                location: fix.address,
+                latitude: fix.lat,
+                longitude: fix.lng,
+                driverName: _driverName,
+              );
+              AppPopup.hideLoading();
+              AppSnackBar.showSuccess(
+                title: 'On The Way 🛻',
+                message: 'Admin ko inform kar diya. Safe driving!',
+              );
+            } catch (e) {
+              AppPopup.hideLoading();
+              AppSnackBar.showError(title: 'Error', message: e.toString());
+            }
           },
         );
     }
@@ -723,8 +738,11 @@ class TripDetailsController extends GetxController {
   /// logging. Falls back to the last simulated position only if GPS fails, so
   /// logs never end up with 0.0 coordinates.
   Future<({double lat, double lng, String address})> _realFix() async {
+    final locationService = Get.find<LocationService>();
+    // Force check location permission and service
+    await locationService.checkLocationAccess();
+
     try {
-      final locationService = Get.find<LocationService>();
       final pos = await locationService.getCurrentPosition();
       final address = await locationService.getAddressFromCoordinates(
           pos.latitude, pos.longitude);
@@ -775,8 +793,9 @@ class TripDetailsController extends GetxController {
           try {
             driverName = Get.find<SessionService>().name.value;
           } catch (_) {}
-          final fix = await _realFix();
+          AppPopup.showLoading(message: 'Verifying location & sending request...');
           try {
+            final fix = await _realFix();
             final fb = Get.find<FirebaseService>();
             await fb.requestDelivery(
               tripId,
@@ -785,12 +804,14 @@ class TripDetailsController extends GetxController {
               longitude: fix.lng,
               driverName: driverName,
             );
+            AppPopup.hideLoading();
             AppSnackBar.showSuccess(
               title: 'Delivery Sent 📍',
               message: 'Admin ko approval ke liye bhej diya. Approve hone par '
                   'trip complete ho jayegi.',
             );
           } catch (e) {
+            AppPopup.hideLoading();
             AppSnackBar.showError(
               title: 'Delivery Request Failed',
               message: 'Could not send request: ${e.toString()}',
@@ -807,9 +828,9 @@ class TripDetailsController extends GetxController {
       confirmText: 'Confirm',
       cancelText: 'Cancel',
       onConfirm: () async {
-        currentMilestone.value = milestoneIndex + 1;
-        final fix = await _realFix();
+        AppPopup.showLoading(message: 'Verifying checkpoint location...');
         try {
+          final fix = await _realFix();
           final firebaseService = Get.find<FirebaseService>();
           await firebaseService.updateTripMilestone(
             tripId,
@@ -818,11 +839,19 @@ class TripDetailsController extends GetxController {
             latitude: fix.lat,
             longitude: fix.lng,
           );
-        } catch (_) {}
-        AppSnackBar.showSuccess(
-          title: 'Checkpoint Verified',
-          message: 'Logged milestone: $milestoneName',
-        );
+          currentMilestone.value = milestoneIndex + 1;
+          AppPopup.hideLoading();
+          AppSnackBar.showSuccess(
+            title: 'Checkpoint Verified',
+            message: 'Logged milestone: $milestoneName',
+          );
+        } catch (e) {
+          AppPopup.hideLoading();
+          AppSnackBar.showError(
+            title: 'Checkpoint Failed',
+            message: 'Could not log checkpoint: ${e.toString()}',
+          );
+        }
       },
     );
   }

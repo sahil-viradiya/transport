@@ -2280,6 +2280,11 @@ class AdminHomeView extends GetView<AdminHomeController> {
     final truckNo = (trip['truckNo'] ?? '-').toString();
     final tripId = (trip['id'] ?? '-').toString();
     final loadingPass = (trip['loadingPassId'] ?? '-').toString();
+    final passGenTime = (trip['loadingPassGeneratedAt'] ?? '').toString();
+    final date = (trip['date'] ?? '').toString();
+    final passGenValue = passGenTime.isNotEmpty
+        ? passGenTime
+        : (date.isNotEmpty ? date : '-');
     final driverPhone = (trip['driverPhone'] ?? '').toString();
     final driver = controller.driverNameFor(driverPhone);
     final driverAvatar = controller.driverAvatarFor(driverPhone);
@@ -2289,7 +2294,6 @@ class AdminHomeView extends GetView<AdminHomeController> {
     final dropCity = (trip['dropCity'] ?? '').toString();
     final dropLocation =
         (trip['dropLocation'] ?? 'Destination pending').toString();
-    final date = (trip['date'] ?? '').toString();
 
     return Container(
       decoration: BoxDecoration(
@@ -2516,10 +2520,10 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const AppText('PASS NO.',
+                    const AppText('PASS GENERATED',
                         style: AppTextStyle.labelMedium, color: Colors.grey),
                     const SizedBox(height: 2),
-                    AppText(loadingPass,
+                    AppText(passGenValue,
                         style: AppTextStyle.bodyMedium,
                         fontWeight: FontWeight.bold,
                         maxLines: 1,
@@ -5434,6 +5438,12 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                       'royaltyName': royaltyCtrl.text.trim(),
                                       'loadingPassId':
                                           loadingPassCtrl.text.trim(),
+                                      'loadingPassGeneratedAt':
+                                          ((editModeTrip?['loadingPassId'] ?? '') == loadingPassCtrl.text.trim())
+                                              ? (editModeTrip?['loadingPassGeneratedAt'] ?? '')
+                                              : (loadingPassCtrl.text.trim().isNotEmpty
+                                                  ? _formatCurrentDateTime()
+                                                  : ''),
                                       'pickupDistrict':
                                           pickupDistrictCtrl.text.trim(),
                                       'pickupCity': pickupCityCtrl.text.trim(),
@@ -8562,4 +8572,14 @@ class AdminHomeView extends GetView<AdminHomeController> {
       ),
     );
   }
+}
+
+String _formatCurrentDateTime() {
+  final now = DateTime.now();
+  final hour = now.hour == 0 ? 12 : (now.hour > 12 ? now.hour - 12 : now.hour);
+  final amPm = now.hour >= 12 ? 'PM' : 'AM';
+  final minuteStr = now.minute.toString().padLeft(2, '0');
+  final monthStr = now.month.toString().padLeft(2, '0');
+  final dayStr = now.day.toString().padLeft(2, '0');
+  return '${now.year}-$monthStr-$dayStr $hour:$minuteStr $amPm';
 }

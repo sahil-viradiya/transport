@@ -1,6 +1,7 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:get/get.dart';
+import 'package:flutter/material.dart';
 
 class LocationService extends GetxService {
   // Default fallback coordinates: JNPT Port, Navi Mumbai
@@ -35,6 +36,51 @@ class LocationService extends GetxService {
     }
 
     return true;
+  }
+
+  /// Force check and prompt for location service & permission.
+  /// Throws Exception if not enabled or not granted, blocking the calling action.
+  Future<void> checkLocationAccess() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      Get.snackbar(
+        'GPS Service Disabled 📍',
+        'Please turn on Location Services (GPS) in your device settings to proceed.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFFEF4444),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+      );
+      throw Exception('GPS is disabled. Please turn on Location/GPS.');
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        Get.snackbar(
+          'Location Permission Required 📍',
+          'Location permission is required to perform trip actions. Please grant permission.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: const Color(0xFFEF4444),
+          colorText: Colors.white,
+          duration: const Duration(seconds: 5),
+        );
+        throw Exception('Location permission denied.');
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      Get.snackbar(
+        'Location Permission Blocked 📍',
+        'Location permission is permanently denied. Please enable it in App Settings to proceed.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFFEF4444),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+      );
+      throw Exception('Location permission permanently denied. Enable in Settings.');
+    }
   }
 
   /// Get current GPS location. Falls back to mock coordinates on emulator/failure.

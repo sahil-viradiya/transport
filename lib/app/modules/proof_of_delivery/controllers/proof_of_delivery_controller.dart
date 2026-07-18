@@ -76,6 +76,15 @@ class ProofOfDeliveryController extends GetxController {
     isUploading.value = true;
     uploadProgress.value = 0.0;
 
+    final locationService = Get.find<LocationService>();
+    try {
+      await locationService.checkLocationAccess();
+    } catch (e) {
+      isUploading.value = false;
+      uploadProgress.value = 0.0;
+      return;
+    }
+
     // Simulate progress updates during actual upload
     const totalSteps = 5;
     for (int i = 1; i <= totalSteps; i++) {
@@ -87,16 +96,10 @@ class ProofOfDeliveryController extends GetxController {
     try {
       final firebaseService = Get.find<FirebaseService>();
       
-      double currentLat = LocationService.fallbackLatitude;
-      double currentLng = LocationService.fallbackLongitude;
-      String currentAddr = "JNPT Port Terminal, Navi Mumbai, Maharashtra";
-      try {
-        final locationService = Get.find<LocationService>();
-        final pos = await locationService.getCurrentPosition();
-        currentLat = pos.latitude;
-        currentLng = pos.longitude;
-        currentAddr = await locationService.getAddressFromCoordinates(currentLat, currentLng);
-      } catch (_) {}
+      final pos = await locationService.getCurrentPosition();
+      final currentLat = pos.latitude;
+      final currentLng = pos.longitude;
+      final currentAddr = await locationService.getAddressFromCoordinates(currentLat, currentLng);
 
       finalUrl = await firebaseService.uploadProofOfDelivery(tripId.value, pickedBytes.value);
       uploadProgress.value = 0.9;
@@ -122,7 +125,12 @@ class ProofOfDeliveryController extends GetxController {
         longitude: currentLng,
         driverName: driverName,
       );
-    } catch (_) {}
+    } catch (e) {
+      isUploading.value = false;
+      uploadProgress.value = 0.0;
+      AppSnackBar.showError(title: 'Submission Failed', message: e.toString());
+      return;
+    }
 
     uploadProgress.value = 1.0;
     await Future.delayed(const Duration(milliseconds: 200));
