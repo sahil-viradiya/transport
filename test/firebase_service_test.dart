@@ -624,10 +624,15 @@ void main() {
       await svc.assignTruckToDriver('GJ-01-AB-1234', '+91 98765 43210',
           model: 'Tata Signa');
 
-      final t = (await firestore.collection('trucks').doc('GJ-01-AB-1234').get())
+      var t = (await firestore.collection('trucks').doc('GJ-01-AB-1234').get())
           .data()!;
       expect(t['assignedTo'], ownerA); // normalized phone
       expect(t['assignedBy'], admin);
+      expect(t['inspectionStatus'], 'pending_confirmation');
+
+      await svc.acceptTruckAssignment('GJ-01-AB-1234');
+      t = (await firestore.collection('trucks').doc('GJ-01-AB-1234').get())
+          .data()!;
       expect(t['inspectionStatus'], 'pending');
 
       final notes = await svc.getNotifications(ownerA);
@@ -640,6 +645,7 @@ void main() {
       owner = admin;
       final svc = service();
       await svc.assignTruckToDriver('GJ-01', ownerA);
+      await svc.acceptTruckAssignment('GJ-01');
 
       owner = ownerA;
       await svc.reportTruckIssue('GJ-01',
@@ -662,6 +668,7 @@ void main() {
       owner = admin;
       final svc = service();
       await svc.assignTruckToDriver('GJ-01', ownerA);
+      await svc.acceptTruckAssignment('GJ-01');
       owner = ownerA;
       await svc.reportTruckIssue('GJ-01', reason: 'Brake loose');
 

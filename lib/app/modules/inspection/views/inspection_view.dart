@@ -2,6 +2,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:transport/app/data/services/firebase_service.dart';
+import 'package:transport/widgets/dialogs/app_popup.dart';
 import '../../dashboard/controllers/dashboard_controller.dart';
 import '../../home/controllers/home_controller.dart';
 import '../../../../widgets/app_text.dart';
@@ -46,6 +48,90 @@ class InspectionView extends GetView<DashboardController> {
         final inspection = controller.truckInspection;
         final truckNo = (truck['truckNo'] ?? '').toString();
         final issue = (truck['inspectionIssue'] ?? '').toString();
+
+        if (inspection == 'pending_confirmation') {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 10),
+                const AppText(
+                  'Truck Assignment',
+                  style: AppTextStyle.headlineMedium,
+                  fontWeight: FontWeight.bold,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 6),
+                const AppText(
+                  'Driver review screen',
+                  style: AppTextStyle.bodyMedium,
+                  color: Colors.grey,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: isDark ? Colors.white10 : AppColors.border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      )
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildReviewRow('Driver', controller.driverName.value),
+                      const Divider(height: 24),
+                      _buildReviewRow('Truck No', truckNo),
+                      const Divider(height: 24),
+                      _buildReviewRow('Truck Name', (truck['model'] ?? 'Tata Signa').toString()),
+                      const Divider(height: 24),
+                      _buildReviewRow('Truck Type', (truck['type'] ?? '12 Wheel').toString()),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                          side: const BorderSide(color: AppColors.error, width: 1.5),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => _showRejectAssignmentDialog(context, truckNo),
+                        child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.success,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                        onPressed: () => controller.confirmTruckAssignment(true),
+                        child: const Text('Accept', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }
 
         final (chipLabel, chipColor) = switch (inspection) {
           'ready' => ('Ready', AppColors.success),
@@ -140,6 +226,126 @@ class InspectionView extends GetView<DashboardController> {
           ),
         );
       }),
+    );
+  }
+
+  Widget _buildReviewRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        AppText(label, style: AppTextStyle.bodyMedium, color: Colors.grey),
+        AppText(value, style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
+      ],
+    );
+  }
+
+  void _showRejectAssignmentDialog(BuildContext context, String truckNo) {
+    final reasonCtrl = TextEditingController();
+    Uint8List? selectedImageBytes;
+
+    Get.dialog(
+      StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.report_problem_rounded, color: AppColors.error),
+                SizedBox(width: 8),
+                AppText('Reject Truck Assignment', style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
+              ],
+            ),
+            content: SizedBox(
+              width: 380,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const AppText(
+                      'Kripya reject karne ka kaaran (reason) aur photo attach karein.',
+                      style: AppTextStyle.labelMedium,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: reasonCtrl,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: 'Reason for rejection',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    if (selectedImageBytes != null) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.memory(
+                          selectedImageBytes!,
+                          height: 150,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final x = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 70);
+                        if (x != null) {
+                          final bytes = await x.readAsBytes();
+                          setState(() => selectedImageBytes = bytes);
+                        }
+                      },
+                      icon: const Icon(Icons.add_a_photo_rounded),
+                      label: const Text('Capture / Attach Photo'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.error,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () async {
+                  final reason = reasonCtrl.text.trim();
+                  if (reason.isEmpty) {
+                    Get.snackbar('Reason Required', 'Kripya reject karne ka reason likhein.');
+                    return;
+                  }
+                  if (selectedImageBytes == null) {
+                    Get.snackbar('Photo Required', 'Kripya reject karne ke liye photo attach karein.');
+                    return;
+                  }
+                  Get.back();
+                  AppPopup.showLoading(message: 'Submitting reject report...');
+                  try {
+                    final firebaseService = Get.find<FirebaseService>();
+                    final imageUrl = await firebaseService.uploadTruckIssueImage(truckNo, selectedImageBytes);
+
+                    await controller.confirmTruckAssignment(
+                      false,
+                      rejectReason: reason,
+                      rejectImageUrl: imageUrl,
+                    );
+                  } catch (e) {
+                    AppPopup.hideLoading();
+                    Get.snackbar('Error', e.toString());
+                  }
+                },
+                child: const Text('Submit Reject'),
+              ),
+            ],
+          );
+        }
+      ),
     );
   }
 }

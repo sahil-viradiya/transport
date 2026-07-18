@@ -118,6 +118,8 @@ class FirebaseService extends GetxService {
       milestonesLog: data['milestonesLog'],
       podUrl: data['podUrl'],
       remarks: data['remarks'],
+      loadingPhotoUrl: data['loadingPhotoUrl'],
+      gatePassPhotoUrl: data['gatePassPhotoUrl'],
     );
   }
 
@@ -435,6 +437,44 @@ class FirebaseService extends GetxService {
     }
   }
 
+  /// Upload a loading-proof photo taken at the vendor site.
+  Future<String> uploadLoadingPhoto(String tripId, Uint8List? bytes) async {
+    final owner = ownerKey.isEmpty ? 'unknown' : ownerKey;
+    if (bytes == null || bytes.isEmpty || useMockStorage) return '';
+    try {
+      final ref = _storage
+          .ref()
+          .child('loading_photos')
+          .child(owner)
+          .child('$tripId.jpg');
+      final task =
+          await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+      return await task.ref.getDownloadURL();
+    } catch (e) {
+      _warnStorage('Loading Photo', e);
+      return '';
+    }
+  }
+
+  /// Upload a gate pass photo taken at the vendor site.
+  Future<String> uploadGatePassPhoto(String tripId, Uint8List? bytes) async {
+    final owner = ownerKey.isEmpty ? 'unknown' : ownerKey;
+    if (bytes == null || bytes.isEmpty || useMockStorage) return '';
+    try {
+      final ref = _storage
+          .ref()
+          .child('gate_pass_photos')
+          .child(owner)
+          .child('$tripId.jpg');
+      final task =
+          await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+      return await task.ref.getDownloadURL();
+    } catch (e) {
+      _warnStorage('Gate Pass Photo', e);
+      return '';
+    }
+  }
+
   /// Driver has loaded goods at pickup and asks the admin to activate the trip.
   /// The trip is marked `LOAD_REQUESTED` (still not active) and the admin is
   /// notified with an approve/reject request.
@@ -444,6 +484,8 @@ class FirebaseService extends GetxService {
     String? driverName,
     double? latitude,
     double? longitude,
+    String? loadingPhotoUrl,
+    String? gatePassPhotoUrl,
   }) async {
     try {
       final data =
@@ -453,6 +495,10 @@ class FirebaseService extends GetxService {
         'currentMilestone': 3,
         'isActive': false,
         'loadRequestedAt': FieldValue.serverTimestamp(),
+        if (loadingPhotoUrl != null && loadingPhotoUrl.isNotEmpty)
+          'loadingPhotoUrl': loadingPhotoUrl,
+        if (gatePassPhotoUrl != null && gatePassPhotoUrl.isNotEmpty)
+          'gatePassPhotoUrl': gatePassPhotoUrl,
         'milestonesLog': FieldValue.arrayUnion([
           {
             'milestone': 3,
@@ -632,6 +678,15 @@ class FirebaseService extends GetxService {
           type: 'delivery_approved',
           tripId: tripId,
         );
+      }
+      final truckNo = (data['truckNo'] ?? '').toString();
+      if (truckNo.isNotEmpty) {
+        await _db.collection('trucks').doc(truckNo).update({
+          'loadingPass': FieldValue.delete(),
+          'hasLoadingPass': FieldValue.delete(),
+          'destinationSetup': FieldValue.delete(),
+          'hasDestinationSetup': FieldValue.delete(),
+        });
       }
     } catch (_) {}
   }
@@ -1369,7 +1424,7 @@ class FirebaseService extends GetxService {
         'assignedTo': p,
         'assignedBy': ownerKey,
         'assignedAt': FieldValue.serverTimestamp(),
-        'inspectionStatus': 'pending',
+        'inspectionStatus': 'pending_confirmation',
         'inspectionIssue': FieldValue.delete(),
         'inspectionIssueImage': FieldValue.delete(),
         'inspectionRemarks': FieldValue.delete(),
@@ -1405,6 +1460,16 @@ class FirebaseService extends GetxService {
       _warnStorage('Truck Issue', e);
       return '';
     }
+  }
+
+  /// Driver accepts the truck assignment (transitions status from pending_confirmation to pending)
+  Future<void> acceptTruckAssignment(String truckNo) async {
+    if (truckNo.isEmpty) return;
+    try {
+      await _db.collection('trucks').doc(truckNo).update({
+        'inspectionStatus': 'pending',
+      });
+    } catch (_) {}
   }
 
   /// Driver reports a problem found during inspection. Admins are notified with
@@ -1450,7 +1515,7 @@ class FirebaseService extends GetxService {
     ].join(' — ');
 
     await _db.collection('trucks').doc(truckNo).set({
-      'inspectionStatus': 'inspected_pending_review',
+      'inspectionStatus': hasIssues ? 'problem' : 'ready',
       'inspectionResults': results,
       'inspectionRemarks': remarks,
       'inspectionImages': imageUrls,
@@ -1459,9 +1524,11 @@ class FirebaseService extends GetxService {
     }, SetOptions(merge: true));
 
     await notifyAdmins(
-      title: hasIssues ? 'Truck Inspection (Issue) ⚠️' : 'Truck Inspection (All Good) 📋',
-      body: '$driverName ne truck $truckNo inspect kiya. Review pending.',
-      type: 'truck_inspection_submitted',
+      title: hasIssues ? 'Truck Inspection (Issue) ⚠️' : 'Truck Ready ✅',
+      body: hasIssues
+          ? '$driverName ne truck $truckNo par issue report kiya.'
+          : '$driverName ka truck $truckNo thik hai — trip ke liye ready.',
+      type: hasIssues ? 'truck_inspection_submitted' : 'truck_ready',
       refId: truckNo,
     );
   }
@@ -1570,6 +1637,50 @@ class FirebaseService extends GetxService {
           refId: truckNo,
         );
       }
+    } catch (_) {}
+  }
+
+  /// Admin clears assignment for a truck.
+  Future<void> unassignTruck(String truckNo) async {
+    if (truckNo.isEmpty) return;
+    try {
+      await _db.collection('trucks').doc(truckNo).update({
+        'assignedTo': FieldValue.delete(),
+        'assignedBy': FieldValue.delete(),
+        'assignedAt': FieldValue.delete(),
+        'inspectionStatus': FieldValue.delete(),
+        'inspectionIssue': FieldValue.delete(),
+        'inspectionIssueImage': FieldValue.delete(),
+        'inspectionRemarks': FieldValue.delete(),
+        'inspectionResults': FieldValue.delete(),
+        'inspectionImages': FieldValue.delete(),
+        'loadingPass': FieldValue.delete(),
+        'hasLoadingPass': FieldValue.delete(),
+        'destinationSetup': FieldValue.delete(),
+        'hasDestinationSetup': FieldValue.delete(),
+      });
+    } catch (_) {}
+  }
+
+  /// Admin saves loading pass details for a truck.
+  Future<void> saveLoadingPass(String truckNo, Map<String, dynamic> passData) async {
+    if (truckNo.isEmpty) return;
+    try {
+      await _db.collection('trucks').doc(truckNo).set({
+        'loadingPass': passData,
+        'hasLoadingPass': true,
+      }, SetOptions(merge: true));
+    } catch (_) {}
+  }
+
+  /// Admin saves destination setup details for a truck.
+  Future<void> saveDestinationSetup(String truckNo, Map<String, dynamic> destData) async {
+    if (truckNo.isEmpty) return;
+    try {
+      await _db.collection('trucks').doc(truckNo).set({
+        'destinationSetup': destData,
+        'hasDestinationSetup': true,
+      }, SetOptions(merge: true));
     } catch (_) {}
   }
 

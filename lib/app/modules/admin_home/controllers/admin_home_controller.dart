@@ -427,6 +427,8 @@ class AdminHomeController extends GetxController {
         'milestonesLog': trip.milestonesLog,
         'podUrl': trip.podUrl,
         'remarks': trip.remarks,
+        'loadingPhotoUrl': trip.loadingPhotoUrl,
+        'gatePassPhotoUrl': trip.gatePassPhotoUrl,
       };
 
   void changeTabIndex(int index) {

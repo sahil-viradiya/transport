@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/services/firebase_service.dart';
@@ -179,6 +180,67 @@ class TripsController extends GetxController {
     );
   }
 
+  /// Driver starts the trip — heads to vendor (ASSIGNED → EN_ROUTE_VENDOR)
+  Future<void> startTrip(String tripId) async {
+    final fb = Get.find<FirebaseService>();
+    final session = Get.find<SessionService>();
+    AppPopup.showLoading(message: 'Starting trip...');
+    try {
+      await fb.startToVendor(tripId, driverName: session.name.value);
+      await fetchTripsFromFirebase();
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(
+          title: 'Trip Started',
+          message: 'Aap vendor ke liye nikal rahe ho. Safe driving!');
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
+  }
+
+  /// Driver reached the loading point (EN_ROUTE_VENDOR → LOADING)
+  Future<void> markReachedLoading(String tripId) async {
+    final fb = Get.find<FirebaseService>();
+    final session = Get.find<SessionService>();
+    AppPopup.showLoading(message: 'Marking reached...');
+    try {
+      await fb.startLoading(tripId, driverName: session.name.value);
+      await fetchTripsFromFirebase();
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(
+          title: 'Reached Loading Point',
+          message: 'Loading point par pahunch gaye. Truck loaded hone par photo upload karein.');
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
+  }
+
+  /// Driver uploads loading photo and requests admin approval (LOADING → LOAD_REQUESTED)
+  Future<void> markTruckLoaded(String tripId, Uint8List photoBytes, Uint8List gatePassBytes) async {
+    final fb = Get.find<FirebaseService>();
+    final session = Get.find<SessionService>();
+    AppPopup.showLoading(message: 'Uploading photos & requesting approval...');
+    try {
+      final photoUrl = await fb.uploadLoadingPhoto(tripId, photoBytes);
+      final gatePassUrl = await fb.uploadGatePassPhoto(tripId, gatePassBytes);
+      await fb.requestLoadApproval(
+        tripId,
+        driverName: session.name.value,
+        loadingPhotoUrl: photoUrl,
+        gatePassPhotoUrl: gatePassUrl,
+      );
+      await fetchTripsFromFirebase();
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(
+          title: 'Load Submitted',
+          message: 'Admin ko photos bhej di gayi hain. Approval ka wait karein.');
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
+  }
+
   @override
   void onClose() {
     _tripsSub?.cancel();
@@ -222,6 +284,8 @@ class TripItemModel {
   final List<dynamic>? milestonesLog;
   final String? podUrl;
   final String? remarks;
+  final String? loadingPhotoUrl;
+  final String? gatePassPhotoUrl;
 
   TripItemModel({
     required this.id,
@@ -257,6 +321,8 @@ class TripItemModel {
     this.milestonesLog,
     this.podUrl,
     this.remarks,
+    this.loadingPhotoUrl,
+    this.gatePassPhotoUrl,
   });
 }
 

@@ -12,6 +12,7 @@ import 'package:transport/app/data/services/connectivity_service.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/app/data/services/location_service.dart';
 import '../../trips/controllers/trips_controller.dart';
+import '../../inspection/views/inspection_view.dart';
 
 class DashboardController extends GetxController {
   final _session = Get.find<SessionService>();
@@ -55,8 +56,14 @@ class DashboardController extends GetxController {
   final Rxn<Map<String, dynamic>> myTruck = Rxn<Map<String, dynamic>>();
   StreamSubscription? _truckSub;
   String get myTruckNo => (myTruck.value?['truckNo'] ?? '').toString();
-  String get truckInspection =>
-      (myTruck.value?['inspectionStatus'] ?? '').toString();
+  String get truckInspection {
+    final status = (myTruck.value?['inspectionStatus'] ?? '').toString();
+    if (status == 'inspected_pending_review' ||
+        status == 'approved_pending_accept') {
+      return 'ready';
+    }
+    return status;
+  }
 
   // Active Trip Getter
   TripItemModel? get activeTrip {
@@ -181,6 +188,31 @@ class DashboardController extends GetxController {
   void onClose() {
     _truckSub?.cancel();
     super.onClose();
+  }
+
+  Future<void> confirmTruckAssignment(bool accept, {String rejectReason = '', String rejectImageUrl = ''}) async {
+    final truckNo = myTruckNo;
+    if (truckNo.isEmpty) return;
+    AppPopup.showLoading(message: accept ? 'Accepting truck...' : 'Rejecting truck...');
+    try {
+      if (accept) {
+        await Get.find<FirebaseService>().acceptTruckAssignment(truckNo);
+        AppPopup.hideLoading();
+        Get.to(() => TruckInspectionFormView());
+      } else {
+        await Get.find<FirebaseService>().reportTruckIssue(
+          truckNo,
+          reason: rejectReason,
+          imageUrl: rejectImageUrl,
+          driverName: driverName.value,
+        );
+        AppPopup.hideLoading();
+        AppSnackBar.showSuccess(title: 'Rejected', message: 'Truck assignment rejected. Admin ko notify kar diya.');
+      }
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
   }
 
   /// Driver confirms the assigned truck's condition is proper → READY.

@@ -8,6 +8,7 @@ import '../../../../widgets/trip_status_timeline.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/session_service.dart';
 import '../../../routes/app_pages.dart';
+import 'driver_loading_workflow.dart';
 
 /// Reference "My Trips": All / Upcoming / Ongoing / Completed tabs with
 /// vendor-material trip cards. Accept/Reject stays on PENDING cards.
@@ -156,6 +157,26 @@ class TripsView extends GetView<TripsController> {
     }
   }
 
+  /// Destination details are visible only after admin approves load.
+  bool _isDestinationVisible(String status) {
+    return const {
+      'ACTIVE NOW',
+      'DELIVERY_REQUESTED',
+      'DELIVERED',
+    }.contains(status);
+  }
+
+  /// Show the loading workflow stepper for these statuses.
+  bool _showLoadingWorkflow(String status) {
+    return const {
+      'ASSIGNED',
+      'EN_ROUTE_VENDOR',
+      'LOADING',
+      'LOAD_REQUESTED',
+      'ACTIVE NOW',
+    }.contains(status);
+  }
+
   Widget _kvRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -255,6 +276,45 @@ class TripsView extends GetView<TripsController> {
           _kvRow('Pickup Location',
               '${trip.pickupLocation}${trip.pickupDistrict.isNotEmpty ? ', ${trip.pickupDistrict}' : ''}'),
           _kvRow('Loading Pass ID', trip.loadingPassId),
+
+          // Destination details — HIDDEN until admin approves (ACTIVE NOW or later)
+          if (_isDestinationVisible(trip.status)) ...[
+            _kvRow('Drop City', trip.dropCity),
+            _kvRow('Drop Location', trip.dropLocation),
+          ] else if (trip.status != 'PENDING' && trip.status != 'REJECTED' && trip.status != 'DELIVERED') ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white10 : const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                    color: isDark ? Colors.white12 : const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.lock_rounded,
+                      size: 14,
+                      color: isDark ? Colors.amber.shade200 : Colors.amber.shade700),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Destination admin approval ke baad dikhega',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.amber.shade200 : Colors.amber.shade800,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Loading Workflow stepper for active/ongoing trips
+          if (_showLoadingWorkflow(trip.status))
+            DriverLoadingWorkflow(trip: trip),
 
           // Trip Status Timeline — collapsed by default since multiple trips
           // can be listed here; expand to see the full stage-by-stage journey.
