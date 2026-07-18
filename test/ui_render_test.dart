@@ -402,7 +402,7 @@ void main() {
     expect(tester.takeException(), isNull);
     // Wide layout shows the dark brand sidebar + top bar instead of bottom nav.
     expect(find.text('BHARAT'), findsOneWidget);
-    expect(find.text('Assign Trip'), findsOneWidget);
+    expect(find.text('Add New'), findsOneWidget);
   });
 
   testWidgets('Trip details page renders long-address milestones without overflow',

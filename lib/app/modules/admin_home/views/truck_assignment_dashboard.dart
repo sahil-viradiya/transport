@@ -324,7 +324,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           ),
           const SizedBox(height: 10),
           SizedBox(
-            height: 330,
+            height: 400,
             child: assignedTrucks.isEmpty
                 ? _buildEmptyPlaceholder('No trucks assigned yet. Assign a truck from above.')
                 : SingleChildScrollView(
@@ -644,72 +644,29 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                   ),
                 ),
               ),
-              if (status == 'LOAD_REQUESTED' && hasPhoto) ...[
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => _showFullImageDialog(truck.activeTripPhotoUrl!),
-                  child: Hero(
-                    tag: truck.activeTripPhotoUrl!,
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: color.withOpacity(0.4)),
-                        image: DecorationImage(
-                          image: CachedNetworkImageProvider(truck.activeTripPhotoUrl!),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-              if (status == 'LOAD_REQUESTED' && hasGatePassPhoto) ...[
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => _showFullImageDialog(truck.activeTripGatePassUrl!),
-                  child: Hero(
-                    tag: truck.activeTripGatePassUrl!,
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: color.withOpacity(0.4)),
-                        image: DecorationImage(
-                          image: CachedNetworkImageProvider(truck.activeTripGatePassUrl!),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-              if (status == 'DELIVERY_REQUESTED' && hasPodPhoto) ...[
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => _showFullImageDialog(truck.activeTripPodUrl!),
-                  child: Hero(
-                    tag: truck.activeTripPodUrl!,
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: color.withOpacity(0.4)),
-                        image: DecorationImage(
-                          image: CachedNetworkImageProvider(truck.activeTripPodUrl!),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
             ],
           ),
         ),
+        if ((status == 'LOAD_REQUESTED' && (hasPhoto || hasGatePassPhoto)) ||
+            (status == 'DELIVERY_REQUESTED' && hasPodPhoto)) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              if (status == 'LOAD_REQUESTED' && hasPhoto) ...[
+                _buildPhotoPreview(context, truck.activeTripPhotoUrl!, 'Loading Proof', widget.isDark),
+                const SizedBox(width: 10),
+              ],
+              if (status == 'LOAD_REQUESTED' && hasGatePassPhoto) ...[
+                _buildPhotoPreview(context, truck.activeTripGatePassUrl!, 'Gate Pass', widget.isDark),
+                const SizedBox(width: 10),
+              ],
+              if (status == 'DELIVERY_REQUESTED' && hasPodPhoto) ...[
+                _buildPhotoPreview(context, truck.activeTripPodUrl!, 'POD Proof', widget.isDark),
+                const SizedBox(width: 10),
+              ],
+            ],
+          ),
+        ],
         if (status == 'DELIVERY_REQUESTED' && hasRemarks) ...[
           const SizedBox(height: 6),
           Container(
@@ -802,7 +759,64 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     );
   }
 
+  Widget _buildPhotoPreview(BuildContext context, String url, String label, bool isDark) {
+    final safeUrl = corsSafeImageUrl(url);
+    return GestureDetector(
+      onTap: () => _showFullImageDialog(url),
+      child: Tooltip(
+        message: 'Click to view full $label',
+        child: Container(
+          width: 70,
+          height: 70,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isDark ? Colors.white24 : Colors.grey.shade300,
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8.5),
+            child: CachedNetworkImage(
+              imageUrl: safeUrl,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => const Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+              errorWidget: (context, url, error) => Container(
+                color: isDark ? Colors.white10 : Colors.grey.shade100,
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.broken_image_rounded, size: 20, color: Colors.grey),
+                    SizedBox(height: 2),
+                    Text(
+                      'Failed',
+                      style: TextStyle(fontSize: 8, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showFullImageDialog(String imageUrl) {
+    final safeUrl = corsSafeImageUrl(imageUrl);
     Get.dialog(
       Dialog(
         backgroundColor: Colors.transparent,
@@ -823,7 +837,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: CachedNetworkImage(
-                    imageUrl: imageUrl,
+                    imageUrl: safeUrl,
                     fit: BoxFit.contain,
                     placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
                     errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white),
