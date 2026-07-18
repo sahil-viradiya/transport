@@ -710,21 +710,10 @@ class TripDetailsController extends GetxController {
         final tripsController = Get.find<TripsController>();
         final updatedTrips = tripsController.allTrips.map((trip) {
           if (trip.id == tripId) {
-            return TripItemModel(
-              id: trip.id,
-              truckNo: trip.truckNo,
-              status: trip.status,
-              pickupCity: trip.pickupCity,
-              pickupLocation: trip.pickupLocation,
-              dropCity: trip.dropCity,
-              dropLocation: trip.dropLocation,
-              date: trip.date,
-              tabType: trip.tabType,
-              isActive: trip.isActive,
+            return trip.copyWith(
               remainingDistance: remainingDistance.value,
               estimatedTime: estimatedTime.value,
               currentAddress: address,
-              driverPhone: trip.driverPhone,
             );
           }
           return trip;

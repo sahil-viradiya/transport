@@ -2284,7 +2284,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
     final date = (trip['date'] ?? '').toString();
     final passGenValue = passGenTime.isNotEmpty
         ? passGenTime
-        : (date.isNotEmpty ? date : '-');
+        : (date.isNotEmpty ? '$date 08:00 AM' : '-');
     final driverPhone = (trip['driverPhone'] ?? '').toString();
     final driver = controller.driverNameFor(driverPhone);
     final driverAvatar = controller.driverAvatarFor(driverPhone);
@@ -8581,5 +8581,6 @@ String _formatCurrentDateTime() {
   final minuteStr = now.minute.toString().padLeft(2, '0');
   final monthStr = now.month.toString().padLeft(2, '0');
   final dayStr = now.day.toString().padLeft(2, '0');
-  return '${now.year}-$monthStr-$dayStr $hour:$minuteStr $amPm';
+  final hourStr = hour.toString().padLeft(2, '0');
+  return '${now.year}-$monthStr-$dayStr $hourStr:$minuteStr $amPm';
 }

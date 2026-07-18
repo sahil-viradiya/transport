@@ -120,6 +120,7 @@ class FirebaseService extends GetxService {
       remarks: data['remarks'],
       loadingPhotoUrl: data['loadingPhotoUrl'],
       gatePassPhotoUrl: data['gatePassPhotoUrl'],
+      loadingPassGeneratedAt: data['loadingPassGeneratedAt'] ?? '',
     );
   }
 
@@ -252,6 +253,16 @@ class FirebaseService extends GetxService {
         'confirmedByDriver': false,
         'rejectReason': reason,
       }, SetOptions(merge: true));
+
+      final truckNo = data['truckNo']?.toString() ?? '';
+      if (truckNo.isNotEmpty) {
+        await _db.collection('trucks').doc(truckNo).update({
+          'loadingPass': FieldValue.delete(),
+          'hasLoadingPass': FieldValue.delete(),
+          'destinationSetup': FieldValue.delete(),
+          'hasDestinationSetup': FieldValue.delete(),
+        });
+      }
 
       final assignedBy = data['assignedBy']?.toString() ?? '';
       if (assignedBy.isNotEmpty) {
@@ -592,10 +603,20 @@ class FirebaseService extends GetxService {
           (await _db.collection('trips').doc(tripId).get()).data() ?? {};
       if (data['status'] != 'LOAD_REQUESTED') return; // already handled
       await _db.collection('trips').doc(tripId).set({
-        'status': 'ASSIGNED',
+        'status': 'REJECTED',
         'isActive': false,
         'loadRejectReason': reason,
       }, SetOptions(merge: true));
+
+      final truckNo = data['truckNo']?.toString() ?? '';
+      if (truckNo.isNotEmpty) {
+        await _db.collection('trucks').doc(truckNo).update({
+          'loadingPass': FieldValue.delete(),
+          'hasLoadingPass': FieldValue.delete(),
+          'destinationSetup': FieldValue.delete(),
+          'hasDestinationSetup': FieldValue.delete(),
+        });
+      }
       final driverPhone =
           (data['driverPhone'] ?? data['ownerId'])?.toString() ?? '';
       if (driverPhone.isNotEmpty) {
@@ -714,10 +735,20 @@ class FirebaseService extends GetxService {
           (await _db.collection('trips').doc(tripId).get()).data() ?? {};
       if (data['status'] != 'DELIVERY_REQUESTED') return; // already handled
       await _db.collection('trips').doc(tripId).set({
-        'status': 'ACTIVE NOW',
-        'isActive': true,
+        'status': 'REJECTED',
+        'isActive': false,
         'deliveryRejectReason': reason,
       }, SetOptions(merge: true));
+
+      final truckNo = data['truckNo']?.toString() ?? '';
+      if (truckNo.isNotEmpty) {
+        await _db.collection('trucks').doc(truckNo).update({
+          'loadingPass': FieldValue.delete(),
+          'hasLoadingPass': FieldValue.delete(),
+          'destinationSetup': FieldValue.delete(),
+          'hasDestinationSetup': FieldValue.delete(),
+        });
+      }
       final driverPhone =
           (data['driverPhone'] ?? data['ownerId'])?.toString() ?? '';
       if (driverPhone.isNotEmpty) {

@@ -1720,7 +1720,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             onPressed: () async {
               if (!formKey.currentState!.validate()) return;
               final now = DateTime.now();
-              final formatted = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+              final formatted = _formatDateTime(now);
 
               final passId = (10000000 + Random().nextInt(90000000)).toString();
               final data = {
@@ -2133,4 +2133,14 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
       );
     } catch (_) {}
   }
+}
+
+String _formatDateTime(DateTime dt) {
+  final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+  final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+  final minuteStr = dt.minute.toString().padLeft(2, '0');
+  final monthStr = dt.month.toString().padLeft(2, '0');
+  final dayStr = dt.day.toString().padLeft(2, '0');
+  final hourStr = hour.toString().padLeft(2, '0');
+  return '${dt.year}-$monthStr-$dayStr $hourStr:$minuteStr $amPm';
 }
