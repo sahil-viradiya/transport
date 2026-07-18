@@ -440,7 +440,8 @@ class FirebaseService extends GetxService {
   /// Upload a loading-proof photo taken at the vendor site.
   Future<String> uploadLoadingPhoto(String tripId, Uint8List? bytes) async {
     final owner = ownerKey.isEmpty ? 'unknown' : ownerKey;
-    if (bytes == null || bytes.isEmpty || useMockStorage) return '';
+    const placeholder = 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=600';
+    if (bytes == null || bytes.isEmpty || useMockStorage) return placeholder;
     try {
       final ref = _storage
           .ref()
@@ -452,14 +453,15 @@ class FirebaseService extends GetxService {
       return await task.ref.getDownloadURL();
     } catch (e) {
       _warnStorage('Loading Photo', e);
-      return '';
+      throw Exception('Loading Photo upload failed: $e');
     }
   }
 
   /// Upload a gate pass photo taken at the vendor site.
   Future<String> uploadGatePassPhoto(String tripId, Uint8List? bytes) async {
     final owner = ownerKey.isEmpty ? 'unknown' : ownerKey;
-    if (bytes == null || bytes.isEmpty || useMockStorage) return '';
+    const placeholder = 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600';
+    if (bytes == null || bytes.isEmpty || useMockStorage) return placeholder;
     try {
       final ref = _storage
           .ref()
@@ -471,7 +473,7 @@ class FirebaseService extends GetxService {
       return await task.ref.getDownloadURL();
     } catch (e) {
       _warnStorage('Gate Pass Photo', e);
-      return '';
+      throw Exception('Gate Pass Photo upload failed: $e');
     }
   }
 
@@ -722,7 +724,6 @@ class FirebaseService extends GetxService {
   // TRIP EXPENSES WITH PROOF + APPROVAL
   // ---------------------------------------------------------------------------
 
-  /// Upload expense receipt bytes (per-owner path). Web + mobile safe.
   Future<String> uploadExpenseReceipt(String expenseId, Uint8List? bytes) async {
     final owner = ownerKey.isEmpty ? 'unknown' : ownerKey;
     const placeholder =
@@ -739,7 +740,7 @@ class FirebaseService extends GetxService {
       return await uploadTask.ref.getDownloadURL();
     } catch (e) {
       _warnStorage('Expense Receipt', e);
-      return '';
+      throw Exception('Expense Receipt upload failed: $e');
     }
   }
 
@@ -1141,7 +1142,6 @@ class FirebaseService extends GetxService {
   // PROOF OF DELIVERY
   // ---------------------------------------------------------------------------
 
-  /// Uploads POD image bytes (web + mobile safe — no dart:io File).
   Future<String> uploadProofOfDelivery(String tripId, Uint8List? bytes) async {
     final owner = ownerKey.isEmpty ? 'unknown' : ownerKey;
     const placeholder =
@@ -1158,7 +1158,7 @@ class FirebaseService extends GetxService {
       return await task.ref.getDownloadURL();
     } catch (e) {
       _warnStorage('Proof of Delivery', e);
-      return placeholder;
+      throw Exception('Proof of Delivery upload failed: $e');
     }
   }
 

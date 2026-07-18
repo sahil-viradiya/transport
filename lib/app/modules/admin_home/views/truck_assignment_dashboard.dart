@@ -647,21 +647,33 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             ],
           ),
         ),
-        if ((status == 'LOAD_REQUESTED' && (hasPhoto || hasGatePassPhoto)) ||
-            (status == 'DELIVERY_REQUESTED' && hasPodPhoto)) ...[
+        if (status == 'LOAD_REQUESTED' || (status == 'DELIVERY_REQUESTED' && hasPodPhoto)) ...[
           const SizedBox(height: 8),
           Row(
             children: [
-              if (status == 'LOAD_REQUESTED' && hasPhoto) ...[
-                _buildPhotoPreview(context, truck.activeTripPhotoUrl!, 'Loading Proof', widget.isDark),
+              if (status == 'LOAD_REQUESTED') ...[
+                _buildPhotoPreview(
+                  context,
+                  hasPhoto ? truck.activeTripPhotoUrl! : 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=600',
+                  'Loading Proof',
+                  widget.isDark,
+                ),
                 const SizedBox(width: 10),
-              ],
-              if (status == 'LOAD_REQUESTED' && hasGatePassPhoto) ...[
-                _buildPhotoPreview(context, truck.activeTripGatePassUrl!, 'Gate Pass', widget.isDark),
+                _buildPhotoPreview(
+                  context,
+                  hasGatePassPhoto ? truck.activeTripGatePassUrl! : 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600',
+                  'Gate Pass',
+                  widget.isDark,
+                ),
                 const SizedBox(width: 10),
               ],
               if (status == 'DELIVERY_REQUESTED' && hasPodPhoto) ...[
-                _buildPhotoPreview(context, truck.activeTripPodUrl!, 'POD Proof', widget.isDark),
+                _buildPhotoPreview(
+                  context,
+                  truck.activeTripPodUrl!,
+                  'POD Proof',
+                  widget.isDark,
+                ),
                 const SizedBox(width: 10),
               ],
             ],

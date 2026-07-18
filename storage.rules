@@ -32,5 +32,26 @@ service firebase.storage {
         && ownerId == phone()
         && isImageUnder(10);
     }
+
+    match /loading_photos/{ownerId}/{fileName} {
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn()
+        && ownerId == phone()
+        && isImageUnder(10);
+    }
+
+    match /gate_pass_photos/{ownerId}/{fileName} {
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn()
+        && ownerId == phone()
+        && isImageUnder(10);
+    }
+
+    match /expense_receipts/{ownerId}/{fileName} {
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn()
+        && ownerId == phone()
+        && isImageUnder(10);
+    }
   }
 }
