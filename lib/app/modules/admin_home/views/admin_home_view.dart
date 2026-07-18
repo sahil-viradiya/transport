@@ -341,21 +341,6 @@ class AdminHomeView extends GetView<AdminHomeController> {
             );
           }),
           const Spacer(),
-          ElevatedButton.icon(
-            onPressed: () => _assignTripGuarded(context, isDark),
-            icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
-            label: const Text('Assign Trip',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF047857), // Solid green button
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-          const SizedBox(width: 8),
           PopupMenuButton<String>(
             color: isDark ? const Color(0xFF1E293B) : Colors.white,
             shape:
@@ -4257,88 +4242,353 @@ class AdminHomeView extends GetView<AdminHomeController> {
               ],
             );
           }
-          return ListView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-            itemCount: controller.vendors.length,
-            itemBuilder: (context, index) {
-              final v = controller.vendors[index];
-              final loc =
-                  (v['pickupLocation'] ?? v['location'] ?? '').toString();
-              final cityDistrict = [
-                (v['city'] ?? '').toString(),
-                (v['district'] ?? '').toString(),
-              ].where((s) => s.isNotEmpty).join(', ');
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color:
-                          Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color:
-                            isDark ? Colors.white10 : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(12),
+          final width = MediaQuery.of(context).size.width;
+          final isWide = width >= 900;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Mockup Header Columns (only on web/wide screens)
+              if (isWide)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 16, 28, 12),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        flex: 4,
+                        child: AppText('VENDOR PROFILE',
+                            style: AppTextStyle.labelMedium,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey),
                       ),
-                      child: const Icon(Icons.storefront_rounded,
-                          color: AppColors.primary, size: 26),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          AppText((v['name'] ?? 'Vendor').toString(),
-                              style: AppTextStyle.bodyLarge,
-                              fontWeight: FontWeight.bold,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
-                          if (loc.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            AppText(loc,
-                                style: AppTextStyle.labelMedium,
+                      const Expanded(
+                        flex: 5,
+                        child: AppText('PICKUP LOCATION',
+                            style: AppTextStyle.labelMedium,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey),
+                      ),
+                      const Expanded(
+                        flex: 3,
+                        child: AppText('ITEM NAME',
+                            style: AppTextStyle.labelMedium,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey),
+                      ),
+                      const SizedBox(width: 48), // Align with more options menu
+                    ],
+                  ),
+                ),
+
+              Expanded(
+                child: ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                  itemCount: controller.vendors.length,
+                  itemBuilder: (context, index) {
+                    final v = controller.vendors[index];
+                    final loc =
+                        (v['pickupLocation'] ?? v['location'] ?? '').toString();
+                    final cityDistrict = [
+                      (v['city'] ?? '').toString(),
+                      (v['district'] ?? '').toString(),
+                    ].where((s) => s.isNotEmpty).join(', ');
+
+                    final vendorId = (v['id'] ?? '').toString();
+                    final displayId =
+                        'ID: V-${vendorId.length >= 4 ? vendorId.substring(vendorId.length - 4) : "100"}';
+
+                    final siteName = (v['siteName'] ?? '').toString();
+                    final itemName = (v['itemName'] ?? '').toString();
+                    final phone = (v['phone'] ?? '').toString();
+
+                    if (isWide) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color:
+                              isDark ? const Color(0xFF1E293B) : Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color:
+                                isDark ? Colors.white10 : Colors.grey.shade200,
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black
+                                  .withValues(alpha: isDark ? 0.2 : 0.02),
+                              blurRadius: 6,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            // Column 1: Profile (Storefront Logo, Name, Phone, ID)
+                            Expanded(
+                              flex: 4,
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor: isDark
+                                        ? const Color(0xFF3B82F6)
+                                            .withOpacity(0.2)
+                                        : const Color(0xFFDBEAFE),
+                                    child: const Icon(
+                                      Icons.storefront_rounded,
+                                      color: Color(0xFF3B82F6),
+                                      size: 22,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        AppText(
+                                          (v['name'] ?? 'Vendor').toString(),
+                                          style: AppTextStyle.bodyLarge,
+                                          fontWeight: FontWeight.bold,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 2),
+                                        if (phone.isNotEmpty) ...[
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.phone_rounded,
+                                                  size: 10, color: Colors.grey),
+                                              const SizedBox(width: 4),
+                                              AppText(
+                                                phone,
+                                                style: AppTextStyle.labelMedium,
+                                                color: Colors.grey,
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                        ],
+                                        AppText(
+                                          displayId,
+                                          style: AppTextStyle.labelMedium,
+                                          color: Colors.grey,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Column 2: Pickup Location (Site Name + Address + City)
+                            Expanded(
+                              flex: 5,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (siteName.isNotEmpty) ...[
+                                    AppText(
+                                      siteName,
+                                      style: AppTextStyle.bodyMedium,
+                                      fontWeight: FontWeight.bold,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                  ],
+                                  AppText(
+                                    loc.isNotEmpty ? loc : 'Address pending',
+                                    style: AppTextStyle.bodyMedium,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    color: loc.isNotEmpty ? null : Colors.grey,
+                                  ),
+                                  if (cityDistrict.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    AppText(
+                                      cityDistrict,
+                                      style: AppTextStyle.labelMedium,
+                                      color: Colors.grey,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+
+                            // Column 3: Item Name
+                            Expanded(
+                              flex: 3,
+                              child: AppText(
+                                itemName.isNotEmpty
+                                    ? itemName
+                                    : 'General Cargo',
+                                style: AppTextStyle.bodyMedium,
+                                fontWeight: FontWeight.bold,
                                 maxLines: 1,
-                                overflow: TextOverflow.ellipsis),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+
+                            // Column 5: Action PopupMenu
+                            PopupMenuButton<String>(
+                              icon: const Icon(Icons.more_vert_rounded,
+                                  color: AppColors.textSecondary),
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  _showVendorFormDialog(context, isDark,
+                                      editVendor: v);
+                                } else if (value == 'delete') {
+                                  controller.deleteVendor(
+                                    (v['id'] ?? '').toString(),
+                                    name: (v['name'] ?? '').toString(),
+                                  );
+                                }
+                              },
+                              itemBuilder: (_) => [
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit_rounded,
+                                          size: 18, color: AppColors.primary),
+                                      SizedBox(width: 10),
+                                      AppText('Edit',
+                                          style: AppTextStyle.bodyMedium),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete_outline_rounded,
+                                          size: 18, color: AppColors.error),
+                                      SizedBox(width: 10),
+                                      AppText('Delete',
+                                          style: AppTextStyle.bodyMedium,
+                                          color: AppColors.error),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
-                          if (cityDistrict.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            AppText(cityDistrict,
-                                style: AppTextStyle.labelMedium,
-                                color: AppColors.textHint),
-                          ],
+                        ),
+                      );
+                    }
+
+                    // Mobile card layout (matches old layout perfectly but cleaner)
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark ? Colors.white10 : Colors.grey.shade100,
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black
+                                .withValues(alpha: isDark ? 0.2 : 0.03),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
                         ],
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.edit_rounded,
-                          color: AppColors.primary, size: 20),
-                      onPressed: () =>
-                          _showVendorFormDialog(context, isDark, editVendor: v),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded,
-                          color: AppColors.error, size: 20),
-                      onPressed: () => controller.deleteVendor(
-                          (v['id'] ?? '').toString(),
-                          name: (v['name'] ?? '').toString()),
-                    ),
-                  ],
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white10
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.storefront_rounded,
+                                color: AppColors.primary, size: 26),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                AppText((v['name'] ?? 'Vendor').toString(),
+                                    style: AppTextStyle.bodyLarge,
+                                    fontWeight: FontWeight.bold,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis),
+                                if (siteName.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  AppText('Site: $siteName',
+                                      style: AppTextStyle.labelMedium,
+                                      fontWeight: FontWeight.bold,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                ],
+                                if (itemName.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  AppText('Item: $itemName',
+                                      style: AppTextStyle.labelMedium,
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.bold,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                ],
+                                if (phone.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  AppText('Phone: $phone',
+                                      style: AppTextStyle.labelMedium,
+                                      color: Colors.grey,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                ],
+                                if (loc.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  AppText(loc,
+                                      style: AppTextStyle.labelMedium,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                ],
+                                if (cityDistrict.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  AppText(cityDistrict,
+                                      style: AppTextStyle.labelMedium,
+                                      color: AppColors.textHint),
+                                ],
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.edit_rounded,
+                                color: AppColors.primary, size: 20),
+                            onPressed: () => _showVendorFormDialog(
+                                context, isDark,
+                                editVendor: v),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline_rounded,
+                                color: AppColors.error, size: 20),
+                            onPressed: () => controller.deleteVendor(
+                                (v['id'] ?? '').toString(),
+                                name: (v['name'] ?? '').toString()),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+            ],
           );
         }),
       ),
@@ -4491,29 +4741,41 @@ class AdminHomeView extends GetView<AdminHomeController> {
   }
 
   void _showTripFormDialog(BuildContext context, bool isDark,
-      {Map<String, dynamic>? editModeTrip, Map<String, dynamic>? prefilledPassData}) {
+      {Map<String, dynamic>? editModeTrip,
+      Map<String, dynamic>? prefilledPassData}) {
     final formKey = GlobalKey<FormState>();
     final idCtrl = TextEditingController(text: editModeTrip?['id'] ?? '');
     final pickupCityCtrl =
         TextEditingController(text: editModeTrip?['pickupCity'] ?? '');
     final pickupLocCtrl =
         TextEditingController(text: editModeTrip?['pickupLocation'] ?? '');
-    final dropCityCtrl =
-        TextEditingController(text: editModeTrip?['dropCity'] ?? prefilledPassData?['dropCity'] ?? '');
-    final dropLocCtrl =
-        TextEditingController(text: editModeTrip?['dropLocation'] ?? prefilledPassData?['dropLocation'] ?? '');
+    final dropCityCtrl = TextEditingController(
+        text:
+            editModeTrip?['dropCity'] ?? prefilledPassData?['dropCity'] ?? '');
+    final dropLocCtrl = TextEditingController(
+        text: editModeTrip?['dropLocation'] ??
+            prefilledPassData?['dropLocation'] ??
+            '');
     final dateCtrl = TextEditingController(text: editModeTrip?['date'] ?? '');
     // Vendor / material details
-    final vendorNameCtrl =
-        TextEditingController(text: editModeTrip?['vendorName'] ?? prefilledPassData?['vendorName'] ?? '');
-    final vendorLocCtrl =
-        TextEditingController(text: editModeTrip?['vendorLocation'] ?? prefilledPassData?['vendorLocation'] ?? '');
-    final materialCtrl =
-        TextEditingController(text: editModeTrip?['materialName'] ?? prefilledPassData?['itemName'] ?? '');
+    final vendorNameCtrl = TextEditingController(
+        text: editModeTrip?['vendorName'] ??
+            prefilledPassData?['vendorName'] ??
+            '');
+    final vendorLocCtrl = TextEditingController(
+        text: editModeTrip?['vendorLocation'] ??
+            prefilledPassData?['vendorLocation'] ??
+            '');
+    final materialCtrl = TextEditingController(
+        text: editModeTrip?['materialName'] ??
+            prefilledPassData?['itemName'] ??
+            '');
     final passHolderCtrl =
         TextEditingController(text: editModeTrip?['passHolderName'] ?? '');
-    final royaltyCtrl =
-        TextEditingController(text: editModeTrip?['royaltyName'] ?? prefilledPassData?['royaltyName'] ?? '');
+    final royaltyCtrl = TextEditingController(
+        text: editModeTrip?['royaltyName'] ??
+            prefilledPassData?['royaltyName'] ??
+            '');
     final loadingPassCtrl =
         TextEditingController(text: editModeTrip?['loadingPassId'] ?? '');
     final pickupDistrictCtrl =
@@ -4534,7 +4796,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
         text: editModeTrip?['dropLongitude'] != null
             ? editModeTrip!['dropLongitude'].toString()
             : '79.0274');
- 
+
     final availableDrivers = controller.users
         .where((u) {
           if (u['role'] != 'driver') return false;
@@ -4542,23 +4804,24 @@ class AdminHomeView extends GetView<AdminHomeController> {
           if (controller.isOnLeave(u)) return false;
           final phone = u['phone'] as String?;
           if (phone == null || phone.isEmpty) return false;
- 
+
           // Find the truck assigned to this driver phone
           final truck = controller.trucks
               .firstWhereOrNull((t) => t['assignedTo'] == phone);
           if (truck == null) return false;
- 
+
           // Check if inspection is complete ('ready')
           return truck['inspectionStatus'] == 'ready';
         })
         .map((u) => u['phone'] as String)
         .toList();
- 
+
     if (availableDrivers.isEmpty) {
       availableDrivers.add('+919876543210');
     }
-    String selectedDriver =
-        editModeTrip?['driverPhone'] ?? prefilledPassData?['driverPhone'] ?? availableDrivers.first;
+    String selectedDriver = editModeTrip?['driverPhone'] ??
+        prefilledPassData?['driverPhone'] ??
+        availableDrivers.first;
     if (!availableDrivers.contains(selectedDriver)) {
       availableDrivers.add(selectedDriver);
     }
@@ -4746,6 +5009,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                       (v['city'] ?? '').toString();
                                   pickupDistrictCtrl.text =
                                       (v['district'] ?? '').toString();
+                                  materialCtrl.text =
+                                      (v['itemName'] ?? '').toString();
                                   if (v['latitude'] != null) {
                                     pickupLatCtrl.text =
                                         v['latitude'].toString();
@@ -5243,16 +5508,17 @@ class AdminHomeView extends GetView<AdminHomeController> {
       {Map<String, dynamic>? editVendor}) {
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController(text: editVendor?['name'] ?? '');
+    final siteNameCtrl =
+        TextEditingController(text: editVendor?['siteName'] ?? '');
+    final itemNameCtrl =
+        TextEditingController(text: editVendor?['itemName'] ?? '');
+    final phoneCtrl = TextEditingController(text: editVendor?['phone'] ?? '');
     final locCtrl = TextEditingController(
         text: (editVendor?['pickupLocation'] ?? editVendor?['location'] ?? '')
             .toString());
     final cityCtrl = TextEditingController(text: editVendor?['city'] ?? '');
     final districtCtrl =
         TextEditingController(text: editVendor?['district'] ?? '');
-    final latCtrl =
-        TextEditingController(text: editVendor?['latitude']?.toString() ?? '');
-    final lngCtrl =
-        TextEditingController(text: editVendor?['longitude']?.toString() ?? '');
 
     showModalBottomSheet(
       context: context,
@@ -5309,22 +5575,45 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
+                            controller: siteNameCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Vendor Site Name',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.factory_rounded),
+                            ),
+                            validator: (v) =>
+                                v!.trim().isEmpty ? 'Field required' : null,
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: itemNameCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Item Name',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.category_rounded),
+                            ),
+                            validator: (v) =>
+                                v!.trim().isEmpty ? 'Field required' : null,
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: phoneCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Phone Number',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.phone_rounded),
+                            ),
+                            keyboardType: TextInputType.phone,
+                            validator: (v) =>
+                                v!.trim().isEmpty ? 'Field required' : null,
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
                             controller: locCtrl,
-                            decoration: InputDecoration(
-                              labelText: 'Pickup Location',
-                              border: const OutlineInputBorder(),
-                              prefixIcon: const Icon(Icons.pin_drop_rounded),
-                              suffixIcon: IconButton(
-                                icon: const Icon(Icons.search_rounded,
-                                    color: AppColors.primary),
-                                tooltip: 'Search Coordinates',
-                                onPressed: () async {
-                                  final query =
-                                      '${locCtrl.text.trim()}, ${cityCtrl.text.trim()}';
-                                  await _resolveCoordinates(
-                                      context, query, latCtrl, lngCtrl);
-                                },
-                              ),
+                            decoration: const InputDecoration(
+                              labelText: 'Full Address',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.pin_drop_rounded),
                             ),
                             validator: (v) =>
                                 v!.trim().isEmpty ? 'Field required' : null,
@@ -5336,13 +5625,11 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                 child: TextFormField(
                                   controller: cityCtrl,
                                   decoration: const InputDecoration(
-                                    labelText: 'City',
+                                    labelText: 'City (optional)',
                                     border: OutlineInputBorder(),
                                     prefixIcon:
                                         Icon(Icons.location_city_rounded),
                                   ),
-                                  validator: (v) =>
-                                      v!.trim().isEmpty ? 'Required' : null,
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -5350,43 +5637,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                 child: TextFormField(
                                   controller: districtCtrl,
                                   decoration: const InputDecoration(
-                                    labelText: 'District',
+                                    labelText: 'District (optional)',
                                     border: OutlineInputBorder(),
                                     prefixIcon: Icon(Icons.map_rounded),
-                                  ),
-                                  validator: (v) =>
-                                      v!.trim().isEmpty ? 'Required' : null,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextFormField(
-                                  controller: latCtrl,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                          decimal: true),
-                                  decoration: const InputDecoration(
-                                    labelText: 'Latitude',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.my_location_rounded),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: TextFormField(
-                                  controller: lngCtrl,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                          decimal: true),
-                                  decoration: const InputDecoration(
-                                    labelText: 'Longitude',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.my_location_rounded),
                                   ),
                                 ),
                               ),
@@ -5414,13 +5667,13 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                     if (editVendor?['id'] != null)
                                       'id': editVendor!['id'],
                                     'name': nameCtrl.text.trim(),
+                                    'siteName': siteNameCtrl.text.trim(),
+                                    'itemName': itemNameCtrl.text.trim(),
+                                    'phone': phoneCtrl.text.trim(),
                                     'pickupLocation': locCtrl.text.trim(),
+                                    'location': locCtrl.text.trim(),
                                     'city': cityCtrl.text.trim(),
                                     'district': districtCtrl.text.trim(),
-                                    'latitude':
-                                        double.tryParse(latCtrl.text.trim()),
-                                    'longitude':
-                                        double.tryParse(lngCtrl.text.trim()),
                                   };
                                   Navigator.of(sheetCtx).pop();
                                   controller.saveVendor(data);

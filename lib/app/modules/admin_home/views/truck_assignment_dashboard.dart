@@ -85,14 +85,6 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
 
   Widget _buildDriverAvatar(DriverInfo driver, {double radius = 14}) {
     final hasImage = driver.avatarUrl.isNotEmpty && driver.avatarUrl.startsWith('http');
-    if (hasImage) {
-      return CircleAvatar(
-        radius: radius,
-        backgroundImage: CachedNetworkImageProvider(driver.avatarUrl),
-        backgroundColor: Colors.grey.shade200,
-      );
-    }
-
     final initial = driver.name.isNotEmpty ? driver.name.substring(0, 1).toUpperCase() : 'D';
     final colors = [
       const Color(0xFF10B981),
@@ -103,18 +95,40 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     ];
     final color = colors[driver.name.hashCode % colors.length];
 
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: color.withOpacity(0.15),
-      child: Text(
-        initial,
-        style: TextStyle(
-          fontSize: radius - 2,
-          fontWeight: FontWeight.bold,
-          color: color,
+    Widget fallbackWidget() {
+      return Container(
+        width: radius * 2,
+        height: radius * 2,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.15),
+          shape: BoxShape.circle,
         ),
-      ),
-    );
+        alignment: Alignment.center,
+        child: Text(
+          initial,
+          style: TextStyle(
+            fontSize: radius,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      );
+    }
+
+    if (hasImage) {
+      return ClipOval(
+        child: CachedNetworkImage(
+          imageUrl: corsSafeImageUrl(driver.avatarUrl),
+          width: radius * 2,
+          height: radius * 2,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => fallbackWidget(),
+          errorWidget: (context, url, error) => fallbackWidget(),
+        ),
+      );
+    }
+
+    return fallbackWidget();
   }
 
   @override
@@ -1467,9 +1481,37 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     final itemNameCtrl = TextEditingController(text: pass['itemName'] ?? '');
     final royaltyNameCtrl = TextEditingController(text: pass['royaltyName'] ?? '');
 
-    final vendorsList = ["Adani Coal", "Ultratech Cement", "Jindal Steel", "Ambuja Cement", "Reliance Ind"];
-    final sitesList = ["Mundra Port", "Nagpur GIDC", "Mumbai Warehouse", "Sachin GIDC", "Indore Plant"];
-    final itemsList = ["Coal", "Cement", "Iron Ore", "Steel Coils", "Bauxite", "Gypsum", "Aggregate", "Sand"];
+    final adminController = Get.find<AdminHomeController>();
+    final vendors = adminController.vendors;
+
+    final vendorsList = vendors
+        .map((v) => (v['name'] ?? '').toString())
+        .where((name) => name.isNotEmpty)
+        .toSet()
+        .toList();
+    final sitesList = vendors
+        .map((v) => (v['siteName'] ?? '').toString())
+        .where((site) => site.isNotEmpty)
+        .toSet()
+        .toList();
+    final itemsList = vendors
+        .map((v) => (v['itemName'] ?? '').toString())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .toList();
+
+    if (vendorsList.isEmpty) {
+      vendorsList.addAll(["Adani Coal", "Ultratech Cement", "Jindal Steel", "Ambuja Cement", "Reliance Ind"]);
+    }
+    if (sitesList.isEmpty) {
+      sitesList.addAll(["Mundra Port", "Nagpur GIDC", "Mumbai Warehouse", "Sachin GIDC", "Indore Plant"]);
+    }
+    if (itemsList.isEmpty) {
+      itemsList.addAll(["Coal", "Cement", "Iron Ore", "Steel Coils", "Bauxite", "Gypsum", "Aggregate", "Sand"]);
+    }
+
+    TextEditingController? siteFieldController;
+    TextEditingController? itemFieldController;
 
     Get.dialog(
       AlertDialog(
@@ -1532,6 +1574,20 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                     },
                     onSelected: (String selection) {
                       vendorNameCtrl.text = selection;
+                      final matched = vendors.firstWhereOrNull(
+                          (v) => (v['name'] ?? '').toString() == selection);
+                      if (matched != null) {
+                        final site = (matched['siteName'] ?? '').toString();
+                        final item = (matched['itemName'] ?? '').toString();
+                        vendorSiteCtrl.text = site;
+                        itemNameCtrl.text = item;
+                        if (siteFieldController != null) {
+                          siteFieldController!.text = site;
+                        }
+                        if (itemFieldController != null) {
+                          itemFieldController!.text = item;
+                        }
+                      }
                     },
                   ),
                   const SizedBox(height: 14),
@@ -1548,6 +1604,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                       });
                     },
                     fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                      siteFieldController = textEditingController;
                       textEditingController.addListener(() {
                         vendorSiteCtrl.text = textEditingController.text;
                       });
@@ -1581,6 +1638,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                       });
                     },
                     fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                      itemFieldController = textEditingController;
                       textEditingController.addListener(() {
                         itemNameCtrl.text = textEditingController.text;
                       });
