@@ -8,6 +8,10 @@ import 'package:transport/widgets/app_text.dart';
 import 'package:transport/app/core/theme/app_colors.dart';
 import 'package:transport/app/core/utils/time_utils.dart';
 import '../controllers/admin_home_controller.dart';
+import 'package:transport/app/core/utils/image_url.dart';
+import 'package:transport/app/data/services/firebase_service.dart';
+import 'package:transport/widgets/dialogs/app_popup.dart';
+import 'package:transport/widgets/dialogs/app_snackbar.dart';
 
 class AdminTripDetailsView extends GetView<AdminHomeController> {
   const AdminTripDetailsView({super.key});
@@ -109,26 +113,92 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
               }
             }
           } else {
-            final currentMilestone = trip['currentMilestone'] as int? ?? 1;
-            final tripDate = trip['date'] ?? '11:16 AM';
+            final tripDate = trip['date'] ?? 'Today';
+            final pLocation = trip['pickupLocation'] ?? 'Terminal Gate';
+            final pLat = trip['pickupLatitude'] ?? 22.3039;
+            final pLng = trip['pickupLongitude'] ?? 70.8022;
 
+            // 1. Initial Assignment milestone
             logs.add({
-              'milestone': 1,
-              'label': 'Vendor ke liye nikla (on the way)',
+              'milestone': 0,
+              'label': 'Trip Assigned by Admin',
               'timestamp': tripDate,
-              'address': trip['pickupLocation'] ?? 'rajkot, 180 ft ring road sagun hights',
-              'latitude': trip['pickupLatitude'] ?? 22.3039,
-              'longitude': trip['pickupLongitude'] ?? 70.8022,
+              'address': pLocation,
+              'latitude': pLat,
+              'longitude': pLng,
             });
 
-            if (currentMilestone >= 2) {
+            // 2. Acceptance milestone
+            if (status != 'PENDING') {
+              logs.add({
+                'milestone': 1,
+                'label': 'Trip Accepted by Driver',
+                'timestamp': trip['confirmedAt'] ?? tripDate,
+                'address': pLocation,
+                'latitude': pLat,
+                'longitude': pLng,
+              });
+            }
+
+            // 3. En Route to Vendor milestone
+            final hasStartedVendor = const {
+              'EN_ROUTE_VENDOR', 'LOADING', 'LOAD_REQUESTED', 'LOAD_REJECTED',
+              'ACTIVE NOW', 'DELIVERY_REQUESTED', 'DELIVERY_REJECTED', 'DELIVERED'
+            }.contains(status);
+            if (hasStartedVendor) {
               logs.add({
                 'milestone': 2,
-                'label': 'Reached Pickup Point',
-                'timestamp': '12:05 PM',
-                'address': trip['pickupLocation'] ?? 'rajkot, 180 ft ring road sagun hights',
-                'latitude': trip['pickupLatitude'] ?? 22.3039,
-                'longitude': trip['pickupLongitude'] ?? 70.8022,
+                'label': 'Vendor ke liye nikla (on the way)',
+                'timestamp': tripDate,
+                'address': pLocation,
+                'latitude': pLat,
+                'longitude': pLng,
+              });
+            }
+
+            // 4. Loading milestone
+            final hasStartedLoading = const {
+              'LOADING', 'LOAD_REQUESTED', 'LOAD_REJECTED',
+              'ACTIVE NOW', 'DELIVERY_REQUESTED', 'DELIVERY_REJECTED', 'DELIVERED'
+            }.contains(status);
+            if (hasStartedLoading) {
+              logs.add({
+                'milestone': 3,
+                'label': 'Vendor pahuncha — loading shuru',
+                'timestamp': tripDate,
+                'address': pLocation,
+                'latitude': pLat,
+                'longitude': pLng,
+              });
+            }
+
+            // 5. Loaded / Awaiting approval milestone
+            final hasRequestedLoad = const {
+              'LOAD_REQUESTED', 'ACTIVE NOW', 'DELIVERY_REQUESTED', 'DELIVERY_REJECTED', 'DELIVERED'
+            }.contains(status);
+            if (hasRequestedLoad) {
+              logs.add({
+                'milestone': 4,
+                'label': 'Loaded — awaiting admin approval',
+                'timestamp': tripDate,
+                'address': pLocation,
+                'latitude': pLat,
+                'longitude': pLng,
+              });
+            }
+
+            // 6. Active (On the way to destination) milestone
+            final hasStartedDestination = const {
+              'ACTIVE NOW', 'DELIVERY_REQUESTED', 'DELIVERY_REJECTED', 'DELIVERED'
+            }.contains(status);
+            if (hasStartedDestination) {
+              logs.add({
+                'milestone': 5,
+                'label': 'On The Way (Destination)',
+                'timestamp': tripDate,
+                'address': trip['dropLocation'] ?? 'Destination Gate',
+                'latitude': trip['dropLatitude'] ?? pLat,
+                'longitude': trip['dropLongitude'] ?? pLng,
               });
             }
           }
@@ -200,29 +270,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                     ),
                     if (status == 'DELIVERY_REQUESTED') ...[
                       ElevatedButton.icon(
-                        onPressed: () async {
-                          final confirm = await Get.dialog<bool>(
-                            AlertDialog(
-                              title: const Text('Approve Delivery?'),
-                              content: Text('Are you sure you want to approve delivery and complete trip ${trip['id']}?'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Get.back(result: false),
-                                  child: const Text('No'),
-                                ),
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                                  onPressed: () => Get.back(result: true),
-                                  child: const Text('Approve & Complete', style: TextStyle(color: Colors.white)),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (confirm == true) {
-                            await controller.approveTripDelivery(trip['id']);
-                            Get.back();
-                          }
-                        },
+                        onPressed: () => _approveDeliveryDirectly(trip['id']),
                         icon: const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
                         label: const Text('Approve Delivery', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
@@ -233,31 +281,34 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                       ),
                       const SizedBox(width: 10),
                       OutlinedButton.icon(
-                        onPressed: () async {
-                          final confirm = await Get.dialog<bool>(
-                            AlertDialog(
-                              title: const Text('Reject Delivery?'),
-                              content: Text('Are you sure you want to reject the delivery for trip ${trip['id']}?'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Get.back(result: false),
-                                  child: const Text('No'),
-                                ),
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-                                  onPressed: () => Get.back(result: true),
-                                  child: const Text('Reject', style: TextStyle(color: Colors.white)),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (confirm == true) {
-                            await controller.rejectTripDelivery(trip['id'], 'Delivery rejected by admin.');
-                            Get.back();
-                          }
-                        },
+                        onPressed: () => _showRejectDeliveryDialog(context, trip['id'], isDark),
                         icon: const Icon(Icons.cancel_rounded, size: 16),
                         label: const AppText('Reject Delivery', style: AppTextStyle.labelMedium),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                          side: const BorderSide(color: AppColors.error),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    if (status == 'LOAD_REQUESTED') ...[
+                      ElevatedButton.icon(
+                        onPressed: () => _approveLoadDirectly(trip['id']),
+                        icon: const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
+                        label: const Text('Approve Load', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      OutlinedButton.icon(
+                        onPressed: () => _showRejectLoadDialog(context, trip['id'], isDark),
+                        icon: const Icon(Icons.cancel_rounded, size: 16),
+                        label: const AppText('Reject Load', style: AppTextStyle.labelMedium),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.error,
                           side: const BorderSide(color: AppColors.error),
@@ -320,8 +371,16 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                 const SizedBox(height: 24),
 
                 // 2. Locations Overview Card
-                _buildLocationsOverviewCard(isDark, trip),
+                _buildLocationsOverviewCard(context, isDark, trip),
                 const SizedBox(height: 24),
+
+                // 2b. Verification Proofs (if load/delivery requested or rejected)
+                if (trip['loadingPhotoUrl']?.toString().isNotEmpty == true ||
+                    trip['gatePassPhotoUrl']?.toString().isNotEmpty == true ||
+                    trip['podUrl']?.toString().isNotEmpty == true) ...[
+                  _buildVerificationProofPanel(context, isDark, trip),
+                  const SizedBox(height: 24),
+                ],
 
                 // 3. Driver & Vehicle Profile Cards
                 _buildMetadataProfileRow(context, isDark, trip, driverName, driverPhone, isWebOrDesktop),
@@ -369,7 +428,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
     );
   }
 
-  Widget _buildLocationsOverviewCard(bool isDark, Map<String, dynamic> trip) {
+  Widget _buildLocationsOverviewCard(BuildContext context, bool isDark, Map<String, dynamic> trip) {
     final pickupCity = (trip['pickupCity'] ?? 'Rajkot').toString();
     final pickupAddr = (trip['pickupLocation'] ?? '').toString();
     final dropCity = (trip['dropCity'] ?? '').toString();
@@ -446,34 +505,47 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
               // Drop Point
               Expanded(
                 flex: 4,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const AppText('DROP POINT', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+                child: InkWell(
+                  onTap: () => _showSetDestinationDialog(context, trip),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Expanded(
-                          child: AppText(
-                            hasDrop ? dropCity : 'Destination pending',
-                            style: AppTextStyle.bodyLarge,
-                            fontWeight: FontWeight.bold,
-                            color: hasDrop ? null : Colors.grey,
-                            textAlign: TextAlign.end,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            const AppText('DROP POINT', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey),
+                            const SizedBox(width: 4),
+                            Icon(Icons.edit_location_alt_rounded, size: 12, color: hasDrop ? AppColors.primary : Colors.grey),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: const BoxDecoration(
-                            color: Colors.redAccent,
-                            shape: BoxShape.circle,
-                          ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: AppText(
+                                hasDrop ? dropCity : 'Destination pending',
+                                style: AppTextStyle.bodyLarge,
+                                fontWeight: FontWeight.bold,
+                                color: hasDrop ? null : Colors.grey,
+                                textAlign: TextAlign.end,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            if (!hasDrop)
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: const BoxDecoration(
+                                  color: Colors.redAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                          ],
                         ),
-                      ],
-                    ),
                     const SizedBox(height: 4),
                     if (hasDrop && dropAddr.isNotEmpty)
                       Padding(
@@ -488,6 +560,8 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                   ],
                 ),
               ),
+            ),
+          ),
             ],
           ),
           const Divider(height: 36),
@@ -1140,6 +1214,651 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVerificationProofPanel(BuildContext context, bool isDark, Map<String, dynamic> trip) {
+    final status = (trip['status'] ?? '').toString();
+    final tripId = (trip['id'] ?? '').toString();
+
+    final loadingPhotoUrl = (trip['loadingPhotoUrl'] ?? '').toString();
+    final gatePassPhotoUrl = (trip['gatePassPhotoUrl'] ?? '').toString();
+    final podUrl = (trip['podUrl'] ?? '').toString();
+    final remarks = (trip['remarks'] ?? '').toString();
+
+    final hasLoadingProof = loadingPhotoUrl.isNotEmpty || gatePassPhotoUrl.isNotEmpty;
+    final hasPodProof = podUrl.isNotEmpty;
+
+    if (!hasLoadingProof && !hasPodProof) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.verified_user_rounded, color: AppColors.primary, size: 22),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: AppText(
+                  'VERIFICATION PROOFS',
+                  style: AppTextStyle.labelLarge,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 32),
+
+          // A. Loading Proof Section
+          if (hasLoadingProof) ...[
+            const AppText('LOADING STAGE PROOFS', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (loadingPhotoUrl.isNotEmpty) ...[
+                  _buildPhotoThumbnail(context, loadingPhotoUrl, 'Loading Photo', isDark),
+                  const SizedBox(width: 12),
+                ],
+                if (gatePassPhotoUrl.isNotEmpty) ...[
+                  _buildPhotoThumbnail(context, gatePassPhotoUrl, 'Gate Pass Photo', isDark),
+                ],
+              ],
+            ),
+            if (status == 'LOAD_REJECTED') ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppText(
+                      'Load Rejected: ${trip['loadRejectReason'] ?? 'None'}',
+                      style: AppTextStyle.labelMedium,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF991B1B),
+                    ),
+                    const SizedBox(height: 4),
+                    AppText(
+                      'Flagged photo: ${trip['flaggedPhoto'] == 'loading' ? 'Loading Photo Only' : trip['flaggedPhoto'] == 'gate_pass' ? 'Gate Pass Photo Only' : 'Both Photos'}',
+                      style: AppTextStyle.labelMedium,
+                      fontSize: 11,
+                      color: const Color(0xFFB91C1C),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+          ],
+
+          // B. POD Proof Section
+          if (hasPodProof) ...[
+            const AppText('PROOF OF DELIVERY (POD)', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey),
+            const SizedBox(height: 12),
+            if (remarks.isNotEmpty) ...[
+              const AppText('DRIVER REMARKS / NOTES', style: AppTextStyle.labelMedium, color: Colors.grey),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade100),
+                ),
+                child: AppText(remarks, style: AppTextStyle.bodyMedium),
+              ),
+              const SizedBox(height: 16),
+            ],
+            _buildPhotoThumbnail(context, podUrl, 'POD Document', isDark),
+            if (status == 'DELIVERY_REJECTED') ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                ),
+                child: AppText(
+                  'Delivery Rejected: ${trip['deliveryRejectReason'] ?? 'None'}',
+                  style: AppTextStyle.labelMedium,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF991B1B),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+          ],
+
+          // C. Approve / Reject Action row inside the card for awaiting approval
+          if (status == 'LOAD_REQUESTED') ...[
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showRejectLoadDialog(context, tripId, isDark),
+                    icon: const Icon(Icons.close_rounded, size: 14),
+                    label: const Text('Reject Load', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFDC2626),
+                      side: const BorderSide(color: Color(0xFFDC2626)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _approveLoadDirectly(tripId),
+                    icon: const Icon(Icons.check_rounded, size: 14),
+                    label: const Text('Approve Load', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+
+          if (status == 'DELIVERY_REQUESTED') ...[
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showRejectDeliveryDialog(context, tripId, isDark),
+                    icon: const Icon(Icons.close_rounded, size: 14),
+                    label: const Text('Reject Delivery', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFDC2626),
+                      side: const BorderSide(color: Color(0xFFDC2626)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _approveDeliveryDirectly(tripId),
+                    icon: const Icon(Icons.check_rounded, size: 14),
+                    label: const Text('Approve Delivery', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoThumbnail(BuildContext context, String url, String label, bool isDark) {
+    return GestureDetector(
+      onTap: () => _showFullImageDialog(url),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(11),
+              child: CachedNetworkImage(
+                imageUrl: corsSafeImageUrl(url),
+                fit: BoxFit.cover,
+                placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+                errorWidget: (context, url, error) => Container(
+                  color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+                  child: const Center(
+                    child: Icon(Icons.broken_image_outlined, size: 24, color: Colors.grey),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          AppText(label, style: AppTextStyle.labelMedium, color: Colors.grey, fontWeight: FontWeight.bold),
+        ],
+      ),
+    );
+  }
+
+  void _showFullImageDialog(String imageUrl) {
+    final safeUrl = corsSafeImageUrl(imageUrl);
+    Get.dialog(
+      Dialog(
+        backgroundColor: Colors.transparent,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 30),
+                onPressed: () => Get.back(),
+              ),
+            ),
+            Hero(
+              tag: imageUrl,
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 500, maxWidth: 500),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: CachedNetworkImage(
+                    imageUrl: safeUrl,
+                    fit: BoxFit.contain,
+                    placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+                    errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _approveLoadDirectly(String tripId) async {
+    AppPopup.showLoading(message: 'Approving Load...');
+    try {
+      final err = await Get.find<FirebaseService>().approveLoad(tripId);
+      AppPopup.hideLoading();
+      if (err != null) {
+        Get.snackbar('Alert', err, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.orangeAccent);
+      } else {
+        Get.snackbar('Success', 'Load approved & Trip activated! 🚛', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
+      }
+    } catch (e) {
+      AppPopup.hideLoading();
+      Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent);
+    }
+  }
+
+  void _showRejectLoadDialog(BuildContext context, String tripId, bool isDark) {
+    String selectedReason = 'Photo unclear/blurry';
+    final List<String> reasons = [
+      'Photo unclear/blurry',
+      'Wrong truck/quantity mismatch',
+      'Bill number mismatch',
+      'Sequence incorrect',
+      'Other'
+    ];
+    String selectedPhotoFlag = 'both'; // 'loading', 'gate_pass', 'both'
+    final reasonCtrl = TextEditingController();
+
+    Get.dialog(
+      StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Reject Load Verification?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('Select Rejection Reason (Mandatory):', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    value: selectedReason,
+                    items: reasons.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 13)))).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          selectedReason = val;
+                        });
+                      }
+                    },
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  if (selectedReason == 'Other') ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: reasonCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Specify Custom Reason',
+                        labelStyle: const TextStyle(fontSize: 13),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  const Text('Flag Specific Photo to Re-upload:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    value: selectedPhotoFlag,
+                    items: const [
+                      DropdownMenuItem(value: 'both', child: Text('Both Photos', style: TextStyle(fontSize: 13))),
+                      DropdownMenuItem(value: 'loading', child: Text('Loading Photo Only', style: TextStyle(fontSize: 13))),
+                      DropdownMenuItem(value: 'gate_pass', child: Text('Gate Pass Photo Only', style: TextStyle(fontSize: 13))),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          selectedPhotoFlag = val;
+                        });
+                      }
+                    },
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+                onPressed: () async {
+                  String finalReason = selectedReason;
+                  if (selectedReason == 'Other') {
+                    finalReason = reasonCtrl.text.trim();
+                    if (finalReason.isEmpty) {
+                      Get.snackbar('Alert', 'Please specify a custom reason');
+                      return;
+                    }
+                  }
+                  Get.back();
+                  AppPopup.showLoading(message: 'Rejecting Load...');
+                  try {
+                    await Get.find<FirebaseService>().rejectLoad(
+                      tripId,
+                      reason: finalReason,
+                      flaggedPhoto: selectedPhotoFlag,
+                    );
+                    AppPopup.hideLoading();
+                    Get.snackbar('Rejected', 'Load request rejected.', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent, colorText: Colors.white);
+                  } catch (e) {
+                    AppPopup.hideLoading();
+                    Get.snackbar('Error', e.toString());
+                  }
+                },
+                child: const Text('Reject', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        }
+      ),
+    );
+  }
+
+  Future<void> _approveDeliveryDirectly(String tripId) async {
+    AppPopup.showLoading(message: 'Approving Completion...');
+    try {
+      await Get.find<FirebaseService>().approveDelivery(tripId);
+      AppPopup.hideLoading();
+      Get.snackbar('Success', 'Trip completed successfully! 🏁', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
+    } catch (e) {
+      AppPopup.hideLoading();
+      Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent);
+    }
+  }
+
+  void _showRejectDeliveryDialog(BuildContext context, String tripId, bool isDark) {
+    final reasonCtrl = TextEditingController();
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Reject Completion?', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Reason likhein delivery reject karne ka:'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonCtrl,
+              decoration: InputDecoration(
+                labelText: 'Rejection Reason',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () async {
+              final reason = reasonCtrl.text.trim();
+              if (reason.isEmpty) {
+                Get.snackbar('Alert', 'Reason input mandatory');
+                return;
+              }
+              Get.back();
+              AppPopup.showLoading(message: 'Rejecting Delivery...');
+              try {
+                await Get.find<FirebaseService>().rejectDelivery(tripId, reason: reason);
+                AppPopup.hideLoading();
+                Get.snackbar('Rejected', 'Trip delivery has been rejected.', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent, colorText: Colors.white);
+              } catch (e) {
+                AppPopup.hideLoading();
+                Get.snackbar('Error', e.toString());
+              }
+            },
+            child: const Text('Reject', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSetDestinationDialog(BuildContext context, Map<String, dynamic> trip) {
+    final formKey = GlobalKey<FormState>();
+    final truckNo = (trip['truckNo'] ?? '').toString();
+    final tripId = (trip['id'] ?? '').toString();
+
+    final customerNameCtrl = TextEditingController(text: (trip['dropCity'] ?? '').toString());
+    final customerSiteCtrl = TextEditingController(text: (trip['dropLocation'] ?? '').toString());
+    final detailsCtrl = TextEditingController();
+
+    final customersList = ["Tata Motors", "Mahindra Log", "L&T Construction", "Reliance Industries", "Adani Power"];
+    final sitesList = ["Pune Hub", "Chennai GIDC", "Kolkata Port", "Delhi Depot", "Nagpur GIDC"];
+
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.add_location_alt_rounded, color: Color(0xFF3B82F6)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Destination Setup: $truckNo',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 420,
+          child: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const AppText(
+                    'Step 2: Enter destination. "Save & Next" will immediately launch the Create Trip wizard.',
+                    style: AppTextStyle.labelMedium,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Customer Name Autocomplete
+                  Autocomplete<String>(
+                    initialValue: TextEditingValue(text: customerNameCtrl.text),
+                    optionsBuilder: (TextEditingValue textEditingValue) {
+                      if (textEditingValue.text.isEmpty) {
+                        return customersList;
+                      }
+                      return customersList.where((String option) {
+                        return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                      });
+                    },
+                    fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                      textEditingController.addListener(() {
+                        customerNameCtrl.text = textEditingController.text;
+                      });
+                      return TextFormField(
+                        controller: textEditingController,
+                        focusNode: focusNode,
+                        decoration: InputDecoration(
+                          labelText: 'Customer Name',
+                          labelStyle: const TextStyle(fontSize: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          prefixIcon: const Icon(Icons.business_rounded, size: 18),
+                        ),
+                        validator: (value) => value == null || value.trim().isEmpty ? 'Enter customer name' : null,
+                      );
+                    },
+                    onSelected: (String selection) {
+                      customerNameCtrl.text = selection;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Customer Site Autocomplete
+                  Autocomplete<String>(
+                    initialValue: TextEditingValue(text: customerSiteCtrl.text),
+                    optionsBuilder: (TextEditingValue textEditingValue) {
+                      if (textEditingValue.text.isEmpty) {
+                        return sitesList;
+                      }
+                      return sitesList.where((String option) {
+                        return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                      });
+                    },
+                    fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                      textEditingController.addListener(() {
+                        customerSiteCtrl.text = textEditingController.text;
+                      });
+                      return TextFormField(
+                        controller: textEditingController,
+                        focusNode: focusNode,
+                        decoration: InputDecoration(
+                          labelText: 'Customer Site',
+                          labelStyle: const TextStyle(fontSize: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          prefixIcon: const Icon(Icons.location_on_rounded, size: 18),
+                        ),
+                        validator: (value) => value == null || value.trim().isEmpty ? 'Enter customer site' : null,
+                      );
+                    },
+                    onSelected: (String selection) {
+                      customerSiteCtrl.text = selection;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Additional destination details
+                  TextFormField(
+                    controller: detailsCtrl,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      labelText: 'Additional Destination Details',
+                      labelStyle: const TextStyle(fontSize: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      prefixIcon: const Icon(Icons.description_rounded, size: 18),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3B82F6),
+              foregroundColor: Colors.white,
+              elevation: 0,
+            ),
+            onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
+              final data = {
+                'customerName': customerNameCtrl.text.trim(),
+                'customerSite': customerSiteCtrl.text.trim(),
+                'additionalDetails': detailsCtrl.text.trim(),
+              };
+              Get.back();
+              AppPopup.showLoading(message: 'Saving Destination...');
+              try {
+                // Update Firestore for trip
+                await controller.setDestination(tripId, data['customerName']!, data['customerSite']!);
+                
+                // Update active truck config if truckNo is valid
+                if (truckNo.isNotEmpty && truckNo != '-') {
+                  await Get.find<FirebaseService>().saveDestinationSetup(truckNo, data);
+                }
+                AppPopup.hideLoading();
+              } catch (e) {
+                AppPopup.hideLoading();
+                Get.snackbar('Error', e.toString());
+              }
+            },
+            child: const Text('Save', style: TextStyle(color: Colors.white)),
+          ),
         ],
       ),
     );

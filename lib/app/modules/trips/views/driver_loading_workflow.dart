@@ -29,11 +29,13 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
       case 'EN_ROUTE_VENDOR':
         return 1;
       case 'LOADING':
+      case 'LOAD_REJECTED':
         return 2;
       case 'LOAD_REQUESTED':
         return 3; // waiting for admin
       case 'ACTIVE NOW':
       case 'DELIVERY_REQUESTED':
+      case 'DELIVERY_REJECTED':
       case 'DELIVERED':
         return 4; // all done
       default:
@@ -84,12 +86,14 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                 color: isDark ? const Color(0xFF93C5FD) : AppColors.primary,
               ),
               const SizedBox(width: 8),
-              const AppText(
-                'Loading Workflow',
-                style: AppTextStyle.bodyLarge,
-                fontWeight: FontWeight.bold,
+              const Expanded(
+                child: AppText(
+                  'Loading Workflow',
+                  style: AppTextStyle.bodyLarge,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -150,19 +154,25 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
           _StepTile(
             stepNumber: 3,
             title: 'Truck Loaded',
-            subtitle: step > 2
-                ? (step == 3
-                    ? 'Photos submitted — waiting for admin approval'
-                    : 'Admin ne loading approve kar di')
-                : 'Loading & Gate Pass photo click karein',
+            subtitle: widget.trip.status == 'LOAD_REJECTED'
+                ? 'Rejected: Verification failed. Re-upload required.'
+                : step > 2
+                    ? (step == 3
+                        ? 'Photos submitted — waiting for admin approval'
+                        : 'Admin ne loading approve kar di')
+                    : 'Loading & Gate Pass photo click karein',
             isCompleted: step > 3,
             isCurrent: step == 2,
             isLocked: step < 2,
             isWaiting: step == 3,
             isDark: isDark,
-            actionLabel: 'Mark Loaded',
+            actionLabel: widget.trip.status == 'LOAD_REJECTED'
+                ? 'Re-upload Flagged'
+                : 'Mark Loaded',
             actionIcon: Icons.camera_alt_rounded,
-            actionColor: const Color(0xFFF59E0B),
+            actionColor: widget.trip.status == 'LOAD_REJECTED'
+                ? const Color(0xFFDC2626)
+                : const Color(0xFFF59E0B),
             customContent:
                 step == 2 ? _buildStep3Content(controller, isDark) : null,
           ),
@@ -176,11 +186,13 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                 ? 'Delivered successfully'
                 : widget.trip.status == 'DELIVERY_REQUESTED'
                     ? 'Proof submitted — waiting for admin approval'
-                    : widget.trip.status == 'ACTIVE NOW'
-                        ? 'Upload proof of delivery at destination'
-                        : 'Destination unlocks after approval',
+                    : widget.trip.status == 'DELIVERY_REJECTED'
+                        ? 'Rejected: Reupload proof required'
+                        : widget.trip.status == 'ACTIVE NOW'
+                            ? 'Upload proof of delivery at destination'
+                            : 'Destination unlocks after approval',
             isCompleted: widget.trip.status == 'DELIVERED',
-            isCurrent: widget.trip.status == 'ACTIVE NOW',
+            isCurrent: widget.trip.status == 'ACTIVE NOW' || widget.trip.status == 'DELIVERY_REJECTED',
             isWaiting: widget.trip.status == 'DELIVERY_REQUESTED',
             isLocked: step < 4,
             isDark: isDark,
@@ -188,18 +200,22 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                 ? 'Completed'
                 : widget.trip.status == 'DELIVERY_REQUESTED'
                     ? 'Pending Approval'
-                    : widget.trip.status == 'ACTIVE NOW'
-                        ? 'Submit Proof of Delivery'
-                        : 'Locked',
+                    : widget.trip.status == 'DELIVERY_REJECTED'
+                        ? 'Re-submit Proof of Delivery'
+                        : widget.trip.status == 'ACTIVE NOW'
+                            ? 'Submit Proof of Delivery'
+                            : 'Locked',
             actionIcon: widget.trip.status == 'DELIVERED'
                 ? Icons.check_circle_rounded
                 : widget.trip.status == 'DELIVERY_REQUESTED'
                     ? Icons.hourglass_empty_rounded
-                    : widget.trip.status == 'ACTIVE NOW'
+                    : (widget.trip.status == 'ACTIVE NOW' || widget.trip.status == 'DELIVERY_REJECTED')
                         ? Icons.upload_file_rounded
                         : Icons.lock_rounded,
-            actionColor: const Color(0xFF10B981),
-            onAction: widget.trip.status == 'ACTIVE NOW'
+            actionColor: widget.trip.status == 'DELIVERY_REJECTED'
+                ? const Color(0xFFDC2626)
+                : const Color(0xFF10B981),
+            onAction: (widget.trip.status == 'ACTIVE NOW' || widget.trip.status == 'DELIVERY_REJECTED')
                 ? () {
                     Get.toNamed(
                       Routes.PROOF_OF_DELIVERY,
@@ -211,10 +227,53 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                     });
                   }
                 : null,
-            customContent: {'ACTIVE NOW', 'DELIVERY_REQUESTED', 'DELIVERED'}
-                    .contains(widget.trip.status)
-                ? _buildDestinationInfoCard(isDark)
-                : null,
+            customContent: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.trip.status == 'DELIVERY_REJECTED') ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF451A03) : const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: isDark ? const Color(0xFF78350F) : const Color(0xFFFCA5A5)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.error_outline_rounded, color: isDark ? const Color(0xFFFDBA74) : const Color(0xFFDC2626), size: 16),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Delivery Proof Rejected',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? const Color(0xFFFDBA74) : const Color(0xFF991B1B),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Reason: ${widget.trip.deliveryRejectReason}',
+                          style: TextStyle(
+                            color: isDark ? const Color(0xFFFDBA74) : const Color(0xFF991B1B),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if ({'ACTIVE NOW', 'DELIVERY_REQUESTED', 'DELIVERED', 'DELIVERY_REJECTED'}.contains(widget.trip.status))
+                  _buildDestinationInfoCard(isDark),
+              ],
+            ),
           ),
         ],
       ),
@@ -241,25 +300,96 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
   }
 
   Widget _buildStep3Content(TripsController controller, bool isDark) {
+    final needsLoading = widget.trip.status != 'LOAD_REJECTED' ||
+        widget.trip.flaggedPhoto == 'loading' ||
+        widget.trip.flaggedPhoto == 'both';
+    final needsGatePass = widget.trip.status != 'LOAD_REJECTED' ||
+        widget.trip.flaggedPhoto == 'gate_pass' ||
+        widget.trip.flaggedPhoto == 'both';
+
     final hasLoading = _loadingPhotoBytes != null;
     final hasGatePass = _gatePassPhotoBytes != null;
+
+    final isSubmitEnabled = (!needsLoading || hasLoading) && (!needsGatePass || hasGatePass);
+
+    String buttonLabel = 'Submit Load & Gate Pass';
+    if (widget.trip.status == 'LOAD_REJECTED') {
+      if (needsLoading && !needsGatePass) {
+        buttonLabel = 'Resubmit Loading Photo';
+      } else if (!needsLoading && needsGatePass) {
+        buttonLabel = 'Resubmit Gate Pass Photo';
+      } else {
+        buttonLabel = 'Resubmit Both Photos';
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (widget.trip.status == 'LOAD_REJECTED') ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF451A03) : const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: isDark ? const Color(0xFF78350F) : const Color(0xFFFCA5A5)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline_rounded,
+                      color: isDark ? const Color(0xFFFDBA74) : const Color(0xFFDC2626),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: AppText(
+                        'Rejected - Reupload Required',
+                        style: AppTextStyle.bodyMedium,
+                        color: isDark ? const Color(0xFFFDBA74) : const Color(0xFF991B1B),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                AppText(
+                  'Reason: ${widget.trip.loadRejectReason}',
+                  style: AppTextStyle.bodyMedium,
+                  color: isDark ? const Color(0xFFFDBA74) : const Color(0xFF991B1B),
+                ),
+                if (widget.trip.flaggedPhoto != 'both') ...[
+                  const SizedBox(height: 4),
+                  AppText(
+                    'Required: Only re-upload ${widget.trip.flaggedPhoto == 'loading' ? 'Loading Photo' : 'Gate Pass Photo'}',
+                    style: AppTextStyle.bodyMedium,
+                    color: isDark ? const Color(0xFFF59E0B) : const Color(0xFFB91C1C),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
         Row(
           children: [
             Expanded(
               child: InkWell(
-                onTap: () async {
-                  final bytes = await _capturePhotoFromCamera();
-                  if (bytes != null) {
-                    setState(() {
-                      _loadingPhotoBytes = bytes;
-                    });
-                  }
-                },
+                onTap: needsLoading
+                    ? () async {
+                        final bytes = await _capturePhotoFromCamera();
+                        if (bytes != null) {
+                          setState(() {
+                            _loadingPhotoBytes = bytes;
+                          });
+                        }
+                      }
+                    : null,
                 child: Container(
                   height: 110,
                   decoration: BoxDecoration(
@@ -267,22 +397,32 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                         isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: hasLoading
+                      color: !needsLoading
                           ? const Color(0xFF10B981)
-                          : (isDark ? Colors.white24 : Colors.grey.shade300),
+                          : hasLoading
+                              ? const Color(0xFF10B981)
+                              : (isDark ? Colors.white24 : Colors.grey.shade300),
                       width: 1.5,
                     ),
                   ),
-                  child: hasLoading
+                  child: !needsLoading
                       ? Stack(
                           children: [
                             Positioned.fill(
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(10.5),
-                                child: Image.memory(
-                                  _loadingPhotoBytes!,
-                                  fit: BoxFit.cover,
-                                ),
+                                child: widget.trip.loadingPhotoUrl != null &&
+                                        widget.trip.loadingPhotoUrl!.isNotEmpty
+                                    ? Image.network(
+                                        widget.trip.loadingPhotoUrl!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => const Center(
+                                          child: Icon(Icons.broken_image_rounded, color: Colors.grey),
+                                        ),
+                                      )
+                                    : const Center(
+                                        child: Icon(Icons.image_not_supported_rounded, color: Colors.grey),
+                                      ),
                               ),
                             ),
                             Positioned(
@@ -304,7 +444,7 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                               right: 0,
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.5),
+                                  color: Colors.green.withValues(alpha: 0.8),
                                   borderRadius: const BorderRadius.only(
                                     bottomLeft: Radius.circular(10.5),
                                     bottomRight: Radius.circular(10.5),
@@ -313,7 +453,7 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 4),
                                 child: const Text(
-                                  'Retake',
+                                  'Photo OK',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: Colors.white,
@@ -325,47 +465,101 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                             ),
                           ],
                         )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.add_a_photo_rounded,
-                              color: isDark
-                                  ? Colors.white60
-                                  : Colors.grey.shade600,
-                              size: 24,
+                      : hasLoading
+                          ? Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(10.5),
+                                    child: Image.memory(
+                                      _loadingPhotoBytes!,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 6,
+                                  right: 6,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.check_rounded,
+                                        color: Colors.white, size: 12),
+                                  ),
+                                ),
+                                Positioned(
+                                  bottom: 0,
+                                  left: 0,
+                                  right: 0,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(alpha: 0.5),
+                                      borderRadius: const BorderRadius.only(
+                                        bottomLeft: Radius.circular(10.5),
+                                        bottomRight: Radius.circular(10.5),
+                                      ),
+                                    ),
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 4),
+                                    child: const Text(
+                                      'Retake',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.add_a_photo_rounded,
+                                  color: isDark
+                                      ? Colors.white60
+                                      : Colors.grey.shade600,
+                                  size: 24,
+                                ),
+                                const SizedBox(height: 6),
+                                const AppText(
+                                  'Loading Photo',
+                                  style: AppTextStyle.labelMedium,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                const SizedBox(height: 2),
+                                AppText(
+                                  'Click to take',
+                                  style: AppTextStyle.labelMedium,
+                                  fontSize: 10,
+                                  color: isDark
+                                      ? Colors.white30
+                                      : Colors.grey.shade400,
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 6),
-                            const AppText(
-                              'Loading Photo',
-                              style: AppTextStyle.labelMedium,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            const SizedBox(height: 2),
-                            AppText(
-                              'Click to take',
-                              style: AppTextStyle.labelMedium,
-                              fontSize: 10,
-                              color: isDark
-                                  ? Colors.white30
-                                  : Colors.grey.shade400,
-                            ),
-                          ],
-                        ),
                 ),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: InkWell(
-                onTap: () async {
-                  final bytes = await _capturePhotoFromCamera();
-                  if (bytes != null) {
-                    setState(() {
-                      _gatePassPhotoBytes = bytes;
-                    });
-                  }
-                },
+                onTap: needsGatePass
+                    ? () async {
+                        final bytes = await _capturePhotoFromCamera();
+                        if (bytes != null) {
+                          setState(() {
+                            _gatePassPhotoBytes = bytes;
+                          });
+                        }
+                      }
+                    : null,
                 child: Container(
                   height: 110,
                   decoration: BoxDecoration(
@@ -373,22 +567,32 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                         isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: hasGatePass
+                      color: !needsGatePass
                           ? const Color(0xFF10B981)
-                          : (isDark ? Colors.white24 : Colors.grey.shade300),
+                          : hasGatePass
+                              ? const Color(0xFF10B981)
+                              : (isDark ? Colors.white24 : Colors.grey.shade300),
                       width: 1.5,
                     ),
                   ),
-                  child: hasGatePass
+                  child: !needsGatePass
                       ? Stack(
                           children: [
                             Positioned.fill(
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(10.5),
-                                child: Image.memory(
-                                  _gatePassPhotoBytes!,
-                                  fit: BoxFit.cover,
-                                ),
+                                child: widget.trip.gatePassPhotoUrl != null &&
+                                        widget.trip.gatePassPhotoUrl!.isNotEmpty
+                                    ? Image.network(
+                                        widget.trip.gatePassPhotoUrl!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => const Center(
+                                          child: Icon(Icons.broken_image_rounded, color: Colors.grey),
+                                        ),
+                                      )
+                                    : const Center(
+                                        child: Icon(Icons.image_not_supported_rounded, color: Colors.grey),
+                                      ),
                               ),
                             ),
                             Positioned(
@@ -410,7 +614,7 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                               right: 0,
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.5),
+                                  color: Colors.green.withValues(alpha: 0.8),
                                   borderRadius: const BorderRadius.only(
                                     bottomLeft: Radius.circular(10.5),
                                     bottomRight: Radius.circular(10.5),
@@ -419,7 +623,7 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 4),
                                 child: const Text(
-                                  'Retake',
+                                  'Photo OK',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: Colors.white,
@@ -431,34 +635,86 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                             ),
                           ],
                         )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.assignment_rounded,
-                              color: isDark
-                                  ? Colors.white60
-                                  : Colors.grey.shade600,
-                              size: 24,
+                      : hasGatePass
+                          ? Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(10.5),
+                                    child: Image.memory(
+                                      _gatePassPhotoBytes!,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 6,
+                                  right: 6,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.check_rounded,
+                                        color: Colors.white, size: 12),
+                                  ),
+                                ),
+                                Positioned(
+                                  bottom: 0,
+                                  left: 0,
+                                  right: 0,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(alpha: 0.5),
+                                      borderRadius: const BorderRadius.only(
+                                        bottomLeft: Radius.circular(10.5),
+                                        bottomRight: Radius.circular(10.5),
+                                      ),
+                                    ),
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 4),
+                                    child: const Text(
+                                      'Retake',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.assignment_rounded,
+                                  color: isDark
+                                      ? Colors.white60
+                                      : Colors.grey.shade600,
+                                  size: 24,
+                                ),
+                                const SizedBox(height: 6),
+                                const AppText(
+                                  'Gate Pass Photo',
+                                  style: AppTextStyle.labelMedium,
+                                  fontWeight: FontWeight.bold,
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 2),
+                                AppText(
+                                  'Click to take',
+                                  style: AppTextStyle.labelMedium,
+                                  fontSize: 10,
+                                  color: isDark
+                                      ? Colors.white30
+                                      : Colors.grey.shade400,
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 6),
-                            const AppText(
-                              'Gate Pass Photo',
-                              style: AppTextStyle.labelMedium,
-                              fontWeight: FontWeight.bold,
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 2),
-                            AppText(
-                              'Click to take',
-                              style: AppTextStyle.labelMedium,
-                              fontSize: 10,
-                              color: isDark
-                                  ? Colors.white30
-                                  : Colors.grey.shade400,
-                            ),
-                          ],
-                        ),
                 ),
               ),
             ),
@@ -466,12 +722,12 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
         ),
         const SizedBox(height: 12),
         ElevatedButton.icon(
-          onPressed: (hasLoading && hasGatePass)
+          onPressed: isSubmitEnabled
               ? () async {
                   await controller.markTruckLoaded(
                     widget.trip.id,
-                    _loadingPhotoBytes!,
-                    _gatePassPhotoBytes!,
+                    _loadingPhotoBytes,
+                    _gatePassPhotoBytes,
                   );
                   setState(() {
                     _loadingPhotoBytes = null;
@@ -480,9 +736,9 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                 }
               : null,
           icon: const Icon(Icons.cloud_upload_rounded, size: 16),
-          label: const Text(
-            'Submit Load & Gate Pass',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          label: Text(
+            buttonLabel,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF10B981),
@@ -776,12 +1032,14 @@ class _StepTile extends StatelessWidget {
                         ),
                       ),
                       SizedBox(width: 8),
-                      Text(
-                        'Waiting for admin approval...',
-                        style: TextStyle(
-                          color: Color(0xFFF59E0B),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                      Flexible(
+                        child: Text(
+                          'Waiting for admin approval...',
+                          style: TextStyle(
+                            color: Color(0xFFF59E0B),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                     ],

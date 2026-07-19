@@ -379,7 +379,7 @@ void main() {
       expect(secondCount, firstCount);
     });
 
-    test('rejectLoad → status REJECTED + notifies the driver', () async {
+    test('rejectLoad → status LOAD_REJECTED + notifies the driver', () async {
       owner = admin;
       final svc = service();
       await svc.assignTripToDriver('TRP-1', {'driverPhone': ownerA});
@@ -390,8 +390,11 @@ void main() {
       await svc.rejectLoad('TRP-1', reason: 'Wrong goods');
 
       final trip = (await firestore.collection('trips').doc('TRP-1').get()).data()!;
-      expect(trip['status'], 'REJECTED');
-      expect(trip['isActive'], false);
+      expect(trip['status'], 'LOAD_REJECTED');
+      expect(trip['loadRejectReason'], 'Wrong goods');
+      expect(trip['flaggedPhoto'], 'both');
+      expect(trip['loadRejectCount'], 1);
+      expect((trip['loadRejectAudit'] as List).isNotEmpty, true);
 
       final driverNotes = await svc.getNotifications(ownerA);
       final rej = driverNotes.firstWhere((n) => n['type'] == 'load_rejected');
@@ -532,7 +535,7 @@ void main() {
       expect(driverNotes.any((n) => n['type'] == 'delivery_approved'), true);
     });
 
-    test('rejectDelivery → status REJECTED', () async {
+    test('rejectDelivery → status DELIVERY_REJECTED', () async {
       owner = admin;
       final svc = service();
       await svc.assignTripToDriver('TRP-1', {'driverPhone': ownerA});
@@ -542,8 +545,9 @@ void main() {
       await svc.rejectDelivery('TRP-1', reason: 'POD missing');
 
       final trip = (await firestore.collection('trips').doc('TRP-1').get()).data()!;
-      expect(trip['status'], 'REJECTED');
-      expect(trip['isActive'], false);
+      expect(trip['status'], 'DELIVERY_REJECTED');
+      expect(trip['deliveryRejectReason'], 'POD missing');
+      expect(trip['deliveryRejectCount'], 1);
       final driverNotes = await svc.getNotifications(ownerA);
       expect(driverNotes.any((n) => n['type'] == 'delivery_rejected'), true);
     });

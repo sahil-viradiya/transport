@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../controllers/dashboard_controller.dart';
 import '../../../core/utils/image_url.dart';
 import '../../home/controllers/home_controller.dart';
+import '../../trips/controllers/trips_controller.dart';
 import '../../profile/controllers/profile_controller.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../../widgets/app_button.dart';
@@ -49,10 +50,14 @@ class DashboardView extends GetView<DashboardController> {
         return 'Loading';
       case 'LOAD_REQUESTED':
         return 'Load Requested';
+      case 'LOAD_REJECTED':
+        return 'Rejected - Reupload Required';
       case 'ACTIVE NOW':
         return 'On The Way (Dest.)';
       case 'DELIVERY_REQUESTED':
         return 'Delivery Requested';
+      case 'DELIVERY_REJECTED':
+        return 'Delivery Rejected - Reupload POD Required';
       case 'DELIVERED':
         return 'Completed';
       default:
@@ -483,8 +488,11 @@ class DashboardView extends GetView<DashboardController> {
           info = 'You are on the way to ${trip.vendorLocation.isEmpty ? trip.pickupLocation : trip.vendorLocation}';
           break;
         case 'LOADING':
+        case 'LOAD_REJECTED':
           done = 2;
-          info = 'Truck is loading at ${trip.vendorName.isEmpty ? 'vendor' : trip.vendorName}';
+          info = trip.status == 'LOAD_REJECTED'
+              ? 'Loading photo rejected — re-upload required'
+              : 'Truck is loading at ${trip.vendorName.isEmpty ? 'vendor' : trip.vendorName}';
           break;
         case 'LOAD_REQUESTED':
           done = 3;
@@ -492,10 +500,13 @@ class DashboardView extends GetView<DashboardController> {
           break;
         case 'ACTIVE NOW':
         case 'DELIVERY_REQUESTED':
+        case 'DELIVERY_REJECTED':
           done = 4;
-          info = trip.dropCity.isEmpty
-              ? 'On the way to destination'
-              : 'On the way to ${trip.dropCity}';
+          info = trip.status == 'DELIVERY_REJECTED'
+              ? 'Delivery proof rejected — re-upload POD required'
+              : trip.dropCity.isEmpty
+                  ? 'On the way to destination'
+                  : 'On the way to ${trip.dropCity}';
           break;
         case 'DELIVERED':
           done = 5;
@@ -587,14 +598,12 @@ class DashboardView extends GetView<DashboardController> {
             AppButton(
               text: 'Update Status',
               icon: Icons.published_with_changes_rounded,
-              onPressed: () =>
-                  Navigator.of(context, rootNavigator: true).pushNamed(
-                Routes.TRIP_DETAILS,
-                arguments: {
-                  'tripId': trip.id,
-                  'isAlreadyActive': trip.isActive
-                },
-              ),
+              onPressed: () {
+                // Switch to Trips Tab (index 1)
+                Get.find<HomeController>().changeTabIndex(1);
+                // Scroll to the active trip card
+                Get.find<TripsController>().scrollToActiveTrip(trip.id);
+              },
             ),
           ],
         ),

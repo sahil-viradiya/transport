@@ -3,23 +3,66 @@ import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../controllers/trip_details_controller.dart';
 import '../../../../widgets/app_text.dart';
-import '../../../../widgets/trip_status_timeline.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/session_service.dart';
 
-/// Reference "Trip Status / Update Status" screen — the full journey timeline
-/// with the current stage highlighted, the destination box (hidden until the
-/// admin sets it and approves the load), and a single "Update Current Status"
-/// button that drives the staged journey (same dispatcher as before).
+/// Modern, real-time Activity History screen. It displays only the actual logged
+/// milestones from the Firestore milestonesLog with real timestamps and locations.
+/// Does not show fake future ticks or simulated increments.
 class TripStatusView extends GetView<TripDetailsController> {
   const TripStatusView({super.key});
 
   String _driverName() {
     try {
       final name = Get.find<SessionService>().name.value;
-      return name.isEmpty ? '' : name;
+      return name.isEmpty ? 'Deep' : name;
     } catch (_) {
-      return '';
+      return 'Deep';
+    }
+  }
+
+  String _friendlyStatus(String status) {
+    switch (status) {
+      case 'PENDING':
+        return 'Pending Accept';
+      case 'ASSIGNED':
+        return 'Trip Assigned';
+      case 'EN_ROUTE_VENDOR':
+        return 'On The Way to Vendor';
+      case 'LOADING':
+        return 'Loading at Vendor';
+      case 'LOAD_REQUESTED':
+        return 'Awaiting Load Approval';
+      case 'LOAD_REJECTED':
+        return 'Load Photo Rejected';
+      case 'ACTIVE NOW':
+        return 'On The Way (Dest.)';
+      case 'DELIVERY_REQUESTED':
+        return 'Awaiting Delivery Approval';
+      case 'DELIVERY_REJECTED':
+        return 'Delivery Proof Rejected';
+      case 'DELIVERED':
+        return 'Completed';
+      case 'REJECTED':
+        return 'Rejected';
+      default:
+        return status.isEmpty ? 'Active' : status;
+    }
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'DELIVERED':
+        return const Color(0xFF10B981); // Green
+      case 'LOAD_REJECTED':
+      case 'DELIVERY_REJECTED':
+      case 'REJECTED':
+        return const Color(0xFFEF4444); // Red
+      case 'LOAD_REQUESTED':
+      case 'DELIVERY_REQUESTED':
+        return const Color(0xFFF59E0B); // Amber
+      default:
+        return AppColors.primary; // Blue
     }
   }
 
@@ -27,193 +70,260 @@ class TripStatusView extends GetView<TripDetailsController> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const AppText('Trip Status',
-            style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_rounded, color: isDark ? Colors.white : AppColors.textPrimary),
+          onPressed: () => Get.back(),
+        ),
+        title: const AppText(
+          'Journey Timeline',
+          style: AppTextStyle.headlineSmall,
+          fontWeight: FontWeight.bold,
+        ),
       ),
       body: Obx(() {
         final status = controller.tripStatus.value;
-        final done = TripStatusTimeline.doneCount(status);
         final data = controller.tripExtra.value ?? {};
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+        final logs = data['milestonesLog'] as List? ?? [];
+        final tripDate = (data['date'] ?? '').toString();
+
+        // Create a list of milestones starting with an initial "Trip Assigned" event
+        final List<Map<String, dynamic>> items = [];
+        
+        // Always seed "Trip Assigned" as the starting baseline event
+        items.add({
+          'label': 'Trip Assigned by Admin',
+          'timestamp': tripDate.isNotEmpty ? tripDate : 'Assigned',
+          'address': (data['pickupLocation'] ?? 'Terminal Gate').toString(),
+          'isInitial': true,
+        });
+
+        for (final log in logs) {
+          if (log is Map) {
+            items.add({
+              'label': (log['label'] ?? log['milestone']?.toString() ?? 'Update').toString(),
+              'timestamp': (log['timestamp'] ?? '').toString(),
+              'address': (log['address'] ?? '').toString(),
+              'isInitial': false,
+            });
+          }
+        }
+
+        return SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TripStatusTimeline(
-                tripId: controller.tripId,
-                status: status,
-                driverName: _driverName(),
-                truckNo: controller.vehicleNo.value,
-                dropCity: (data['dropCity'] ?? '').toString(),
-                milestonesLog: data['milestonesLog'] as List?,
-                tripDate: (data['date'] ?? '').toString(),
-              ),
-              const SizedBox(height: 16),
-              _destinationBox(isDark, data),
-              const SizedBox(height: 16),
-              _currentStatusBox(isDark, done),
-              const SizedBox(height: 16),
-              if (status != 'DELIVERED')
-                ElevatedButton.icon(
-                  onPressed: controller.startJourney,
-                  icon: const Icon(Icons.published_with_changes_rounded,
-                      size: 18),
-                  label: Obx(() => Text(controller.primaryActionLabel)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+              // A. Header Overview Card
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      )
+                    ],
+                    border: Border.all(color: isDark ? Colors.white10 : AppColors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          AppText(
+                            controller.tripId,
+                            style: AppTextStyle.bodyLarge,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _statusColor(status).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: AppText(
+                              _friendlyStatus(status),
+                              style: AppTextStyle.labelMedium,
+                              color: _statusColor(status),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 16,
+                        runSpacing: 6,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.person_outline_rounded, size: 16, color: Colors.grey),
+                              const SizedBox(width: 6),
+                              AppText('Driver: ${_driverName()}', style: AppTextStyle.bodyMedium),
+                            ],
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.local_shipping_outlined, size: 16, color: Colors.grey),
+                              const SizedBox(width: 6),
+                              AppText('Truck: ${controller.vehicleNo.value}', style: AppTextStyle.bodyMedium),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              Obx(() => controller.showCallAdmin.value
-                  ? Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: OutlinedButton.icon(
-                        onPressed: controller.callAdmin,
-                        icon: const Icon(Icons.call_rounded, size: 18),
-                        label: const Text('Call Admin — destination set nahi hua'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.error,
-                          side: const BorderSide(color: AppColors.error),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // B. Real-time Activity Timeline List
+              Expanded(
+                child: items.isEmpty
+                    ? const Center(
+                        child: AppText('No milestones logged yet.'),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                        itemCount: items.length,
+                        itemBuilder: (context, index) {
+                          final item = items[index];
+                          final isLast = index == items.length - 1;
+                          final isNewest = index == items.length - 1; // latest event is active
+                          
+                          return IntrinsicHeight(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Left Dot and vertical line connector
+                                Column(
+                                  children: [
+                                    Container(
+                                      width: 22,
+                                      height: 22,
+                                      decoration: BoxDecoration(
+                                        color: isNewest 
+                                            ? _statusColor(status) 
+                                            : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: isNewest 
+                                              ? _statusColor(status).withOpacity(0.3)
+                                              : Colors.transparent,
+                                          width: 3,
+                                        ),
+                                      ),
+                                      child: Center(
+                                        child: Icon(
+                                          isNewest ? Icons.play_arrow_rounded : Icons.check_rounded,
+                                          size: 12,
+                                          color: isNewest ? Colors.white : (isDark ? Colors.white54 : Colors.grey.shade600),
+                                        ),
+                                      ),
+                                    ),
+                                    if (!isLast)
+                                      Expanded(
+                                        child: Container(
+                                          width: 2,
+                                          color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+
+                                const SizedBox(width: 16),
+
+                                // Right text information card
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(bottom: 24),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Expanded(
+                                              child: AppText(
+                                                item['label'].toString(),
+                                                style: AppTextStyle.bodyLarge,
+                                                fontWeight: isNewest ? FontWeight.bold : FontWeight.w600,
+                                                color: isNewest 
+                                                    ? (isDark ? Colors.white : AppColors.textPrimary)
+                                                    : (isDark ? Colors.white70 : Colors.grey.shade700),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            AppText(
+                                              item['timestamp'].toString(),
+                                              style: AppTextStyle.labelMedium,
+                                              color: Colors.grey,
+                                            ),
+                                          ],
+                                        ),
+                                        if (item['address'].toString().isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              const Icon(Icons.place_outlined, size: 13, color: Colors.grey),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: AppText(
+                                                  item['address'].toString(),
+                                                  style: AppTextStyle.labelMedium,
+                                                  color: Colors.grey.shade500,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
-                    )
-                  : const SizedBox.shrink()),
+              ),
+
+              // C. Primary Action Button (at the bottom)
+              if (status != 'DELIVERED' && status != 'REJECTED' && status != 'PENDING')
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ElevatedButton.icon(
+                    onPressed: controller.startJourney,
+                    icon: const Icon(Icons.published_with_changes_rounded, size: 18),
+                    label: Text(controller.primaryActionLabel),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
             ],
           ),
         );
       }),
-    );
-  }
-
-  /// Amber "admin will set destination" note until revealed; green destination
-  /// card with Open in Maps once the load is approved.
-  Widget _destinationBox(bool isDark, Map<String, dynamic> data) {
-    final revealed = controller.destinationRevealed;
-    final dropCity = (data['dropCity'] ?? '').toString();
-    final dropLocation = (data['dropLocation'] ?? '').toString();
-    final customerName = (data['customerName'] ?? '').toString();
-    final customerAddress = (data['customerAddress'] ?? '').toString();
-
-    if (!revealed || (dropCity.isEmpty && dropLocation.isEmpty)) {
-      return Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.tertiaryLight,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.tertiary),
-        ),
-        child: const Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.info_rounded, color: AppColors.tertiaryDark, size: 20),
-            SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AppText('Admin will set destination',
-                      style: AppTextStyle.bodyMedium,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.tertiaryDark),
-                  AppText(
-                      'Destination will be visible after loading is completed.',
-                      style: AppTextStyle.labelMedium,
-                      color: AppColors.tertiaryDark),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final lat = (data['dropLatitude'] as num?)?.toDouble();
-    final lng = (data['dropLongitude'] as num?)?.toDouble();
-    final query = lat != null && lng != null
-        ? '$lat,$lng'
-        : Uri.encodeComponent('$dropLocation, $dropCity');
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.primaryLight.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const AppText('Destination Location',
-              style: AppTextStyle.bodyLarge, fontWeight: FontWeight.w700),
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.place_rounded,
-                  color: AppColors.primary, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: AppText('$dropLocation, $dropCity',
-                    style: AppTextStyle.bodyMedium,
-                    fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          if (customerName.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            AppText('Customer: $customerName', style: AppTextStyle.labelMedium),
-          ],
-          if (customerAddress.isNotEmpty)
-            AppText('Address: $customerAddress',
-                style: AppTextStyle.labelMedium),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: () async {
-              try {
-                await launchUrl(
-                  Uri.parse(
-                      'https://www.google.com/maps/search/?api=1&query=$query'),
-                  mode: LaunchMode.externalApplication,
-                );
-              } catch (_) {}
-            },
-            icon: const Icon(Icons.map_rounded, size: 16),
-            label: const Text('Open in Maps'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              side: const BorderSide(color: AppColors.primary),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _currentStatusBox(bool isDark, int done) {
-    final current = done >= TripStatusTimeline.stages.length
-        ? 'Trip Completed'
-        : TripStatusTimeline.stages[done];
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.info.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const AppText('Current Status', style: AppTextStyle.labelMedium),
-          const SizedBox(height: 2),
-          AppText(current,
-              style: AppTextStyle.bodyLarge,
-              color: AppColors.info,
-              fontWeight: FontWeight.w700),
-        ],
-      ),
     );
   }
 }

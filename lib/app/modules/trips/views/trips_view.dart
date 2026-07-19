@@ -115,6 +115,7 @@ class TripsView extends GetView<TripsController> {
                   );
                 }
                 return ListView.builder(
+                  controller: controller.scrollController,
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.only(bottom: 100),
                   itemCount: trips.length,
@@ -143,6 +144,9 @@ class TripsView extends GetView<TripsController> {
       case 'LOAD_REQUESTED':
       case 'DELIVERY_REQUESTED':
         return (const Color(0xFFE0F2FE), AppColors.info);
+      case 'LOAD_REJECTED':
+      case 'DELIVERY_REJECTED':
+        return (const Color(0xFFFEE2E2), AppColors.error);
       default:
         return (AppColors.secondaryLight, AppColors.textSecondary);
     }
@@ -173,7 +177,9 @@ class TripsView extends GetView<TripsController> {
       'EN_ROUTE_VENDOR',
       'LOADING',
       'LOAD_REQUESTED',
+      'LOAD_REJECTED',
       'ACTIVE NOW',
+      'DELIVERY_REJECTED',
     }.contains(status);
   }
 

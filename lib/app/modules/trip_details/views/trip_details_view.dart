@@ -143,20 +143,31 @@ class TripDetailsView extends GetView<TripDetailsController> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => Get.to(() => const TripStatusView()),
-                      icon: const Icon(Icons.published_with_changes_rounded,
-                          size: 18),
-                      label: const Text('Update Status'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                  Obx(() {
+                    final status = controller.tripStatus.value;
+                    final isActionable = status != 'PENDING' && status != 'DELIVERED' && status != 'REJECTED';
+                    if (!isActionable) return const SizedBox.shrink();
+                    return Expanded(
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => Get.to(() => const TripStatusView()),
+                              icon: const Icon(Icons.published_with_changes_rounded,
+                                  size: 18),
+                              label: const Text('Update Status'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                 ],
               ),
               const SizedBox(height: 24),

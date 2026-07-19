@@ -121,6 +121,14 @@ class FirebaseService extends GetxService {
       loadingPhotoUrl: data['loadingPhotoUrl'],
       gatePassPhotoUrl: data['gatePassPhotoUrl'],
       loadingPassGeneratedAt: data['loadingPassGeneratedAt'] ?? '',
+      loadRejectCount: (data['loadRejectCount'] as num?)?.toInt() ?? 0,
+      loadRejectReason: data['loadRejectReason'] ?? '',
+      flaggedPhoto: data['flaggedPhoto'] ?? 'both',
+      loadRejectAudit: data['loadRejectAudit'],
+      needsSupervisor: data['needsSupervisor'] ?? false,
+      deliveryRejectCount: (data['deliveryRejectCount'] as num?)?.toInt() ?? 0,
+      deliveryRejectReason: data['deliveryRejectReason'] ?? '',
+      deliveryRejectAudit: data['deliveryRejectAudit'],
     );
   }
 
@@ -514,6 +522,7 @@ class FirebaseService extends GetxService {
         'currentMilestone': 3,
         'isActive': false,
         'loadRequestedAt': FieldValue.serverTimestamp(),
+        'loadRejectReason': '',
         if (loadingPhotoUrl != null && loadingPhotoUrl.isNotEmpty)
           'loadingPhotoUrl': loadingPhotoUrl,
         if (gatePassPhotoUrl != null && gatePassPhotoUrl.isNotEmpty)
@@ -594,37 +603,43 @@ class FirebaseService extends GetxService {
     }
   }
 
-  /// Admin rejects the load — the trip goes back to ASSIGNED and the driver is
+  /// Admin rejects the load — the trip goes back to LOAD_REJECTED and the driver is
   /// told why.
   Future<void> rejectLoad(String tripId,
-      {String reason = '', String? adminName}) async {
+      {String reason = '', String flaggedPhoto = 'both', String? adminName}) async {
     try {
-      final data =
-          (await _db.collection('trips').doc(tripId).get()).data() ?? {};
+      final docRef = _db.collection('trips').doc(tripId);
+      final data = (await docRef.get()).data() ?? {};
       if (data['status'] != 'LOAD_REQUESTED') return; // already handled
-      await _db.collection('trips').doc(tripId).set({
-        'status': 'REJECTED',
-        'isActive': false,
+      
+      final currentRejectCount = (data['loadRejectCount'] as num?)?.toInt() ?? 0;
+      final newRejectCount = currentRejectCount + 1;
+      final needsEscalation = newRejectCount >= 3;
+      
+      final auditEntry = {
+        'timestamp': DateTime.now().toIso8601String(),
+        'reason': reason,
+        'flaggedPhoto': flaggedPhoto,
+        'adminName': adminName ?? 'Admin',
+        'rejectCount': newRejectCount,
+      };
+
+      await docRef.set({
+        'status': 'LOAD_REJECTED',
         'loadRejectReason': reason,
+        'flaggedPhoto': flaggedPhoto,
+        'loadRejectCount': newRejectCount,
+        'needsSupervisor': needsEscalation,
+        'loadRejectAudit': FieldValue.arrayUnion([auditEntry]),
       }, SetOptions(merge: true));
 
-      final truckNo = data['truckNo']?.toString() ?? '';
-      if (truckNo.isNotEmpty) {
-        await _db.collection('trucks').doc(truckNo).update({
-          'loadingPass': FieldValue.delete(),
-          'hasLoadingPass': FieldValue.delete(),
-          'destinationSetup': FieldValue.delete(),
-          'hasDestinationSetup': FieldValue.delete(),
-        });
-      }
       final driverPhone =
           (data['driverPhone'] ?? data['ownerId'])?.toString() ?? '';
       if (driverPhone.isNotEmpty) {
         await createNotification(
           toPhone: driverPhone,
-          title: 'Load Not Approved ⚠️',
-          body: 'Admin did not approve the load for trip $tripId.'
-              '${reason.isNotEmpty ? ' Reason: $reason' : ''}',
+          title: 'Load Rejected - Reupload Required ⚠️',
+          body: 'Admin rejected loading photos. Reason: $reason. Please reupload.',
           type: 'load_rejected',
           tripId: tripId,
         );
@@ -659,6 +674,7 @@ class FirebaseService extends GetxService {
       await _db.collection('trips').doc(tripId).set({
         'status': 'DELIVERY_REQUESTED',
         'deliveryRequestedAt': FieldValue.serverTimestamp(),
+        'deliveryRejectReason': '',
         if (latitude != null) 'currentLatitude': latitude,
         if (longitude != null) 'currentLongitude': longitude,
         if (location != null) 'currentAddress': location,
@@ -727,35 +743,38 @@ class FirebaseService extends GetxService {
     } catch (_) {}
   }
 
-  /// Admin rejects the delivery — trip goes back to ACTIVE NOW.
+  /// Admin rejects the delivery — trip goes to DELIVERY_REJECTED.
   Future<void> rejectDelivery(String tripId,
       {String reason = '', String? adminName}) async {
     try {
-      final data =
-          (await _db.collection('trips').doc(tripId).get()).data() ?? {};
+      final docRef = _db.collection('trips').doc(tripId);
+      final data = (await docRef.get()).data() ?? {};
       if (data['status'] != 'DELIVERY_REQUESTED') return; // already handled
-      await _db.collection('trips').doc(tripId).set({
-        'status': 'REJECTED',
-        'isActive': false,
+      
+      final currentRejectCount = (data['deliveryRejectCount'] as num?)?.toInt() ?? 0;
+      final newRejectCount = currentRejectCount + 1;
+      
+      final auditEntry = {
+        'timestamp': DateTime.now().toIso8601String(),
+        'reason': reason,
+        'adminName': adminName ?? 'Admin',
+        'rejectCount': newRejectCount,
+      };
+
+      await docRef.set({
+        'status': 'DELIVERY_REJECTED',
         'deliveryRejectReason': reason,
+        'deliveryRejectCount': newRejectCount,
+        'deliveryRejectAudit': FieldValue.arrayUnion([auditEntry]),
       }, SetOptions(merge: true));
 
-      final truckNo = data['truckNo']?.toString() ?? '';
-      if (truckNo.isNotEmpty) {
-        await _db.collection('trucks').doc(truckNo).update({
-          'loadingPass': FieldValue.delete(),
-          'hasLoadingPass': FieldValue.delete(),
-          'destinationSetup': FieldValue.delete(),
-          'hasDestinationSetup': FieldValue.delete(),
-        });
-      }
       final driverPhone =
           (data['driverPhone'] ?? data['ownerId'])?.toString() ?? '';
       if (driverPhone.isNotEmpty) {
         await createNotification(
           toPhone: driverPhone,
-          title: 'Delivery Not Approved ⚠️',
-          body: 'Admin did not approve delivery for trip $tripId.'
+          title: 'Delivery Proof Rejected ⚠️',
+          body: 'Admin rejected delivery proof for trip $tripId.'
               '${reason.isNotEmpty ? ' Reason: $reason' : ''}',
           type: 'delivery_rejected',
           tripId: tripId,

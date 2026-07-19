@@ -11,8 +11,24 @@ import '../../../../widgets/dialogs/app_snackbar.dart';
 
 class TripsController extends GetxController {
   final searchController = TextEditingController();
+  final scrollController = ScrollController();
   final RxString activeTab = 'Today'.obs;
   final RxString searchQuery = ''.obs;
+
+  void scrollToActiveTrip(String tripId) {
+    selectTab('Today');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final idx = filteredTrips.indexWhere((t) => t.id == tripId);
+      if (idx != -1 && scrollController.hasClients) {
+        final offset = idx * 360.0;
+        scrollController.animateTo(
+          offset,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
 
   // Static stats
   final int pendingPickups = 4;
@@ -27,8 +43,10 @@ class TripsController extends GetxController {
     'EN_ROUTE_VENDOR',
     'LOADING',
     'LOAD_REQUESTED',
+    'LOAD_REJECTED',
     'ACTIVE NOW',
     'DELIVERY_REQUESTED',
+    'DELIVERY_REJECTED',
   };
 
   bool _matchesTab(TripItemModel trip) {
@@ -56,6 +74,9 @@ class TripsController extends GetxController {
       case 'EN_ROUTE_VENDOR':
       case 'LOADING':
       case 'LOAD_REQUESTED':
+      case 'LOAD_REJECTED':
+      case 'DELIVERY_REQUESTED':
+      case 'DELIVERY_REJECTED':
         return 0; // Active / Ongoing
       case 'PENDING':
       case 'ASSIGNED':
@@ -269,7 +290,7 @@ class TripsController extends GetxController {
   }
 
   /// Driver uploads loading photo and requests admin approval (LOADING → LOAD_REQUESTED)
-  Future<void> markTruckLoaded(String tripId, Uint8List photoBytes, Uint8List gatePassBytes) async {
+  Future<void> markTruckLoaded(String tripId, Uint8List? photoBytes, Uint8List? gatePassBytes) async {
     final fb = Get.find<FirebaseService>();
     final session = Get.find<SessionService>();
     final locationService = Get.find<LocationService>();
@@ -279,8 +300,14 @@ class TripsController extends GetxController {
       final pos = await locationService.getCurrentPosition();
       final address = await locationService.getAddressFromCoordinates(pos.latitude, pos.longitude);
 
-      final photoUrl = await fb.uploadLoadingPhoto(tripId, photoBytes);
-      final gatePassUrl = await fb.uploadGatePassPhoto(tripId, gatePassBytes);
+      String? photoUrl;
+      if (photoBytes != null) {
+        photoUrl = await fb.uploadLoadingPhoto(tripId, photoBytes);
+      }
+      String? gatePassUrl;
+      if (gatePassBytes != null) {
+        gatePassUrl = await fb.uploadGatePassPhoto(tripId, gatePassBytes);
+      }
       await fb.requestLoadApproval(
         tripId,
         pickupLocation: address,
@@ -305,6 +332,7 @@ class TripsController extends GetxController {
   void onClose() {
     _tripsSub?.cancel();
     searchController.dispose();
+    scrollController.dispose();
     super.onClose();
   }
 }
@@ -347,6 +375,17 @@ class TripItemModel {
   final String? loadingPhotoUrl;
   final String? gatePassPhotoUrl;
   final String loadingPassGeneratedAt;
+  
+  // Rejection/Verification fields
+  final int loadRejectCount;
+  final String loadRejectReason;
+  final String flaggedPhoto; // 'loading', 'gate_pass', or 'both'
+  final List<dynamic>? loadRejectAudit;
+  final bool needsSupervisor;
+
+  final int deliveryRejectCount;
+  final String deliveryRejectReason;
+  final List<dynamic>? deliveryRejectAudit;
 
   TripItemModel({
     required this.id,
@@ -385,6 +424,14 @@ class TripItemModel {
     this.loadingPhotoUrl,
     this.gatePassPhotoUrl,
     this.loadingPassGeneratedAt = '',
+    this.loadRejectCount = 0,
+    this.loadRejectReason = '',
+    this.flaggedPhoto = 'both',
+    this.loadRejectAudit,
+    this.needsSupervisor = false,
+    this.deliveryRejectCount = 0,
+    this.deliveryRejectReason = '',
+    this.deliveryRejectAudit,
   });
 
   TripItemModel copyWith({
@@ -424,6 +471,14 @@ class TripItemModel {
     String? loadingPhotoUrl,
     String? gatePassPhotoUrl,
     String? loadingPassGeneratedAt,
+    int? loadRejectCount,
+    String? loadRejectReason,
+    String? flaggedPhoto,
+    List<dynamic>? loadRejectAudit,
+    bool? needsSupervisor,
+    int? deliveryRejectCount,
+    String? deliveryRejectReason,
+    List<dynamic>? deliveryRejectAudit,
   }) {
     return TripItemModel(
       id: id ?? this.id,
@@ -462,6 +517,14 @@ class TripItemModel {
       loadingPhotoUrl: loadingPhotoUrl ?? this.loadingPhotoUrl,
       gatePassPhotoUrl: gatePassPhotoUrl ?? this.gatePassPhotoUrl,
       loadingPassGeneratedAt: loadingPassGeneratedAt ?? this.loadingPassGeneratedAt,
+      loadRejectCount: loadRejectCount ?? this.loadRejectCount,
+      loadRejectReason: loadRejectReason ?? this.loadRejectReason,
+      flaggedPhoto: flaggedPhoto ?? this.flaggedPhoto,
+      loadRejectAudit: loadRejectAudit ?? this.loadRejectAudit,
+      needsSupervisor: needsSupervisor ?? this.needsSupervisor,
+      deliveryRejectCount: deliveryRejectCount ?? this.deliveryRejectCount,
+      deliveryRejectReason: deliveryRejectReason ?? this.deliveryRejectReason,
+      deliveryRejectAudit: deliveryRejectAudit ?? this.deliveryRejectAudit,
     );
   }
 }

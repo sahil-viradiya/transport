@@ -68,10 +68,12 @@ class TripStatusTimeline extends StatelessWidget {
       case 'EN_ROUTE_VENDOR':
         return 3;
       case 'LOADING':
+      case 'LOAD_REJECTED':
         return 5;
       case 'LOAD_REQUESTED':
         return 6;
       case 'ACTIVE NOW':
+      case 'DELIVERY_REJECTED':
         return 7;
       case 'DELIVERY_REQUESTED':
         return 8;

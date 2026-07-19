@@ -325,7 +325,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           ),
           const SizedBox(height: 10),
           SizedBox(
-            height: 440,
+            height: 510,
             child: assignedTrucks.isEmpty
                 ? _buildEmptyPlaceholder('No trucks assigned yet. Assign a truck from above.')
                 : SingleChildScrollView(
@@ -610,6 +610,16 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         icon = Icons.verified_rounded;
         color = const Color(0xFFF97316);
         break;
+      case 'DELIVERY_REJECTED':
+        label = 'Delivery Rejected - Reupload Pending ⚠️';
+        icon = Icons.warning_amber_rounded;
+        color = const Color(0xFFDC2626);
+        break;
+      case 'LOAD_REJECTED':
+        label = 'Load Rejected - Reupload Pending ⚠️';
+        icon = Icons.warning_amber_rounded;
+        color = const Color(0xFFDC2626);
+        break;
       default:
         label = 'Trip Active';
         icon = Icons.info_outline;
@@ -649,6 +659,63 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             ],
           ),
         ),
+        if (status == 'LOAD_REJECTED') ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: widget.isDark ? const Color(0xFF451A03) : const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: widget.isDark ? const Color(0xFF78350F) : const Color(0xFFFCA5A5)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Rejection Reason: ${activeTrip['loadRejectReason'] ?? 'None'}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: widget.isDark ? const Color(0xFFFDBA74) : const Color(0xFF991B1B),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Flagged Photo: ${activeTrip['flaggedPhoto'] == 'loading' ? 'Loading Photo Only' : activeTrip['flaggedPhoto'] == 'gate_pass' ? 'Gate Pass Photo Only' : 'Both Photos'}',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: widget.isDark ? const Color(0xFFF59E0B) : const Color(0xFFB91C1C),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (status == 'DELIVERY_REJECTED') ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: widget.isDark ? const Color(0xFF451A03) : const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: widget.isDark ? const Color(0xFF78350F) : const Color(0xFFFCA5A5)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Rejection Reason: ${activeTrip['deliveryRejectReason'] ?? 'None'}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: widget.isDark ? const Color(0xFFFDBA74) : const Color(0xFF991B1B),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         if (status == 'LOAD_REQUESTED' || (status == 'DELIVERY_REQUESTED' && hasPodPhoto)) ...[
           const SizedBox(height: 8),
           Row(
@@ -882,54 +949,120 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
   }
 
   void _showRejectLoadDialog(String tripId) {
+    String selectedReason = 'Photo unclear/blurry';
+    final List<String> reasons = [
+      'Photo unclear/blurry',
+      'Wrong truck/quantity mismatch',
+      'Bill number mismatch',
+      'Sequence incorrect',
+      'Other'
+    ];
+    String selectedPhotoFlag = 'both'; // 'loading', 'gate_pass', 'both'
     final reasonCtrl = TextEditingController();
+
     Get.dialog(
-      AlertDialog(
-        backgroundColor: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Reject Load?', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text('Reason likhein load reject karne ka:'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonCtrl,
-              decoration: InputDecoration(
-                labelText: 'Rejection Reason',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Reject Load Verification?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('Select Rejection Reason (Mandatory):', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    dropdownColor: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
+                    value: selectedReason,
+                    items: reasons.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 13)))).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          selectedReason = val;
+                        });
+                      }
+                    },
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  if (selectedReason == 'Other') ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: reasonCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Specify Custom Reason',
+                        labelStyle: const TextStyle(fontSize: 13),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  const Text('Flag Specific Photo to Re-upload:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    dropdownColor: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
+                    value: selectedPhotoFlag,
+                    items: const [
+                      DropdownMenuItem(value: 'both', child: Text('Both Photos', style: TextStyle(fontSize: 13))),
+                      DropdownMenuItem(value: 'loading', child: Text('Loading Photo Only', style: TextStyle(fontSize: 13))),
+                      DropdownMenuItem(value: 'gate_pass', child: Text('Gate Pass Photo Only', style: TextStyle(fontSize: 13))),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          selectedPhotoFlag = val;
+                        });
+                      }
+                    },
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
-            onPressed: () async {
-              final reason = reasonCtrl.text.trim();
-              if (reason.isEmpty) {
-                Get.snackbar('Alert', 'Please enter a reason');
-                return;
-              }
-              Get.back();
-              AppPopup.showLoading(message: 'Rejecting Load...');
-              try {
-                await _firebaseService.rejectLoad(tripId, reason: reason);
-                AppPopup.hideLoading();
-                Get.snackbar('Rejected', 'Load request rejected.', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent, colorText: Colors.white);
-              } catch (e) {
-                AppPopup.hideLoading();
-                Get.snackbar('Error', e.toString());
-              }
-            },
-            child: const Text('Reject', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+                onPressed: () async {
+                  String finalReason = selectedReason;
+                  if (selectedReason == 'Other') {
+                    finalReason = reasonCtrl.text.trim();
+                    if (finalReason.isEmpty) {
+                      Get.snackbar('Alert', 'Please specify a custom reason');
+                      return;
+                    }
+                  }
+                  Get.back();
+                  AppPopup.showLoading(message: 'Rejecting Load...');
+                  try {
+                    await _firebaseService.rejectLoad(
+                      tripId,
+                      reason: finalReason,
+                      flaggedPhoto: selectedPhotoFlag,
+                    );
+                    AppPopup.hideLoading();
+                    Get.snackbar('Rejected', 'Load request rejected.', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent, colorText: Colors.white);
+                  } catch (e) {
+                    AppPopup.hideLoading();
+                    Get.snackbar('Error', e.toString());
+                  }
+                },
+                child: const Text('Reject', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        }
       ),
     );
   }

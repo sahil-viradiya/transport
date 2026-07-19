@@ -269,7 +269,7 @@ class TripDetailsController extends GetxController {
   /// While the load request waits without a destination, remind the admin once
   /// after ~10 minutes and then surface a direct "Call Admin" option.
   void _syncDestinationReminder(Map<String, dynamic> data) {
-    final waiting = (data['status'] == 'LOADING' || data['status'] == 'LOAD_REQUESTED') &&
+    final waiting = (data['status'] == 'LOADING' || data['status'] == 'LOAD_REQUESTED' || data['status'] == 'LOAD_REJECTED') &&
         (data['dropCity'] ?? '').toString().trim().isEmpty;
     if (!waiting) {
       _destReminderTimer?.cancel();
@@ -321,6 +321,13 @@ class TripDetailsController extends GetxController {
         );
         return;
 
+      case 'DELIVERY_REJECTED':
+        AppSnackBar.showError(
+          title: 'Delivery Proof Rejected ⚠️',
+          message: 'Proof of Delivery is rejected by admin. Please re-upload it from the main Trips tab.',
+        );
+        return;
+
       case 'ACTIVE NOW':
         Get.toNamed(Routes.PROOF_OF_DELIVERY, arguments: {'tripId': tripId})?.then((result) async {
           if (result == true) {
@@ -357,6 +364,13 @@ class TripDetailsController extends GetxController {
           title: 'Awaiting Approval',
           message: 'Load approval request admin ko bheja ja chuka hai. '
               'Approve hote hi trip active hogi.',
+        );
+        return;
+
+      case 'LOAD_REJECTED':
+        AppSnackBar.showError(
+          title: 'Load Rejected ⚠️',
+          message: 'Loading photos are rejected by admin. Please re-upload them from the main Trips tab.',
         );
         return;
 
