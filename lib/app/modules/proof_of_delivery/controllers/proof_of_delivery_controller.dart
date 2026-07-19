@@ -89,29 +89,32 @@ class ProofOfDeliveryController extends GetxController {
     const totalSteps = 5;
     for (int i = 1; i <= totalSteps; i++) {
       await Future.delayed(const Duration(milliseconds: 150));
-      uploadProgress.value = (i / totalSteps) * 0.7; // Go up to 70% during simulation prep
+      uploadProgress.value =
+          (i / totalSteps) * 0.7; // Go up to 70% during simulation prep
     }
 
     String finalUrl = '';
     try {
       final firebaseService = Get.find<FirebaseService>();
-      
+
       final pos = await locationService.getCurrentPosition();
       final currentLat = pos.latitude;
       final currentLng = pos.longitude;
-      final currentAddr = await locationService.getAddressFromCoordinates(currentLat, currentLng);
+      final currentAddr = await locationService.getAddressFromCoordinates(
+          currentLat, currentLng);
 
-      finalUrl = await firebaseService.uploadProofOfDelivery(tripId.value, pickedBytes.value);
+      finalUrl = await firebaseService.uploadProofOfDelivery(
+          tripId.value, pickedBytes.value);
       uploadProgress.value = 0.9;
       await firebaseService.saveProofOfDeliveryDetails(
-        tripId.value, 
-        finalUrl, 
+        tripId.value,
+        finalUrl,
         remarksController.text,
         locationName: currentAddr,
         latitude: currentLat,
         longitude: currentLng,
       );
-      
+
       String driverName = '';
       try {
         driverName = Get.find<SessionService>().name.value;
@@ -141,10 +144,12 @@ class ProofOfDeliveryController extends GetxController {
         title: 'Upload Successful',
         message: 'Proof of delivery submitted successfully. Trip completed!',
       );
+      Get.back(result: true);
     } else {
       AppSnackBar.showWarning(
         title: 'Saved Locally (Fallback)',
-        message: 'Firebase Storage bucket not initialized. Proof of delivery saved locally on device.',
+        message:
+            'Firebase Storage bucket not initialized. Proof of delivery saved locally on device.',
       );
     }
 

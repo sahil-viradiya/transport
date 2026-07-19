@@ -28,19 +28,19 @@ class TripStatusView extends GetView<TripDetailsController> {
       case 'ASSIGNED':
         return 'Trip Assigned';
       case 'EN_ROUTE_VENDOR':
-        return 'On The Way to Vendor';
+        return 'On The Way (Vendor)';
       case 'LOADING':
         return 'Loading at Vendor';
       case 'LOAD_REQUESTED':
-        return 'Awaiting Load Approval';
+        return 'Load Approval';
       case 'LOAD_REJECTED':
-        return 'Load Photo Rejected';
+        return 'Load Rejected';
       case 'ACTIVE NOW':
         return 'On The Way (Dest.)';
       case 'DELIVERY_REQUESTED':
-        return 'Awaiting Delivery Approval';
+        return 'Delivery Approval';
       case 'DELIVERY_REJECTED':
-        return 'Delivery Proof Rejected';
+        return 'Delivery Rejected';
       case 'DELIVERED':
         return 'Completed';
       case 'REJECTED':
@@ -139,22 +139,31 @@ class TripStatusView extends GetView<TripDetailsController> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          AppText(
-                            controller.tripId,
-                            style: AppTextStyle.bodyLarge,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _statusColor(status).withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
+                          Expanded(
                             child: AppText(
-                              _friendlyStatus(status),
-                              style: AppTextStyle.labelMedium,
-                              color: _statusColor(status),
+                              controller.tripId,
+                              style: AppTextStyle.bodyLarge,
                               fontWeight: FontWeight.bold,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _statusColor(status).withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: AppText(
+                                _friendlyStatus(status),
+                                style: AppTextStyle.labelMedium,
+                                color: _statusColor(status),
+                                fontWeight: FontWeight.bold,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
                             ),
                           ),
                         ],
@@ -179,6 +188,56 @@ class TripStatusView extends GetView<TripDetailsController> {
                               const SizedBox(width: 6),
                               AppText('Truck: ${controller.vehicleNo.value}', style: AppTextStyle.bodyMedium),
                             ],
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const AppText('MATERIAL', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 10),
+                                const SizedBox(height: 4),
+                                AppText((data['materialName'] ?? '—').toString(), style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const AppText('ROYALTY OWNER', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 10),
+                                const SizedBox(height: 4),
+                                AppText((data['royaltyName'] ?? '—').toString(), style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const AppText('LOADING PASS ID', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 10),
+                                const SizedBox(height: 4),
+                                AppText((data['loadingPassId'] ?? '—').toString(), style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const AppText('PASS GENERATED AT', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 10),
+                                const SizedBox(height: 4),
+                                AppText((data['loadingPassGeneratedAt'] ?? '—').toString(), style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -301,25 +360,6 @@ class TripStatusView extends GetView<TripDetailsController> {
                       ),
               ),
 
-              // C. Primary Action Button (at the bottom)
-              if (status != 'DELIVERED' && status != 'REJECTED' && status != 'PENDING')
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: ElevatedButton.icon(
-                    onPressed: controller.startJourney,
-                    icon: const Icon(Icons.published_with_changes_rounded, size: 18),
-                    label: Text(controller.primaryActionLabel),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                  ),
-                ),
             ],
           ),
         );

@@ -14,13 +14,16 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF3F7FD),
+      backgroundColor:
+          isDark ? const Color(0xFF0F172A) : const Color(0xFFF3F7FD),
       appBar: AppBar(
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: isDark ? Colors.white : AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back_rounded,
+              color: isDark ? Colors.white : AppColors.textPrimary),
           onPressed: () => Get.back(),
         ),
-        title: const AppText('The Highway Authority', style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
+        title: const AppText('The Highway Authority',
+            style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
         actions: [
           IconButton(
             icon: const Icon(Icons.hub_rounded, color: AppColors.primary),
@@ -78,47 +81,22 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
                         color: Colors.white.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 28),
+                      child: const Icon(Icons.camera_alt_rounded,
+                          color: Colors.white, size: 28),
                     ),
                     const SizedBox(height: 12),
-                    const AppText('Take Photo', style: AppTextStyle.bodyLarge, color: Colors.white, fontWeight: FontWeight.bold),
+                    const AppText('Take Photo',
+                        style: AppTextStyle.bodyLarge,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold),
                     const SizedBox(height: 4),
-                    const AppText('Use Camera', style: AppTextStyle.labelMedium, color: Colors.white70),
+                    const AppText('Use Camera',
+                        style: AppTextStyle.labelMedium, color: Colors.white70),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 16),
-
-            // From Gallery Box Card
-            GestureDetector(
-              onTap: controller.fromGallery,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 28),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE9F2FF),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: isDark ? Colors.transparent : AppColors.primaryLight, width: 1.5),
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.image_rounded, color: AppColors.primary, size: 28),
-                    ),
-                    const SizedBox(height: 12),
-                    const AppText('From Gallery', style: AppTextStyle.bodyLarge, color: AppColors.primary, fontWeight: FontWeight.bold),
-                    const SizedBox(height: 4),
-                    const AppText('Browse Files', style: AppTextStyle.labelMedium, color: AppColors.secondary),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
 
             // Reactive Preview Card (Dotted Border container)
             Obx(() {
@@ -145,23 +123,31 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
                       children: [
                         const Row(
                           children: [
-                            Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 20),
+                            Icon(Icons.receipt_long_rounded,
+                                color: AppColors.primary, size: 20),
                             SizedBox(width: 8),
-                            AppText('Document Preview', style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
+                            AppText('Document Preview',
+                                style: AppTextStyle.bodyLarge,
+                                fontWeight: FontWeight.bold),
                           ],
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFE380).withValues(alpha: 0.3),
+                            color:
+                                const Color(0xFFFFE380).withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const AppText('Draft', style: AppTextStyle.labelMedium, color: Color(0xFFBF2600), fontWeight: FontWeight.bold),
+                          child: const AppText('Draft',
+                              style: AppTextStyle.labelMedium,
+                              color: Color(0xFFBF2600),
+                              fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Scanned Document image illustration container
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
@@ -175,7 +161,7 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
                                 width: double.infinity,
                                 height: double.infinity,
                                 fit: BoxFit.cover),
-                            
+
                             // Bottom Info Overlay Bar
                             Positioned(
                               bottom: 0,
@@ -183,22 +169,25 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
                               right: 0,
                               child: Container(
                                 color: Colors.black.withValues(alpha: 0.6),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
                                 child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Expanded(
+                                    const Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          const AppText(
+                                          AppText(
                                             'proof_of_delivery.jpg',
                                             style: AppTextStyle.bodyMedium,
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold,
                                             overflow: TextOverflow.ellipsis,
                                           ),
-                                          const AppText(
+                                          AppText(
                                             'Uploaded today, 14:22 PM',
                                             style: AppTextStyle.labelMedium,
                                             color: Colors.white70,
@@ -214,7 +203,10 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
                                           color: AppColors.error,
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 20),
+                                        child: const Icon(
+                                            Icons.delete_outline_rounded,
+                                            color: Colors.white,
+                                            size: 20),
                                       ),
                                     ),
                                   ],
@@ -231,11 +223,14 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
             }),
 
             // Remarks Area
-            const AppText('REMARKS / NOTES', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+            const AppText('REMARKS / NOTES',
+                style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
             const SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE9F2FF).withValues(alpha: 0.4),
+                color: isDark
+                    ? const Color(0xFF1E293B)
+                    : const Color(0xFFE9F2FF).withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: TextField(
@@ -245,8 +240,11 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
                   color: isDark ? Colors.white : AppColors.textPrimary,
                 ),
                 decoration: InputDecoration(
-                  hintText: 'Enter any discrepancies, damage notes, or recipient name...',
-                  hintStyle: TextStyle(color: isDark ? Colors.white30 : AppColors.textHint, fontSize: 14),
+                  hintText:
+                      'Enter any discrepancies, damage notes, or recipient name...',
+                  hintStyle: TextStyle(
+                      color: isDark ? Colors.white30 : AppColors.textHint,
+                      fontSize: 14),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.all(16),
                 ),
@@ -263,7 +261,10 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
                     color: isDark ? const Color(0xFF1E293B) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: const [
-                      BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))
+                      BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 4,
+                          offset: Offset(0, 2))
                     ],
                   ),
                   child: Column(
@@ -274,12 +275,18 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
                         children: [
                           const Row(
                             children: [
-                              Icon(Icons.sync_rounded, color: AppColors.primary, size: 16),
+                              Icon(Icons.sync_rounded,
+                                  color: AppColors.primary, size: 16),
                               SizedBox(width: 8),
-                              AppText('Uploading Proof...', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+                              AppText('Uploading Proof...',
+                                  style: AppTextStyle.labelMedium,
+                                  fontWeight: FontWeight.bold),
                             ],
                           ),
-                          AppText('${(controller.uploadProgress.value * 100).toInt()}%', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+                          AppText(
+                              '${(controller.uploadProgress.value * 100).toInt()}%',
+                              style: AppTextStyle.labelMedium,
+                              fontWeight: FontWeight.bold),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -288,7 +295,8 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
                         minHeight: 4,
                         borderRadius: BorderRadius.circular(2),
                         backgroundColor: AppColors.border,
-                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                            AppColors.primary),
                       ),
                     ],
                   ),

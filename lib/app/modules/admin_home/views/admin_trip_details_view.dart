@@ -374,6 +374,10 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                 _buildLocationsOverviewCard(context, isDark, trip),
                 const SizedBox(height: 24),
 
+                // New: Pass & Royalty Details Card
+                _buildPassRoyaltyDetailsCard(context, isDark, trip),
+                const SizedBox(height: 24),
+
                 // 2b. Verification Proofs (if load/delivery requested or rejected)
                 if (trip['loadingPhotoUrl']?.toString().isNotEmpty == true ||
                     trip['gatePassPhotoUrl']?.toString().isNotEmpty == true ||
@@ -1861,6 +1865,65 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPassRoyaltyDetailsCard(BuildContext context, bool isDark, Map<String, dynamic> trip) {
+    final material = (trip['materialName'] ?? '—').toString();
+    final royalty = (trip['royaltyName'] ?? '—').toString();
+    final passId = (trip['loadingPassId'] ?? '—').toString();
+    final passGenTime = (trip['loadingPassGeneratedAt'] ?? '—').toString();
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.workspace_premium_rounded, color: AppColors.primary, size: 20),
+              SizedBox(width: 8),
+              AppText(
+                'PASS & ROYALTY DETAILS',
+                style: AppTextStyle.labelLarge,
+                fontWeight: FontWeight.bold,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildPassDetailRow(Icons.category_rounded, 'Material Name', material),
+          const Divider(height: 24),
+          _buildPassDetailRow(Icons.workspace_premium_rounded, 'Royalty Name', royalty),
+          const Divider(height: 24),
+          _buildPassDetailRow(Icons.confirmation_number_rounded, 'Loading Pass ID', passId),
+          const Divider(height: 24),
+          _buildPassDetailRow(Icons.calendar_today_rounded, 'Pass Generated At', passGenTime),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPassDetailRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey),
+        const SizedBox(width: 10),
+        AppText(label, style: AppTextStyle.bodyMedium, color: Colors.grey),
+        const Spacer(),
+        AppText(value, style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+      ],
     );
   }
 }

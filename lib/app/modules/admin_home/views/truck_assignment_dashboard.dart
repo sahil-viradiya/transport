@@ -9,6 +9,7 @@ import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/app/core/utils/image_url.dart';
 import '../controllers/admin_home_controller.dart';
 import '../../../core/theme/app_colors.dart';
+import 'admin_trip_details_view.dart';
 
 class DriverInfo {
   final String name;
@@ -408,7 +409,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               Row(
                 children: [
                   _buildStatusBadge(state),
-                  if (state != 'Pending Acceptance') ...[
+                  if (state != 'Pending Acceptance' && state != 'Accepted') ...[
                     const SizedBox(width: 4),
                     Tooltip(
                       message: 'Reset card assignment',
@@ -635,28 +636,32 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: color.withOpacity(0.3), width: 1),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: color,
+        InkWell(
+          onTap: () => Get.to(() => const AdminTripDetailsView(), arguments: {'tripId': tripId}),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: color.withOpacity(0.3), width: 1),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, size: 14, color: color),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         if (status == 'LOAD_REJECTED') ...[
