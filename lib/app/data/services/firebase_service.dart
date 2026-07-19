@@ -1483,6 +1483,7 @@ class FirebaseService extends GetxService {
       // 2. Assign the truck to this driver (will overwrite any previous driver assigned to this truckNo)
       await _db.collection('trucks').doc(truckNo).set({
         'truckNo': truckNo,
+        'ownerId': ownerKey,
         if (model != null && model.isNotEmpty) 'model': model,
         'assignedTo': p,
         'assignedBy': ownerKey,

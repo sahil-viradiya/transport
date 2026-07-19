@@ -25,9 +25,10 @@ service cloud.firestore {
     }
 
     function isPhoneMatch(dbPhone) {
-      return dbPhone == phone() ||
+      return dbPhone != null && (
+             dbPhone == phone() ||
              '+91' + dbPhone == phone() ||
-             '91' + dbPhone == phone();
+             '91' + dbPhone == phone());
     }
 
     function ownsIncoming() {
@@ -63,9 +64,9 @@ service cloud.firestore {
     }
 
     match /trucks/{truckId} {
-      allow read:   if isSignedIn() && (ownsExisting() || resource.data.assignedTo == phone() || isAdmin());
-      allow create: if isSignedIn() && (ownsIncoming() || request.resource.data.assignedTo == phone() || isAdmin());
-      allow update: if isSignedIn() && (ownsExisting() || resource.data.assignedTo == phone() || isAdmin());
+      allow read:   if isSignedIn() && (ownsExisting() || isPhoneMatch(resource.data.assignedTo) || isAdmin());
+      allow create: if isSignedIn() && (ownsIncoming() || isPhoneMatch(request.resource.data.assignedTo) || isAdmin());
+      allow update: if isSignedIn() && (ownsExisting() || isPhoneMatch(resource.data.assignedTo) || isAdmin());
       allow delete: if isSignedIn() && (ownsExisting() || isAdmin());
     }
 

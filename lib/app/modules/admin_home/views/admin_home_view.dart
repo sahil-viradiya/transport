@@ -5391,65 +5391,27 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           ),
                           const SizedBox(height: 16),
                           // --- Material / per-trip details (vendor set above) ---
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextFormField(
-                                  controller: materialCtrl,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Material Name',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.category_rounded),
-                                  ),
-                                  validator: (v) =>
-                                      v!.isEmpty ? 'Field required' : null,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: TextFormField(
-                                  controller: pickupDistrictCtrl,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Pickup District',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.map_rounded),
-                                  ),
-                                  validator: (v) =>
-                                      v!.isEmpty ? 'Field required' : null,
-                                ),
-                              ),
-                            ],
+                          TextFormField(
+                            controller: materialCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Material Name',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.category_rounded),
+                            ),
+                            validator: (v) =>
+                                v!.isEmpty ? 'Field required' : null,
                           ),
                           const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextFormField(
-                                  controller: passHolderCtrl,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Pass Holder Name',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.badge_rounded),
-                                  ),
-                                  validator: (v) =>
-                                      v!.isEmpty ? 'Field required' : null,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: TextFormField(
-                                  controller: royaltyCtrl,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Royalty Name',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon:
-                                        Icon(Icons.workspace_premium_rounded),
-                                  ),
-                                  validator: (v) =>
-                                      v!.isEmpty ? 'Field required' : null,
-                                ),
-                              ),
-                            ],
+                          TextFormField(
+                            controller: royaltyCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Royalty Name',
+                              border: OutlineInputBorder(),
+                              prefixIcon:
+                                  Icon(Icons.workspace_premium_rounded),
+                            ),
+                            validator: (v) =>
+                                v!.isEmpty ? 'Field required' : null,
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
@@ -5473,163 +5435,14 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             },
                           ),
                           const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextFormField(
-                                  controller: pickupCityCtrl,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Pickup City',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon:
-                                        Icon(Icons.location_city_rounded),
-                                  ),
-                                  validator: (v) =>
-                                      v!.isEmpty ? 'Field required' : null,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: TextFormField(
-                                  controller: dropCityCtrl,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Drop City (optional)',
-                                    helperText: 'Loading ke time set hoga',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon:
-                                        Icon(Icons.location_city_rounded),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
                           TextFormField(
-                            controller: pickupLocCtrl,
-                            decoration: InputDecoration(
-                              labelText: 'Pickup Location',
-                              border: const OutlineInputBorder(),
-                              prefixIcon: const Icon(Icons.pin_drop_rounded),
-                              suffixIcon: IconButton(
-                                icon: const Icon(Icons.search_rounded,
-                                    color: AppColors.primary),
-                                tooltip: 'Search Coordinates',
-                                onPressed: () async {
-                                  final query =
-                                      "${pickupLocCtrl.text.trim()}, ${pickupCityCtrl.text.trim()}";
-                                  await _resolveCoordinates(context, query,
-                                      pickupLatCtrl, pickupLngCtrl);
-                                },
-                              ),
+                            controller: dropCityCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Drop City (optional)',
+                              helperText: 'Loading ke time set hoga',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.location_city_rounded),
                             ),
-                            validator: (v) =>
-                                v!.isEmpty ? 'Field required' : null,
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextFormField(
-                                  controller: pickupLatCtrl,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Pickup Latitude',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.map_rounded),
-                                  ),
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                          decimal: true),
-                                  validator: (v) => v!.isEmpty
-                                      ? 'Required'
-                                      : (double.tryParse(v) == null
-                                          ? 'Invalid number'
-                                          : null),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: TextFormField(
-                                  controller: pickupLngCtrl,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Pickup Longitude',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.map_rounded),
-                                  ),
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                          decimal: true),
-                                  validator: (v) => v!.isEmpty
-                                      ? 'Required'
-                                      : (double.tryParse(v) == null
-                                          ? 'Invalid number'
-                                          : null),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: dropLocCtrl,
-                            decoration: InputDecoration(
-                              labelText: 'Drop Location (optional)',
-                              helperText:
-                                  'Destination loading ke time set kar sakte hain',
-                              border: const OutlineInputBorder(),
-                              prefixIcon: const Icon(Icons.pin_drop_rounded),
-                              suffixIcon: IconButton(
-                                icon: const Icon(Icons.search_rounded,
-                                    color: AppColors.primary),
-                                tooltip: 'Search Coordinates',
-                                onPressed: () async {
-                                  final query =
-                                      "${dropLocCtrl.text.trim()}, ${dropCityCtrl.text.trim()}";
-                                  await _resolveCoordinates(
-                                      context, query, dropLatCtrl, dropLngCtrl);
-                                },
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextFormField(
-                                  controller: dropLatCtrl,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Drop Latitude',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.map_rounded),
-                                  ),
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                          decimal: true),
-                                  validator: (v) => v!.isEmpty
-                                      ? 'Required'
-                                      : (double.tryParse(v) == null
-                                          ? 'Invalid number'
-                                          : null),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: TextFormField(
-                                  controller: dropLngCtrl,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Drop Longitude',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.map_rounded),
-                                  ),
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                          decimal: true),
-                                  validator: (v) => v!.isEmpty
-                                      ? 'Required'
-                                      : (double.tryParse(v) == null
-                                          ? 'Invalid number'
-                                          : null),
-                                ),
-                              ),
-                            ],
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
