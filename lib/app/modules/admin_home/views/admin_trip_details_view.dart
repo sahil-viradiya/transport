@@ -1702,16 +1702,43 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
   }
 
   void _showSetDestinationDialog(BuildContext context, Map<String, dynamic> trip) {
+    final adminController = Get.find<AdminHomeController>();
     final formKey = GlobalKey<FormState>();
     final truckNo = (trip['truckNo'] ?? '').toString();
     final tripId = (trip['id'] ?? '').toString();
 
     final customerNameCtrl = TextEditingController(text: (trip['dropCity'] ?? '').toString());
-    final customerSiteCtrl = TextEditingController(text: (trip['dropLocation'] ?? '').toString());
+    final customerSiteCtrl = TextEditingController(text: (trip['customerSite'] ?? trip['siteName'] ?? '').toString());
+    final customerLocCtrl = TextEditingController(text: (trip['dropLocation'] ?? trip['location'] ?? '').toString());
     final detailsCtrl = TextEditingController();
+    TextEditingController? siteTextController;
+    TextEditingController? locTextController;
 
-    final customersList = ["Tata Motors", "Mahindra Log", "L&T Construction", "Reliance Industries", "Adani Power"];
-    final sitesList = ["Pune Hub", "Chennai GIDC", "Kolkata Port", "Delhi Depot", "Nagpur GIDC"];
+    final dbCustomers = adminController.customers
+        .map((c) => (c['name'] ?? '').toString().trim())
+        .where((n) => n.isNotEmpty)
+        .toList();
+    final customersList = dbCustomers.isNotEmpty
+        ? dbCustomers
+        : ["Tata Motors", "Mahindra Log", "L&T Construction", "Reliance Industries", "Adani Power"];
+
+    final dbSites = adminController.customers
+        .map((c) => (c['siteName'] ?? c['customerSite'] ?? '').toString().trim())
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .toList();
+    final sitesList = dbSites.isNotEmpty
+        ? dbSites
+        : ["Pune Plant", "Chennai GIDC Site", "Kolkata Port Terminal", "Delhi Central Hub", "Nagpur Depot"];
+
+    final dbLocations = adminController.customers
+        .map((c) => (c['location'] ?? c['address'] ?? c['city'] ?? '').toString().trim())
+        .where((l) => l.isNotEmpty)
+        .toSet()
+        .toList();
+    final locationsList = dbLocations.isNotEmpty
+        ? dbLocations
+        : ["Pune, Maharashtra", "Chennai, Tamil Nadu", "Kolkata, West Bengal", "Delhi NCR", "Nagpur, Maharashtra"];
 
     Get.dialog(
       AlertDialog(
@@ -1739,20 +1766,28 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const AppText(
-                    'Step 2: Enter destination. "Save & Next" will immediately launch the Create Trip wizard.',
+                    'Step 2: Enter destination details. "Save & Next" will launch the Create Trip wizard.',
                     style: AppTextStyle.labelMedium,
                     color: Colors.grey,
                   ),
                   const SizedBox(height: 16),
 
-                  // Customer Name Autocomplete
+                  // 1. Customer Name Autocomplete
                   Autocomplete<String>(
                     initialValue: TextEditingValue(text: customerNameCtrl.text),
                     optionsBuilder: (TextEditingValue textEditingValue) {
+                      final currentDbNames = adminController.customers
+                          .map((c) => (c['name'] ?? '').toString().trim())
+                          .where((n) => n.isNotEmpty)
+                          .toList();
+                      final currentCustomersList = currentDbNames.isNotEmpty
+                          ? currentDbNames
+                          : customersList;
+
                       if (textEditingValue.text.isEmpty) {
-                        return customersList;
+                        return currentCustomersList;
                       }
-                      return customersList.where((String option) {
+                      return currentCustomersList.where((String option) {
                         return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
                       });
                     },
@@ -1774,22 +1809,50 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                     },
                     onSelected: (String selection) {
                       customerNameCtrl.text = selection;
+                      final foundCust = adminController.customers.firstWhereOrNull(
+                          (c) => (c['name'] ?? '').toString().trim().toLowerCase() == selection.trim().toLowerCase());
+                      if (foundCust != null) {
+                        final site = (foundCust['siteName'] ?? foundCust['customerSite'] ?? '').toString().trim();
+                        final loc = (foundCust['location'] ?? foundCust['address'] ?? foundCust['city'] ?? '').toString().trim();
+                        if (site.isNotEmpty) {
+                          customerSiteCtrl.text = site;
+                          if (siteTextController != null) {
+                            siteTextController!.text = site;
+                          }
+                        }
+                        if (loc.isNotEmpty) {
+                          customerLocCtrl.text = loc;
+                          if (locTextController != null) {
+                            locTextController!.text = loc;
+                          }
+                        }
+                      }
                     },
                   ),
                   const SizedBox(height: 14),
 
-                  // Customer Site Autocomplete
+                  // 2. Customer Site Name Autocomplete
                   Autocomplete<String>(
                     initialValue: TextEditingValue(text: customerSiteCtrl.text),
                     optionsBuilder: (TextEditingValue textEditingValue) {
+                      final currentDbSites = adminController.customers
+                          .map((c) => (c['siteName'] ?? c['customerSite'] ?? '').toString().trim())
+                          .where((s) => s.isNotEmpty)
+                          .toSet()
+                          .toList();
+                      final currentSitesList = currentDbSites.isNotEmpty
+                          ? currentDbSites
+                          : sitesList;
+
                       if (textEditingValue.text.isEmpty) {
-                        return sitesList;
+                        return currentSitesList;
                       }
-                      return sitesList.where((String option) {
+                      return currentSitesList.where((String option) {
                         return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
                       });
                     },
                     fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                      siteTextController = textEditingController;
                       textEditingController.addListener(() {
                         customerSiteCtrl.text = textEditingController.text;
                       });
@@ -1797,12 +1860,11 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                         controller: textEditingController,
                         focusNode: focusNode,
                         decoration: InputDecoration(
-                          labelText: 'Customer Site',
+                          labelText: 'Customer Site Name',
                           labelStyle: const TextStyle(fontSize: 12),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          prefixIcon: const Icon(Icons.location_on_rounded, size: 18),
+                          prefixIcon: const Icon(Icons.factory_rounded, size: 18),
                         ),
-                        validator: (value) => value == null || value.trim().isEmpty ? 'Enter customer site' : null,
                       );
                     },
                     onSelected: (String selection) {
@@ -1811,7 +1873,50 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Additional destination details
+                  // 3. Customer Location / Address Autocomplete
+                  Autocomplete<String>(
+                    initialValue: TextEditingValue(text: customerLocCtrl.text),
+                    optionsBuilder: (TextEditingValue textEditingValue) {
+                      final currentDbLocs = adminController.customers
+                          .map((c) => (c['location'] ?? c['address'] ?? c['city'] ?? '').toString().trim())
+                          .where((l) => l.isNotEmpty)
+                          .toSet()
+                          .toList();
+                      final currentLocsList = currentDbLocs.isNotEmpty
+                          ? currentDbLocs
+                          : locationsList;
+
+                      if (textEditingValue.text.isEmpty) {
+                        return currentLocsList;
+                      }
+                      return currentLocsList.where((String option) {
+                        return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                      });
+                    },
+                    fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                      locTextController = textEditingController;
+                      textEditingController.addListener(() {
+                        customerLocCtrl.text = textEditingController.text;
+                      });
+                      return TextFormField(
+                        controller: textEditingController,
+                        focusNode: focusNode,
+                        decoration: InputDecoration(
+                          labelText: 'Delivery Address / Location',
+                          labelStyle: const TextStyle(fontSize: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          prefixIcon: const Icon(Icons.pin_drop_rounded, size: 18),
+                        ),
+                        validator: (value) => value == null || value.trim().isEmpty ? 'Enter delivery location' : null,
+                      );
+                    },
+                    onSelected: (String selection) {
+                      customerLocCtrl.text = selection;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 4. Additional destination details
                   TextFormField(
                     controller: detailsCtrl,
                     maxLines: 2,
@@ -1840,16 +1945,24 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
             ),
             onPressed: () async {
               if (!formKey.currentState!.validate()) return;
+              final siteVal = customerSiteCtrl.text.trim();
+              final locVal = customerLocCtrl.text.trim();
+              final combinedSite = (siteVal.isNotEmpty && locVal.isNotEmpty)
+                  ? '$siteVal ($locVal)'
+                  : (siteVal.isNotEmpty ? siteVal : locVal);
+
               final data = {
                 'customerName': customerNameCtrl.text.trim(),
-                'customerSite': customerSiteCtrl.text.trim(),
+                'customerSite': combinedSite,
+                'siteName': siteVal,
+                'customerLocation': locVal,
                 'additionalDetails': detailsCtrl.text.trim(),
               };
               Get.back();
               AppPopup.showLoading(message: 'Saving Destination...');
               try {
                 // Update Firestore for trip
-                await controller.setDestination(tripId, data['customerName']!, data['customerSite']!);
+                await controller.setDestination(tripId, data['customerName']!, combinedSite);
                 
                 // Update active truck config if truckNo is valid
                 if (truckNo.isNotEmpty && truckNo != '-') {
