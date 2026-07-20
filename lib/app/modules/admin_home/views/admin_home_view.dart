@@ -132,12 +132,6 @@ class AdminHomeView extends GetView<AdminHomeController> {
                       label: 'Dashboard',
                     ),
                     NavigationDestination(
-                      icon: Icon(Icons.local_shipping_outlined),
-                      selectedIcon: Icon(Icons.local_shipping_rounded,
-                          color: AppColors.primary),
-                      label: 'Trucks',
-                    ),
-                    NavigationDestination(
                       icon: Icon(Icons.alt_route_outlined),
                       selectedIcon: Icon(Icons.alt_route_rounded,
                           color: AppColors.primary),
@@ -148,6 +142,12 @@ class AdminHomeView extends GetView<AdminHomeController> {
                       selectedIcon:
                           Icon(Icons.people_rounded, color: AppColors.primary),
                       label: 'Drivers',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.local_shipping_outlined),
+                      selectedIcon: Icon(Icons.local_shipping_rounded,
+                          color: AppColors.primary),
+                      label: 'Trucks',
                     ),
                     NavigationDestination(
                       icon: Icon(Icons.storefront_outlined),
@@ -177,15 +177,15 @@ class AdminHomeView extends GetView<AdminHomeController> {
 
   static const _navItems = [
     (Icons.dashboard_rounded, 'Dashboard', 0),
-    (Icons.local_shipping_rounded, 'Trucks', 2),
     (Icons.alt_route_rounded, 'Trips', 1),
     (Icons.people_rounded, 'Drivers', 3),
+    (Icons.local_shipping_rounded, 'Trucks', 2),
     (Icons.storefront_rounded, 'Vendors', 4),
     (Icons.apartment_rounded, 'Customers', 6),
     (Icons.currency_rupee_rounded, 'Expenses', 5),
   ];
 
-  static const _mobileNavOrder = [0, 2, 1, 3, 4, 6, 5];
+  static const _mobileNavOrder = [0, 1, 3, 2, 4, 6, 5];
 
   static const _monthNames = [
     'Jan',
@@ -2115,25 +2115,13 @@ class AdminHomeView extends GetView<AdminHomeController> {
   Widget _tripsToolbar(BuildContext context, bool isDark) {
     final borderColor = isDark ? Colors.white24 : Colors.grey.shade300;
 
-    final allCount = controller.trips.length;
-    final enRouteCount = controller.trips
-        .where((t) =>
-            t['status'] == 'EN_ROUTE_VENDOR' || t['status'] == 'ACTIVE NOW')
-        .length;
-    final pendingCount =
-        controller.trips.where((t) => t['status'] == 'PENDING').length;
-    final completedCount =
-        controller.trips.where((t) => t['status'] == 'DELIVERED').length;
-    final cancelledCount =
-        controller.trips.where((t) => t['status'] == 'REJECTED').length;
-
     return Wrap(
       spacing: 12,
       runSpacing: 12,
       alignment: WrapAlignment.spaceBetween,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        // Tab segments
+        // Tab segments (All | Today | En Route | Pending | Completed | Cancelled)
         Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
@@ -2142,24 +2130,21 @@ class AdminHomeView extends GetView<AdminHomeController> {
           ),
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _tripMockupFilterChip('All', 'All Trips ($allCount)'),
-                _tripMockupFilterChip('En Route', 'En Route ($enRouteCount)'),
-                _tripMockupFilterChip('Pending', 'Pending ($pendingCount)'),
-                _tripMockupFilterChip(
-                    'Completed', 'Completed ($completedCount)'),
-                _tripMockupFilterChip(
-                    'Cancelled', 'Cancelled ($cancelledCount)'),
-              ],
-            ),
+            child: Obx(() => Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _tripMockupFilterChip('All', 'All Trips (${controller.tripStatusCount("All")})'),
+                    _tripMockupFilterChip('Today', 'Today (${controller.tripStatusCount("Today")})'),
+                    _tripMockupFilterChip('En Route', 'En Route (${controller.tripStatusCount("En Route")})'),
+                    _tripMockupFilterChip('Pending', 'Pending (${controller.tripStatusCount("Pending")})'),
+                    _tripMockupFilterChip('Completed', 'Completed (${controller.tripStatusCount("Completed")})'),
+                    _tripMockupFilterChip('Cancelled', 'Cancelled (${controller.tripStatusCount("Cancelled")})'),
+                  ],
+                )),
           ),
         ),
 
-        // Date selection, Search, tune/clear filters. A Wrap (not a Row) so
-        // these controls flow onto the next line on narrow/mobile widths
-        // instead of overflowing the header.
+        // Driver selection, Date selection, Search, tune/clear filters.
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -2167,7 +2152,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
           children: [
             // Search Input
             SizedBox(
-              width: 180,
+              width: 170,
               height: 38,
               child: TextField(
                 controller: controller.tripSearchController,
@@ -2190,6 +2175,64 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 ),
               ),
             ),
+
+            // Driver-wise Filter Dropdown
+            Obx(() {
+              final driversList = controller.availableTripDriverNames;
+              final currentSelected = controller.tripDriverFilter.value;
+              final displaySelected = driversList.contains(currentSelected) ? currentSelected : 'All Drivers';
+              final isFiltered = displaySelected != 'All Drivers';
+
+              return Container(
+                height: 38,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isFiltered ? AppColors.primary : borderColor,
+                    width: isFiltered ? 1.5 : 1,
+                  ),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: displaySelected,
+                    isDense: true,
+                    icon: Icon(
+                      Icons.arrow_drop_down_rounded,
+                      color: isFiltered ? AppColors.primary : (isDark ? Colors.white70 : Colors.black54),
+                    ),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isFiltered ? FontWeight.bold : FontWeight.w500,
+                      color: isFiltered ? AppColors.primary : (isDark ? Colors.white : Colors.black87),
+                    ),
+                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    items: driversList.map((String driver) {
+                      return DropdownMenuItem<String>(
+                        value: driver,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              driver == 'All Drivers' ? Icons.badge_outlined : Icons.person_pin_rounded,
+                              size: 14,
+                              color: driver == displaySelected ? AppColors.primary : Colors.grey,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(driver),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) controller.setTripDriverFilter(val);
+                    },
+                  ),
+                ),
+              );
+            }),
+
             // Date Filter
             Obx(() {
               final d = controller.tripDateFilter.value;
@@ -2218,10 +2261,12 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 ),
               );
             }),
+
             // Clear / Filter Action
             IconButton(
               onPressed: controller.clearTripFilters,
               icon: const Icon(Icons.tune_rounded, size: 18),
+              tooltip: 'Reset Filters',
               style: IconButton.styleFrom(
                 side: BorderSide(color: borderColor),
                 shape: RoundedRectangleBorder(
@@ -7419,6 +7464,12 @@ class AdminHomeView extends GetView<AdminHomeController> {
   // Helper: Trip metadata summary (Driver Name, phone, truck registration info)
   Widget _buildTripMetadataCard(bool isDark, Map<String, dynamic> trip,
       String driverName, String driverPhone) {
+    String avatarUrl = (trip['driverAvatar'] ?? trip['driverPhoto'] ?? trip['driverAvatarUrl'] ?? trip['driverImage'] ?? '').toString().trim();
+    if (avatarUrl.isEmpty) {
+      if (driverPhone.isNotEmpty) avatarUrl = controller.driverAvatarFor(driverPhone);
+      if (avatarUrl.isEmpty && driverName.isNotEmpty) avatarUrl = controller.driverAvatarFor(driverName);
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -7431,12 +7482,31 @@ class AdminHomeView extends GetView<AdminHomeController> {
           Expanded(
             child: Row(
               children: [
-                CircleAvatar(
-                  backgroundColor: AppColors.primaryLight,
-                  radius: 22,
-                  child: const Icon(Icons.person_rounded,
-                      color: AppColors.primary),
-                ),
+                Builder(builder: (_) {
+                  if (avatarUrl.isNotEmpty && avatarUrl.startsWith('http')) {
+                    final corsUrl = kIsWeb ? 'https://images.weserv.nl/?url=${Uri.encodeComponent(avatarUrl)}' : avatarUrl;
+                    return CircleAvatar(
+                      radius: 22,
+                      backgroundColor: AppColors.primaryLight,
+                      child: ClipOval(
+                        child: Image.network(
+                          corsUrl,
+                          width: 44,
+                          height: 44,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(Icons.person_rounded, color: AppColors.primary, size: 22);
+                          },
+                        ),
+                      ),
+                    );
+                  }
+                  return CircleAvatar(
+                    backgroundColor: AppColors.primaryLight,
+                    radius: 22,
+                    child: const Icon(Icons.person_rounded, color: AppColors.primary),
+                  );
+                }),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

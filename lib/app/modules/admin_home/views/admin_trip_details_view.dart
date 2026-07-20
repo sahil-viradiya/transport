@@ -677,9 +677,62 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
         ? 'Sync Status: Active (${trip['currentAddress']})'
         : 'Sync Status: Awaiting GPS...';
 
+    final adminCtrl = Get.isRegistered<AdminHomeController>() ? Get.find<AdminHomeController>() : null;
+    String avatarUrl = (trip['driverAvatar'] ?? trip['driverPhoto'] ?? trip['driverAvatarUrl'] ?? trip['driverImage'] ?? '').toString().trim();
+    if (avatarUrl.isEmpty && adminCtrl != null) {
+      if (driverPhone.isNotEmpty) avatarUrl = adminCtrl.driverAvatarFor(driverPhone);
+      if (avatarUrl.isEmpty && driverName.isNotEmpty) avatarUrl = adminCtrl.driverAvatarFor(driverName);
+    }
+
     final driverCard = InkWell(
       onTap: () {
-        Get.snackbar('Driver Profile', 'Driver details are up to date.', snackPosition: SnackPosition.BOTTOM);
+        if (avatarUrl.isNotEmpty && avatarUrl.startsWith('http')) {
+          Get.dialog(
+            Dialog(
+              backgroundColor: Colors.black,
+              insetPadding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: AppText(
+                            '$driverName — Driver Profile Photo',
+                            style: AppTextStyle.bodyMedium,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Get.back(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Flexible(
+                    child: InteractiveViewer(
+                      child: Image.network(
+                        _getCorsWebUrl(avatarUrl),
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(Icons.broken_image_rounded, color: Colors.white54, size: 60),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        } else {
+          Get.snackbar('Driver Profile', '$driverName (${driverPhone.isNotEmpty ? driverPhone : "No Phone"})', snackPosition: SnackPosition.BOTTOM);
+        }
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -691,11 +744,31 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
         ),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: const Color(0xFFD1FAE5),
-              child: const Icon(Icons.person_rounded, color: Color(0xFF047857), size: 20),
-            ),
+            Builder(builder: (_) {
+              if (avatarUrl.isNotEmpty && avatarUrl.startsWith('http')) {
+                final corsUrl = _getCorsWebUrl(avatarUrl);
+                return CircleAvatar(
+                  radius: 22,
+                  backgroundColor: const Color(0xFFD1FAE5),
+                  child: ClipOval(
+                    child: Image.network(
+                      corsUrl,
+                      width: 44,
+                      height: 44,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(Icons.person_rounded, color: Color(0xFF047857), size: 22);
+                      },
+                    ),
+                  ),
+                );
+              }
+              return const CircleAvatar(
+                radius: 22,
+                backgroundColor: Color(0xFFD1FAE5),
+                child: Icon(Icons.person_rounded, color: Color(0xFF047857), size: 22),
+              );
+            }),
             const SizedBox(width: 14),
             Expanded(
               child: Column(

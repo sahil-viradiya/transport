@@ -253,10 +253,11 @@ class AdminHomeController extends GetxController {
   }
 
   // ---------------------------------------------------------------------------
-  // ADMIN TRIPS TAB: search + status filter + pagination
+  // ADMIN TRIPS TAB: search + status filter + driver filter + pagination
   // ---------------------------------------------------------------------------
   final RxString tripStatusFilter =
-      'All'.obs; // All|En Route|Pending|Completed|Cancelled
+      'All'.obs; // All|Today|En Route|Pending|Completed|Cancelled
+  final RxString tripDriverFilter = 'All Drivers'.obs;
   final RxString tripSearch = ''.obs;
   final tripSearchController = TextEditingController();
   final Rx<DateTime?> tripDateFilter = Rx<DateTime?>(null);
@@ -286,9 +287,35 @@ class AdminHomeController extends GetxController {
     'Dec'
   ];
 
+  bool _isTodayTrip(Map<String, dynamic> t) {
+    final now = DateTime.now();
+    final dateStr = (t['date'] ?? '').toString();
+
+    // 1. Check if dateStr contains "Today"
+    if (dateStr.toLowerCase().contains('today')) return true;
+
+    // 2. Check if dateStr contains today's formatted date e.g. "21 Jul"
+    final todayTag = '${now.day} ${_monthAbbr[now.month - 1]}';
+    if (dateStr.contains(todayTag)) return true;
+
+    // 3. Check createdAt field
+    final createdAt = t['createdAt'];
+    if (createdAt != null) {
+      final s = createdAt.toString();
+      if (s.contains('${now.year}') &&
+          s.contains('${now.month.toString().padLeft(2, '0')}') &&
+          s.contains('${now.day.toString().padLeft(2, '0')}')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   bool _tripMatchesFilter(Map<String, dynamic> t) {
     final s = (t['status'] ?? '').toString();
     switch (tripStatusFilter.value) {
+      case 'Today':
+        return _isTodayTrip(t);
       case 'En Route':
         return _enRouteStatuses.contains(s);
       case 'Pending':
@@ -300,6 +327,34 @@ class AdminHomeController extends GetxController {
       default:
         return true;
     }
+  }
+
+  bool _tripMatchesDriver(Map<String, dynamic> t) {
+    final selected = tripDriverFilter.value;
+    if (selected == 'All Drivers' || selected.isEmpty) return true;
+    final phone = (t['driverPhone'] ?? '').toString();
+    final directName = (t['driverName'] ?? '').toString();
+    final resolvedName = directName.isNotEmpty ? directName : driverNameFor(phone);
+    return resolvedName.trim().toLowerCase() == selected.trim().toLowerCase() ||
+        phone.trim() == selected.trim();
+  }
+
+  List<String> get availableTripDriverNames {
+    final names = <String>{};
+    for (final t in trips) {
+      final phone = (t['driverPhone'] ?? '').toString();
+      final directName = (t['driverName'] ?? '').toString();
+      final name = directName.isNotEmpty ? directName : driverNameFor(phone);
+      if (name.isNotEmpty && name != 'Unassigned') {
+        names.add(name);
+      }
+    }
+    for (final u in users) {
+      final uName = (u['name'] ?? '').toString().trim();
+      if (uName.isNotEmpty) names.add(uName);
+    }
+    final sorted = names.toList()..sort();
+    return ['All Drivers', ...sorted];
   }
 
   bool _tripMatchesSearch(Map<String, dynamic> t) {
@@ -343,13 +398,14 @@ class AdminHomeController extends GetxController {
     }
   }
 
-  /// Trips after applying the tab's search + status + date filters.
+  /// Trips after applying the tab's search + status + date + driver filters.
   List<Map<String, dynamic>> get filteredTrips {
     final list = trips
         .where((t) =>
             _tripMatchesFilter(t) &&
             _tripMatchesSearch(t) &&
-            _tripMatchesDate(t))
+            _tripMatchesDate(t) &&
+            _tripMatchesDriver(t))
         .toList();
     list.sort((a, b) {
       final weightA = _statusSortWeight((a['status'] ?? '').toString());
@@ -388,13 +444,15 @@ class AdminHomeController extends GetxController {
     return all.sublist(start, end);
   }
 
-  /// Count of trips per status for the filter chips (uses the search + date
+  /// Count of trips per status for the filter chips (uses search + date + driver
   /// filters but ignores the status filter so each chip shows its own total).
   int tripStatusCount(String filter) {
     final base = trips
-        .where((t) => _tripMatchesSearch(t) && _tripMatchesDate(t))
+        .where((t) => _tripMatchesSearch(t) && _tripMatchesDate(t) && _tripMatchesDriver(t))
         .toList();
     switch (filter) {
+      case 'Today':
+        return base.where((t) => _isTodayTrip(t)).length;
       case 'En Route':
         return base
             .where((t) => _enRouteStatuses.contains((t['status'] ?? '')))
@@ -416,6 +474,11 @@ class AdminHomeController extends GetxController {
 
   void setTripFilter(String f) {
     tripStatusFilter.value = f;
+    tripPage.value = 0;
+  }
+
+  void setTripDriverFilter(String d) {
+    tripDriverFilter.value = d;
     tripPage.value = 0;
   }
 
@@ -441,6 +504,7 @@ class AdminHomeController extends GetxController {
 
   void clearTripFilters() {
     tripStatusFilter.value = 'All';
+    tripDriverFilter.value = 'All Drivers';
     tripSearch.value = '';
     tripSearchController.clear();
     tripDateFilter.value = null;
@@ -697,9 +761,33 @@ class AdminHomeController extends GetxController {
     return name.isEmpty ? phone : name;
   }
 
-  String driverAvatarFor(String phone) {
-    final u = users.firstWhereOrNull((u) => (u['phone'] ?? '') == phone);
-    return (u?['avatarUrl'] ?? '').toString();
+  String driverAvatarFor(String phoneOrName) {
+    if (phoneOrName.trim().isEmpty) return '';
+    final target = phoneOrName.trim().toLowerCase();
+    final u = users.firstWhereOrNull((u) {
+      final p = (u['phone'] ?? '').toString().trim().toLowerCase();
+      final n = (u['name'] ?? '').toString().trim().toLowerCase();
+      return (p.isNotEmpty && p == target) || (n.isNotEmpty && n == target);
+    });
+
+    if (u != null) {
+      final avatar = (u['avatarUrl'] ?? u['photoUrl'] ?? u['profileImage'] ?? u['image'] ?? '').toString().trim();
+      if (avatar.isNotEmpty) return avatar;
+
+      final docs = u['documents'] as List?;
+      if (docs != null) {
+        for (final doc in docs) {
+          if (doc is Map) {
+            final t = (doc['title'] ?? '').toString().toLowerCase();
+            final url = (doc['url'] ?? doc['documentUrl'] ?? doc['fileUrl'] ?? '').toString().trim();
+            if ((t.contains('photo') || t.contains('profile') || t.contains('avatar')) && url.isNotEmpty) {
+              return url;
+            }
+          }
+        }
+      }
+    }
+    return '';
   }
 
   /// Admin marks a problem-truck active again (issue resolved).
