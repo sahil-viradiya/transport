@@ -4388,6 +4388,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
   }
 
   // --- TAB 5: VENDORS (predefined pickup sources) ---
+  // --- TAB 5: VENDORS (predefined pickup sources) ---
   Widget _buildVendorsTab(BuildContext context, bool isDark) {
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -4418,353 +4419,20 @@ class AdminHomeView extends GetView<AdminHomeController> {
               ],
             );
           }
-          final width = MediaQuery.of(context).size.width;
-          final isWide = width >= 900;
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Mockup Header Columns (only on web/wide screens)
-              if (isWide)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(28, 16, 28, 12),
-                  child: Row(
-                    children: [
-                      const Expanded(
-                        flex: 4,
-                        child: AppText('VENDOR PROFILE',
-                            style: AppTextStyle.labelMedium,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey),
-                      ),
-                      const Expanded(
-                        flex: 5,
-                        child: AppText('PICKUP LOCATION',
-                            style: AppTextStyle.labelMedium,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey),
-                      ),
-                      const Expanded(
-                        flex: 3,
-                        child: AppText('ITEM NAME',
-                            style: AppTextStyle.labelMedium,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey),
-                      ),
-                      const SizedBox(width: 48), // Align with more options menu
-                    ],
-                  ),
-                ),
-
-              Expanded(
-                child: ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                  itemCount: controller.vendors.length,
-                  itemBuilder: (context, index) {
-                    final v = controller.vendors[index];
-                    final loc =
-                        (v['pickupLocation'] ?? v['location'] ?? '').toString();
-                    final cityDistrict = [
-                      (v['city'] ?? '').toString(),
-                      (v['district'] ?? '').toString(),
-                    ].where((s) => s.isNotEmpty).join(', ');
-
-                    final vendorId = (v['id'] ?? '').toString();
-                    final displayId =
-                        'ID: V-${vendorId.length >= 4 ? vendorId.substring(vendorId.length - 4) : "100"}';
-
-                    final siteName = (v['siteName'] ?? '').toString();
-                    final itemName = (v['itemName'] ?? '').toString();
-                    final phone = (v['phone'] ?? '').toString();
-
-                    if (isWide) {
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color:
-                              isDark ? const Color(0xFF1E293B) : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color:
-                                isDark ? Colors.white10 : Colors.grey.shade200,
-                            width: 1,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black
-                                  .withValues(alpha: isDark ? 0.2 : 0.02),
-                              blurRadius: 6,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            // Column 1: Profile (Storefront Logo, Name, Phone, ID)
-                            Expanded(
-                              flex: 4,
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 22,
-                                    backgroundColor: isDark
-                                        ? const Color(0xFF3B82F6)
-                                            .withOpacity(0.2)
-                                        : const Color(0xFFDBEAFE),
-                                    child: const Icon(
-                                      Icons.storefront_rounded,
-                                      color: Color(0xFF3B82F6),
-                                      size: 22,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        AppText(
-                                          (v['name'] ?? 'Vendor').toString(),
-                                          style: AppTextStyle.bodyLarge,
-                                          fontWeight: FontWeight.bold,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 2),
-                                        if (phone.isNotEmpty) ...[
-                                          Row(
-                                            children: [
-                                              const Icon(Icons.phone_rounded,
-                                                  size: 10, color: Colors.grey),
-                                              const SizedBox(width: 4),
-                                              AppText(
-                                                phone,
-                                                style: AppTextStyle.labelMedium,
-                                                color: Colors.grey,
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 2),
-                                        ],
-                                        AppText(
-                                          displayId,
-                                          style: AppTextStyle.labelMedium,
-                                          color: Colors.grey,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // Column 2: Pickup Location (Site Name + Address + City)
-                            Expanded(
-                              flex: 5,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (siteName.isNotEmpty) ...[
-                                    AppText(
-                                      siteName,
-                                      style: AppTextStyle.bodyMedium,
-                                      fontWeight: FontWeight.bold,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 2),
-                                  ],
-                                  AppText(
-                                    loc.isNotEmpty ? loc : 'Address pending',
-                                    style: AppTextStyle.bodyMedium,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    color: loc.isNotEmpty ? null : Colors.grey,
-                                  ),
-                                  if (cityDistrict.isNotEmpty) ...[
-                                    const SizedBox(height: 2),
-                                    AppText(
-                                      cityDistrict,
-                                      style: AppTextStyle.labelMedium,
-                                      color: Colors.grey,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-
-                            // Column 3: Item Name
-                            Expanded(
-                              flex: 3,
-                              child: AppText(
-                                itemName.isNotEmpty
-                                    ? itemName
-                                    : 'General Cargo',
-                                style: AppTextStyle.bodyMedium,
-                                fontWeight: FontWeight.bold,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-
-                            // Column 5: Action PopupMenu
-                            PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert_rounded,
-                                  color: AppColors.textSecondary),
-                              onSelected: (value) {
-                                if (value == 'edit') {
-                                  _showVendorFormDialog(context, isDark,
-                                      editVendor: v);
-                                } else if (value == 'delete') {
-                                  controller.deleteVendor(
-                                    (v['id'] ?? '').toString(),
-                                    name: (v['name'] ?? '').toString(),
-                                  );
-                                }
-                              },
-                              itemBuilder: (_) => [
-                                const PopupMenuItem(
-                                  value: 'edit',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.edit_rounded,
-                                          size: 18, color: AppColors.primary),
-                                      SizedBox(width: 10),
-                                      AppText('Edit',
-                                          style: AppTextStyle.bodyMedium),
-                                    ],
-                                  ),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.delete_outline_rounded,
-                                          size: 18, color: AppColors.error),
-                                      SizedBox(width: 10),
-                                      AppText('Delete',
-                                          style: AppTextStyle.bodyMedium,
-                                          color: AppColors.error),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    // Mobile card layout (matches old layout perfectly but cleaner)
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isDark ? Colors.white10 : Colors.grey.shade100,
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black
-                                .withValues(alpha: isDark ? 0.2 : 0.03),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? Colors.white10
-                                  : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.storefront_rounded,
-                                color: AppColors.primary, size: 26),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                AppText((v['name'] ?? 'Vendor').toString(),
-                                    style: AppTextStyle.bodyLarge,
-                                    fontWeight: FontWeight.bold,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis),
-                                if (siteName.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  AppText('Site: $siteName',
-                                      style: AppTextStyle.labelMedium,
-                                      fontWeight: FontWeight.bold,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis),
-                                ],
-                                if (itemName.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  AppText('Item: $itemName',
-                                      style: AppTextStyle.labelMedium,
-                                      color: AppColors.primary,
-                                      fontWeight: FontWeight.bold,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis),
-                                ],
-                                if (phone.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  AppText('Phone: $phone',
-                                      style: AppTextStyle.labelMedium,
-                                      color: Colors.grey,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis),
-                                ],
-                                if (loc.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  AppText(loc,
-                                      style: AppTextStyle.labelMedium,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis),
-                                ],
-                                if (cityDistrict.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  AppText(cityDistrict,
-                                      style: AppTextStyle.labelMedium,
-                                      color: AppColors.textHint),
-                                ],
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.edit_rounded,
-                                color: AppColors.primary, size: 20),
-                            onPressed: () => _showVendorFormDialog(
-                                context, isDark,
-                                editVendor: v),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded,
-                                color: AppColors.error, size: 20),
-                            onPressed: () => controller.deleteVendor(
-                                (v['id'] ?? '').toString(),
-                                name: (v['name'] ?? '').toString()),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
+          return GridView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 400,
+              mainAxisExtent: 140,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            itemCount: controller.vendors.length,
+            itemBuilder: (context, index) {
+              return _buildCompactVendorCard(context, controller.vendors[index], isDark);
+            },
           );
         }),
       ),
@@ -4773,6 +4441,193 @@ class AdminHomeView extends GetView<AdminHomeController> {
         backgroundColor: AppColors.primary,
         onPressed: () => _showVendorFormDialog(context, isDark),
         child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
+  Widget _buildCompactVendorCard(BuildContext context, Map<String, dynamic> v, bool isDark) {
+    final name = (v['name'] ?? 'Vendor').toString();
+    final phone = (v['phone'] ?? '').toString();
+    final siteName = (v['siteName'] ?? '').toString();
+    final loc = (v['pickupLocation'] ?? v['location'] ?? '').toString();
+    final cityDistrict = [(v['city'] ?? '').toString(), (v['district'] ?? '').toString()]
+        .where((s) => s.isNotEmpty)
+        .join(', ');
+    final itemName = (v['itemName'] ?? '').toString();
+    final vendorId = (v['id'] ?? '').toString();
+    final displayId = 'V-${vendorId.length >= 4 ? vendorId.substring(vendorId.length - 4) : "100"}';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? Colors.white10 : Colors.grey.shade200,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF3B82F6).withValues(alpha: 0.2) : const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.storefront_rounded, color: Color(0xFF3B82F6), size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: AppText(
+                            name,
+                            style: AppTextStyle.bodyLarge,
+                            fontWeight: FontWeight.bold,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: AppText(
+                            displayId,
+                            style: AppTextStyle.labelMedium,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (phone.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          const Icon(Icons.phone_rounded, size: 10, color: Colors.grey),
+                          const SizedBox(width: 4),
+                          AppText(phone, style: AppTextStyle.labelMedium, color: Colors.grey),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert_rounded, color: AppColors.textSecondary, size: 18),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    _showVendorFormDialog(context, isDark, editVendor: v);
+                  } else if (value == 'delete') {
+                    controller.deleteVendor((v['id'] ?? '').toString(), name: name);
+                  }
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_rounded, size: 16, color: AppColors.primary),
+                        SizedBox(width: 8),
+                        AppText('Edit', style: AppTextStyle.bodyMedium),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.error),
+                        SizedBox(width: 8),
+                        AppText('Delete', style: AppTextStyle.bodyMedium, color: AppColors.error),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const Divider(height: 10, thickness: 0.8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on_rounded, size: 12, color: Color(0xFF3B82F6)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: AppText(
+                            siteName.isNotEmpty ? siteName : 'Pickup Location',
+                            style: AppTextStyle.labelMedium,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    AppText(
+                      loc.isNotEmpty ? loc : (cityDistrict.isNotEmpty ? cityDistrict : 'Address pending'),
+                      style: AppTextStyle.labelMedium,
+                      color: Colors.grey,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              if (itemName.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF3B82F6).withValues(alpha: 0.15) : const Color(0xFFDBEAFE),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.inventory_2_rounded, size: 12, color: Color(0xFF2563EB)),
+                      const SizedBox(width: 4),
+                      AppText(
+                        itemName,
+                        style: AppTextStyle.labelMedium,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF2563EB),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -4822,346 +4677,20 @@ class AdminHomeView extends GetView<AdminHomeController> {
               ],
             );
           }
-          final width = MediaQuery.of(context).size.width;
-          final isWide = width >= 900;
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header Columns (only on web/wide screens)
-              if (isWide)
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(28, 16, 28, 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 4,
-                        child: AppText('CUSTOMER NAME',
-                            style: AppTextStyle.labelMedium,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey),
-                      ),
-                      Expanded(
-                        flex: 5,
-                        child: AppText('DELIVERY LOCATION',
-                            style: AppTextStyle.labelMedium,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: AppText('PHONE NUMBER',
-                            style: AppTextStyle.labelMedium,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey),
-                      ),
-                      SizedBox(width: 48), // Align with menu
-                    ],
-                  ),
-                ),
-
-              Expanded(
-                child: ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                  itemCount: controller.customers.length,
-                  itemBuilder: (context, index) {
-                    final c = controller.customers[index];
-                    final siteName = (c['siteName'] ?? c['customerSite'] ?? '').toString();
-                    final loc =
-                        (c['location'] ?? c['address'] ?? '').toString();
-                    final cityDistrict = [
-                      (c['city'] ?? '').toString(),
-                      (c['district'] ?? '').toString(),
-                    ].where((s) => s.isNotEmpty).join(', ');
-
-                    final custId = (c['id'] ?? '').toString();
-                    final displayId =
-                        'ID: C-${custId.length >= 4 ? custId.substring(custId.length - 4) : "100"}';
-                    final phone = (c['phone'] ?? '').toString();
-
-                    if (isWide) {
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color:
-                              isDark ? const Color(0xFF1E293B) : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color:
-                                isDark ? Colors.white10 : Colors.grey.shade200,
-                            width: 1,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black
-                                  .withValues(alpha: isDark ? 0.2 : 0.02),
-                              blurRadius: 6,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            // Column 1: Profile (Icon, Name, ID, Site Name)
-                            Expanded(
-                              flex: 4,
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 22,
-                                    backgroundColor: isDark
-                                        ? const Color(0xFF10B981)
-                                            .withValues(alpha: 0.2)
-                                        : const Color(0xFFD1FAE5),
-                                    child: const Icon(
-                                      Icons.apartment_rounded,
-                                      color: Color(0xFF10B981),
-                                      size: 22,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        AppText(
-                                          (c['name'] ?? 'Customer').toString(),
-                                          style: AppTextStyle.bodyLarge,
-                                          fontWeight: FontWeight.bold,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        if (siteName.isNotEmpty) ...[
-                                          const SizedBox(height: 2),
-                                          AppText(
-                                            'Site: $siteName',
-                                            style: AppTextStyle.labelMedium,
-                                            fontWeight: FontWeight.bold,
-                                            color: const Color(0xFF10B981),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                        const SizedBox(height: 2),
-                                        AppText(
-                                          displayId,
-                                          style: AppTextStyle.labelMedium,
-                                          color: Colors.grey,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // Column 2: Delivery Location
-                            Expanded(
-                              flex: 5,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  AppText(
-                                    loc.isNotEmpty ? loc : 'Address pending',
-                                    style: AppTextStyle.bodyMedium,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    color: loc.isNotEmpty ? null : Colors.grey,
-                                  ),
-                                  if (cityDistrict.isNotEmpty) ...[
-                                    const SizedBox(height: 2),
-                                    AppText(
-                                      cityDistrict,
-                                      style: AppTextStyle.labelMedium,
-                                      color: Colors.grey,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-
-                            // Column 3: Phone
-                            Expanded(
-                              flex: 3,
-                              child: AppText(
-                                phone.isNotEmpty ? phone : '--',
-                                style: AppTextStyle.bodyMedium,
-                                fontWeight: FontWeight.bold,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-
-                            // Column 4: Popup Menu
-                            PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert_rounded,
-                                  color: AppColors.textSecondary),
-                              onSelected: (value) {
-                                if (value == 'edit') {
-                                  _showCustomerFormDialog(context, isDark,
-                                      editCustomer: c);
-                                } else if (value == 'delete') {
-                                  controller.deleteCustomer(
-                                    (c['id'] ?? '').toString(),
-                                    name: (c['name'] ?? '').toString(),
-                                  );
-                                }
-                              },
-                              itemBuilder: (_) => [
-                                const PopupMenuItem(
-                                  value: 'edit',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.edit_rounded,
-                                          size: 18, color: AppColors.primary),
-                                      SizedBox(width: 10),
-                                      AppText('Edit',
-                                          style: AppTextStyle.bodyMedium),
-                                    ],
-                                  ),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.delete_outline_rounded,
-                                          size: 18, color: AppColors.error),
-                                      SizedBox(width: 10),
-                                      AppText('Delete',
-                                          style: AppTextStyle.bodyMedium,
-                                          color: AppColors.error),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    // Mobile layout
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isDark ? Colors.white10 : Colors.grey.shade100,
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black
-                                .withValues(alpha: isDark ? 0.2 : 0.03),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? Colors.white10
-                                  : const Color(0xFFE6F4EA),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.apartment_rounded,
-                                color: AppColors.primary, size: 26),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                AppText((c['name'] ?? 'Customer').toString(),
-                                    style: AppTextStyle.bodyLarge,
-                                    fontWeight: FontWeight.bold,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis),
-                                if (siteName.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.factory_rounded,
-                                          size: 12, color: Color(0xFF10B981)),
-                                      const SizedBox(width: 4),
-                                      Expanded(
-                                        child: AppText('Site: $siteName',
-                                            style: AppTextStyle.labelMedium,
-                                            fontWeight: FontWeight.bold,
-                                            color: const Color(0xFF10B981),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                                const SizedBox(height: 4),
-                                if (phone.isNotEmpty) ...[
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.phone_rounded,
-                                          size: 12, color: Colors.grey),
-                                      const SizedBox(width: 4),
-                                      AppText(phone,
-                                          style: AppTextStyle.labelMedium,
-                                          color: Colors.grey),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 2),
-                                ],
-                                Row(
-                                  children: [
-                                    const Icon(Icons.location_on_rounded,
-                                        size: 12, color: Colors.grey),
-                                    const SizedBox(width: 4),
-                                    Expanded(
-                                      child: AppText(
-                                          loc.isNotEmpty
-                                              ? loc
-                                              : 'No address set',
-                                          style: AppTextStyle.labelMedium,
-                                          color: Colors.grey,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.edit_rounded,
-                                color: AppColors.primary, size: 20),
-                            onPressed: () => _showCustomerFormDialog(
-                                context, isDark,
-                                editCustomer: c),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded,
-                                color: AppColors.error, size: 20),
-                            onPressed: () => controller.deleteCustomer(
-                                (c['id'] ?? '').toString(),
-                                name: (c['name'] ?? '').toString()),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
+          return GridView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 400,
+              mainAxisExtent: 140,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            itemCount: controller.customers.length,
+            itemBuilder: (context, index) {
+              return _buildCompactCustomerCard(context, controller.customers[index], isDark);
+            },
           );
         }),
       ),
@@ -5170,6 +4699,199 @@ class AdminHomeView extends GetView<AdminHomeController> {
         backgroundColor: AppColors.primary,
         onPressed: () => _showCustomerFormDialog(context, isDark),
         child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
+  Widget _buildCompactCustomerCard(BuildContext context, Map<String, dynamic> c, bool isDark) {
+    final name = (c['name'] ?? 'Customer').toString();
+    final phone = (c['phone'] ?? '').toString();
+    final siteName = (c['siteName'] ?? c['customerSite'] ?? '').toString();
+    final loc = (c['location'] ?? c['address'] ?? '').toString();
+    final cityDistrict = [(c['city'] ?? '').toString(), (c['district'] ?? '').toString()]
+        .where((s) => s.isNotEmpty)
+        .join(', ');
+    final custId = (c['id'] ?? '').toString();
+    final displayId = 'C-${custId.length >= 4 ? custId.substring(custId.length - 4) : "100"}';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? Colors.white10 : Colors.grey.shade200,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF10B981).withValues(alpha: 0.2) : const Color(0xFFD1FAE5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.apartment_rounded, color: Color(0xFF10B981), size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: AppText(
+                            name,
+                            style: AppTextStyle.bodyLarge,
+                            fontWeight: FontWeight.bold,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: AppText(
+                            displayId,
+                            style: AppTextStyle.labelMedium,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (siteName.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          const Icon(Icons.factory_rounded, size: 11, color: Color(0xFF10B981)),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: AppText(
+                              siteName,
+                              style: AppTextStyle.labelMedium,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF10B981),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert_rounded, color: AppColors.textSecondary, size: 18),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    _showCustomerFormDialog(context, isDark, editCustomer: c);
+                  } else if (value == 'delete') {
+                    controller.deleteCustomer((c['id'] ?? '').toString(), name: name);
+                  }
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_rounded, size: 16, color: AppColors.primary),
+                        SizedBox(width: 8),
+                        AppText('Edit', style: AppTextStyle.bodyMedium),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.error),
+                        SizedBox(width: 8),
+                        AppText('Delete', style: AppTextStyle.bodyMedium, color: AppColors.error),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const Divider(height: 10, thickness: 0.8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.pin_drop_rounded, size: 12, color: Color(0xFF10B981)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: AppText(
+                            'Delivery Location',
+                            style: AppTextStyle.labelMedium,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    AppText(
+                      loc.isNotEmpty ? loc : (cityDistrict.isNotEmpty ? cityDistrict : 'Address pending'),
+                      style: AppTextStyle.labelMedium,
+                      color: Colors.grey,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              if (phone.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFFD1FAE5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.phone_rounded, size: 12, color: Color(0xFF059669)),
+                      const SizedBox(width: 4),
+                      AppText(
+                        phone,
+                        style: AppTextStyle.labelMedium,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF059669),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }

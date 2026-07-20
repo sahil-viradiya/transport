@@ -48,10 +48,18 @@ class NotificationsController extends GetxController {
       // After the first snapshot, surface any brand-new notification as a
       // floating OS notification.
       if (_primed) {
+        final Set<String> surfacedThisBatchKeys = {};
         for (final n in list) {
           final id = n['id']?.toString() ?? '';
+          final title = n['title']?.toString() ?? '';
+          final body = n['body']?.toString() ?? '';
+          final key = '$title|$body';
+
           if (id.isNotEmpty && !_seenIds.contains(id) && n['read'] == false) {
-            _floatLocal(n);
+            if (!surfacedThisBatchKeys.contains(key)) {
+              surfacedThisBatchKeys.add(key);
+              _floatLocal(n);
+            }
           }
         }
       }

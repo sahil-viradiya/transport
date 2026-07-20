@@ -938,7 +938,14 @@ class FirebaseService extends GetxService {
     final p = SessionService.normalizePhone(toPhone);
     if (p.isEmpty) return;
     try {
-      await _db.collection('notifications').add({
+      final keyId = (tripId != null && tripId.isNotEmpty)
+          ? tripId
+          : (refId != null && refId.isNotEmpty)
+              ? refId
+              : '${DateTime.now().millisecondsSinceEpoch}';
+      final docId = '${p}_${type}_$keyId';
+
+      await _db.collection('notifications').doc(docId).set({
         'toPhone': p,
         'title': title,
         'body': body,
@@ -947,7 +954,7 @@ class FirebaseService extends GetxService {
         if (refId != null) 'refId': refId,
         'read': false,
         'createdAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
     } catch (_) {}
   }
 

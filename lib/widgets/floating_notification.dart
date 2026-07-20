@@ -24,6 +24,11 @@ class FloatingNotify {
     VoidCallback? onTap,
     Duration duration = const Duration(seconds: 5),
   }) {
+    // Prevent stacking duplicate cards with identical title and body at the same time
+    final isDuplicate = _items.value.any(
+        (item) => item.title == title && item.body == body);
+    if (isDuplicate) return;
+
     final overlay = _overlay();
     if (overlay == null) return;
     _ensureHost(overlay);
