@@ -35,12 +35,14 @@ class AdminHomeController extends GetxController {
   final RxList<Map<String, dynamic>> users = <Map<String, dynamic>>[].obs;
   final RxList<Map<String, dynamic>> expenses = <Map<String, dynamic>>[].obs;
   final RxList<Map<String, dynamic>> vendors = <Map<String, dynamic>>[].obs;
+  final RxList<Map<String, dynamic>> customers = <Map<String, dynamic>>[].obs;
 
   StreamSubscription? _tripsSub;
   StreamSubscription? _expensesSub;
   StreamSubscription? _usersSub;
   StreamSubscription? _trucksSub;
   StreamSubscription? _vendorsSub;
+  StreamSubscription? _customersSub;
 
   @override
   void onInit() {
@@ -55,6 +57,7 @@ class AdminHomeController extends GetxController {
     _expensesSub?.cancel();
     _usersSub?.cancel();
     _vendorsSub?.cancel();
+    _customersSub?.cancel();
     _trucksSub?.cancel();
     tripSearchController.dispose();
     super.onClose();
@@ -124,6 +127,8 @@ class AdminHomeController extends GetxController {
         .listen(trucks.assignAll, onError: (e) => _onStreamError('trucks', e));
     _vendorsSub = _firebaseService.watchVendors().listen(vendors.assignAll,
         onError: (e) => _onStreamError('vendors', e));
+    _customersSub = _firebaseService.watchCustomers().listen(customers.assignAll,
+        onError: (e) => _onStreamError('customers', e));
   }
 
   // ---------------------------------------------------------------------------
@@ -201,6 +206,44 @@ class AdminHomeController extends GetxController {
           AppPopup.hideLoading();
           AppSnackBar.showSuccess(
               title: 'Deleted', message: 'Vendor hata diya gaya.');
+        } catch (e) {
+          AppPopup.hideLoading();
+          AppSnackBar.showError(title: 'Error', message: e.toString());
+        }
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // CUSTOMERS (delivery destinations)
+  // ---------------------------------------------------------------------------
+
+  Future<void> saveCustomer(Map<String, dynamic> customerData) async {
+    AppPopup.showLoading(message: 'Saving customer...');
+    try {
+      await _firebaseService.saveCustomer(customerData);
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(
+          title: 'Customer Saved', message: 'Customer details save ho gaye.');
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
+  }
+
+  Future<void> deleteCustomer(String id, {String name = ''}) async {
+    AppPopup.showConfirmation(
+      title: 'Delete Customer?',
+      description:
+          'Kya aap ${name.isNotEmpty ? '"$name"' : 'is customer'} ko delete karna chahte hain?',
+      confirmText: 'Delete',
+      onConfirm: () async {
+        AppPopup.showLoading(message: 'Deleting...');
+        try {
+          await _firebaseService.deleteCustomer(id);
+          AppPopup.hideLoading();
+          AppSnackBar.showSuccess(
+              title: 'Deleted', message: 'Customer hata diya gaya.');
         } catch (e) {
           AppPopup.hideLoading();
           AppSnackBar.showError(title: 'Error', message: e.toString());

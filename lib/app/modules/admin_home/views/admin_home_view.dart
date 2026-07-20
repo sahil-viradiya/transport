@@ -45,6 +45,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
       _buildUsersTab(context, isDark),
       _buildVendorsTab(context, isDark),
       _buildExpensesTab(context, isDark),
+      _buildCustomersTab(context, isDark),
     ];
 
     Widget content = Obx(() {
@@ -115,8 +116,6 @@ class AdminHomeView extends GetView<AdminHomeController> {
         body: content,
         bottomNavigationBar: isWide
             ? null
-            // Visual order Dashboard, Trucks, Trips, Drivers — mapped to the
-            // underlying tab indices [0, 2, 1, 3] so page content stays correct.
             : Obx(() => NavigationBar(
                   selectedIndex:
                       _mobileNavOrder.indexOf(controller.currentTabIndex.value),
@@ -157,6 +156,12 @@ class AdminHomeView extends GetView<AdminHomeController> {
                       label: 'Vendors',
                     ),
                     NavigationDestination(
+                      icon: Icon(Icons.apartment_outlined),
+                      selectedIcon: Icon(Icons.apartment_rounded,
+                          color: AppColors.primary),
+                      label: 'Customers',
+                    ),
+                    NavigationDestination(
                       icon: Icon(Icons.currency_rupee_rounded),
                       selectedIcon: Icon(Icons.currency_rupee_rounded,
                           color: AppColors.primary),
@@ -170,21 +175,17 @@ class AdminHomeView extends GetView<AdminHomeController> {
 
   // ---- Web/desktop shell: dark brand sidebar + top bar ----
 
-  // Display order: Dashboard, Trucks, Trips, Drivers. Each entry carries its
-  // own destination tab index so the visual order can differ from the
-  // underlying page/index mapping (which many callers reference numerically).
   static const _navItems = [
     (Icons.dashboard_rounded, 'Dashboard', 0),
     (Icons.local_shipping_rounded, 'Trucks', 2),
     (Icons.alt_route_rounded, 'Trips', 1),
     (Icons.people_rounded, 'Drivers', 3),
     (Icons.storefront_rounded, 'Vendors', 4),
+    (Icons.apartment_rounded, 'Customers', 6),
     (Icons.currency_rupee_rounded, 'Expenses', 5),
   ];
 
-  // Mobile bottom-nav visual position → underlying tab index (same order as the
-  // desktop sidebar: Dashboard, Trucks, Trips, Drivers, Vendors, Expenses).
-  static const _mobileNavOrder = [0, 2, 1, 3, 4, 5];
+  static const _mobileNavOrder = [0, 2, 1, 3, 4, 6, 5];
 
   static const _monthNames = [
     'Jan',
@@ -372,6 +373,10 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 _showTruckFormDialog(context, isDark);
               } else if (value == 'driver') {
                 _showUserFormDialog(context, isDark);
+              } else if (value == 'vendor') {
+                _showVendorFormDialog(context, isDark);
+              } else if (value == 'customer') {
+                _showCustomerFormDialog(context, isDark);
               } else if (value == 'trip') {
                 _assignTripGuarded(context, isDark);
               }
@@ -394,6 +399,26 @@ class AdminHomeView extends GetView<AdminHomeController> {
                     Icon(Icons.person_add_rounded, size: 18),
                     SizedBox(width: 8),
                     Text('Add Driver'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'vendor',
+                child: Row(
+                  children: [
+                    Icon(Icons.storefront_rounded, size: 18),
+                    SizedBox(width: 8),
+                    Text('Add Vendor'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'customer',
+                child: Row(
+                  children: [
+                    Icon(Icons.apartment_rounded, size: 18),
+                    SizedBox(width: 8),
+                    Text('Add Customer'),
                   ],
                 ),
               ),
@@ -4752,6 +4777,373 @@ class AdminHomeView extends GetView<AdminHomeController> {
     );
   }
 
+  // --- TAB 7: CUSTOMERS (delivery destinations) ---
+  Widget _buildCustomersTab(BuildContext context, bool isDark) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: RefreshIndicator(
+        onRefresh: controller.loadData,
+        child: Obx(() {
+          if (controller.customers.isEmpty) {
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                SizedBox(height: MediaQuery.of(context).size.height * 0.22),
+                Center(
+                  child: Column(
+                    children: [
+                      const Icon(Icons.apartment_rounded,
+                          size: 60, color: AppColors.textHint),
+                      const SizedBox(height: 12),
+                      const AppText('No customers yet. Tap "+" to add one.',
+                          style: AppTextStyle.bodyLarge),
+                      const SizedBox(height: 4),
+                      const AppText(
+                          'Customer ek baar add karein, phir delivery destination me select karein.',
+                          style: AppTextStyle.labelMedium,
+                          color: AppColors.textHint),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () => _showCustomerFormDialog(context, isDark),
+                        icon: const Icon(Icons.add_rounded, color: Colors.white),
+                        label: const Text('Add Customer',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+          final width = MediaQuery.of(context).size.width;
+          final isWide = width >= 900;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header Columns (only on web/wide screens)
+              if (isWide)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(28, 16, 28, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 4,
+                        child: AppText('CUSTOMER NAME',
+                            style: AppTextStyle.labelMedium,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey),
+                      ),
+                      Expanded(
+                        flex: 5,
+                        child: AppText('DELIVERY LOCATION',
+                            style: AppTextStyle.labelMedium,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: AppText('PHONE NUMBER',
+                            style: AppTextStyle.labelMedium,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey),
+                      ),
+                      SizedBox(width: 48), // Align with menu
+                    ],
+                  ),
+                ),
+
+              Expanded(
+                child: ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                  itemCount: controller.customers.length,
+                  itemBuilder: (context, index) {
+                    final c = controller.customers[index];
+                    final loc =
+                        (c['location'] ?? c['address'] ?? '').toString();
+                    final cityDistrict = [
+                      (c['city'] ?? '').toString(),
+                      (c['district'] ?? '').toString(),
+                    ].where((s) => s.isNotEmpty).join(', ');
+
+                    final custId = (c['id'] ?? '').toString();
+                    final displayId =
+                        'ID: C-${custId.length >= 4 ? custId.substring(custId.length - 4) : "100"}';
+                    final phone = (c['phone'] ?? '').toString();
+
+                    if (isWide) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color:
+                              isDark ? const Color(0xFF1E293B) : Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color:
+                                isDark ? Colors.white10 : Colors.grey.shade200,
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black
+                                  .withValues(alpha: isDark ? 0.2 : 0.02),
+                              blurRadius: 6,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            // Column 1: Profile (Icon, Name, ID)
+                            Expanded(
+                              flex: 4,
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor: isDark
+                                        ? const Color(0xFF10B981)
+                                            .withValues(alpha: 0.2)
+                                        : const Color(0xFFD1FAE5),
+                                    child: const Icon(
+                                      Icons.apartment_rounded,
+                                      color: Color(0xFF10B981),
+                                      size: 22,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        AppText(
+                                          (c['name'] ?? 'Customer').toString(),
+                                          style: AppTextStyle.bodyLarge,
+                                          fontWeight: FontWeight.bold,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 2),
+                                        AppText(
+                                          displayId,
+                                          style: AppTextStyle.labelMedium,
+                                          color: Colors.grey,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Column 2: Delivery Location
+                            Expanded(
+                              flex: 5,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  AppText(
+                                    loc.isNotEmpty ? loc : 'Address pending',
+                                    style: AppTextStyle.bodyMedium,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    color: loc.isNotEmpty ? null : Colors.grey,
+                                  ),
+                                  if (cityDistrict.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    AppText(
+                                      cityDistrict,
+                                      style: AppTextStyle.labelMedium,
+                                      color: Colors.grey,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+
+                            // Column 3: Phone
+                            Expanded(
+                              flex: 3,
+                              child: AppText(
+                                phone.isNotEmpty ? phone : '--',
+                                style: AppTextStyle.bodyMedium,
+                                fontWeight: FontWeight.bold,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+
+                            // Column 4: Popup Menu
+                            PopupMenuButton<String>(
+                              icon: const Icon(Icons.more_vert_rounded,
+                                  color: AppColors.textSecondary),
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  _showCustomerFormDialog(context, isDark,
+                                      editCustomer: c);
+                                } else if (value == 'delete') {
+                                  controller.deleteCustomer(
+                                    (c['id'] ?? '').toString(),
+                                    name: (c['name'] ?? '').toString(),
+                                  );
+                                }
+                              },
+                              itemBuilder: (_) => [
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit_rounded,
+                                          size: 18, color: AppColors.primary),
+                                      SizedBox(width: 10),
+                                      AppText('Edit',
+                                          style: AppTextStyle.bodyMedium),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete_outline_rounded,
+                                          size: 18, color: AppColors.error),
+                                      SizedBox(width: 10),
+                                      AppText('Delete',
+                                          style: AppTextStyle.bodyMedium,
+                                          color: AppColors.error),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // Mobile layout
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark ? Colors.white10 : Colors.grey.shade100,
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black
+                                .withValues(alpha: isDark ? 0.2 : 0.03),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white10
+                                  : const Color(0xFFE6F4EA),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.apartment_rounded,
+                                color: AppColors.primary, size: 26),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                AppText((c['name'] ?? 'Customer').toString(),
+                                    style: AppTextStyle.bodyLarge,
+                                    fontWeight: FontWeight.bold,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 4),
+                                if (phone.isNotEmpty) ...[
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.phone_rounded,
+                                          size: 12, color: Colors.grey),
+                                      const SizedBox(width: 4),
+                                      AppText(phone,
+                                          style: AppTextStyle.labelMedium,
+                                          color: Colors.grey),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                ],
+                                Row(
+                                  children: [
+                                    const Icon(Icons.location_on_rounded,
+                                        size: 12, color: Colors.grey),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: AppText(
+                                          loc.isNotEmpty
+                                              ? loc
+                                              : 'No address set',
+                                          style: AppTextStyle.labelMedium,
+                                          color: Colors.grey,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.edit_rounded,
+                                color: AppColors.primary, size: 20),
+                            onPressed: () => _showCustomerFormDialog(
+                                context, isDark,
+                                editCustomer: c),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline_rounded,
+                                color: AppColors.error, size: 20),
+                            onPressed: () => controller.deleteCustomer(
+                                (c['id'] ?? '').toString(),
+                                name: (c['name'] ?? '').toString()),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        }),
+      ),
+      floatingActionButton: FloatingActionButton(
+        heroTag: null,
+        backgroundColor: AppColors.primary,
+        onPressed: () => _showCustomerFormDialog(context, isDark),
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
   // --- POPUP DIALOG FORM HELPERS ---
 
   // 1. ADD / EDIT TRIP DIALOG
@@ -5758,6 +6150,183 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                   };
                                   Navigator.of(sheetCtx).pop();
                                   controller.saveVendor(data);
+                                },
+                                child: const AppText('Save',
+                                    style: AppTextStyle.bodyMedium,
+                                    color: Colors.white),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // 1c. ADD / EDIT CUSTOMER DIALOG
+  void _showCustomerFormDialog(BuildContext context, bool isDark,
+      {Map<String, dynamic>? editCustomer}) {
+    final formKey = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController(text: editCustomer?['name'] ?? '');
+    final phoneCtrl = TextEditingController(text: editCustomer?['phone'] ?? '');
+    final locCtrl = TextEditingController(
+        text: (editCustomer?['location'] ?? editCustomer?['address'] ?? '')
+            .toString());
+    final cityCtrl = TextEditingController(text: editCustomer?['city'] ?? '');
+    final districtCtrl =
+        TextEditingController(text: editCustomer?['district'] ?? '');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return Material(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: 16,
+              left: 20,
+              right: 20,
+              bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    AppText(
+                      editCustomer != null ? 'Edit Customer' : 'Add Customer',
+                      style: AppTextStyle.headlineSmall,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.of(sheetCtx).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Form(
+                      key: formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextFormField(
+                            controller: nameCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Customer Name',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.apartment_rounded),
+                            ),
+                            validator: (v) =>
+                                v!.trim().isEmpty ? 'Field required' : null,
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: phoneCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Phone Number',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.phone_rounded),
+                            ),
+                            keyboardType: TextInputType.phone,
+                            validator: (v) =>
+                                v!.trim().isEmpty ? 'Field required' : null,
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: locCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Delivery Address / Location',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.pin_drop_rounded),
+                            ),
+                            validator: (v) =>
+                                v!.trim().isEmpty ? 'Field required' : null,
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: cityCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'City (optional)',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon:
+                                        Icon(Icons.location_city_rounded),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: districtCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'District (optional)',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.map_rounded),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: () => Navigator.of(sheetCtx).pop(),
+                                child: const AppText('Cancel',
+                                    style: AppTextStyle.bodyMedium),
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 24, vertical: 12),
+                                ),
+                                onPressed: () {
+                                  if (!formKey.currentState!.validate()) return;
+                                  final data = <String, dynamic>{
+                                    if (editCustomer?['id'] != null)
+                                      'id': editCustomer!['id'],
+                                    'name': nameCtrl.text.trim(),
+                                    'phone': phoneCtrl.text.trim(),
+                                    'location': locCtrl.text.trim(),
+                                    'address': locCtrl.text.trim(),
+                                    'city': cityCtrl.text.trim(),
+                                    'district': districtCtrl.text.trim(),
+                                  };
+                                  Navigator.of(sheetCtx).pop();
+                                  controller.saveCustomer(data);
                                 },
                                 child: const AppText('Save',
                                     style: AppTextStyle.bodyMedium,

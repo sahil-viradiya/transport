@@ -2256,6 +2256,53 @@ class FirebaseService extends GetxService {
         () => _db.collection('vendors').doc(id).delete());
   }
 
+  // ---------------------------------------------------------------------------
+  // CUSTOMERS (delivery destinations / customers directory)
+  // ---------------------------------------------------------------------------
+
+  /// Live stream of all customers for admin directory + trip form.
+  Stream<List<Map<String, dynamic>>> watchCustomers() {
+    return _db.collection('customers').snapshots().map((s) => s.docs.map((d) {
+          final m = d.data();
+          m['id'] = d.id;
+          return m;
+        }).toList());
+  }
+
+  Future<List<Map<String, dynamic>>> getCustomers() async {
+    try {
+      final snap = await _db.collection('customers').get();
+      return snap.docs.map((d) {
+        final m = d.data();
+        m['id'] = d.id;
+        return m;
+      }).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Create or update a customer. Generates an id when one isn't supplied.
+  Future<String> saveCustomer(Map<String, dynamic> customerData) async {
+    final id = (customerData['id'] ?? '').toString().isNotEmpty
+        ? customerData['id'].toString()
+        : 'CUST-${DateTime.now().millisecondsSinceEpoch}';
+    customerData['id'] = id;
+    customerData.putIfAbsent('createdAt', () => FieldValue.serverTimestamp());
+    await _write(
+        'Customer save nahi hua',
+        () => _db
+            .collection('customers')
+            .doc(id)
+            .set(customerData, SetOptions(merge: true)));
+    return id;
+  }
+
+  Future<void> deleteCustomer(String id) {
+    return _write('Customer delete nahi hua',
+        () => _db.collection('customers').doc(id).delete());
+  }
+
   /// Admin marks a driver on leave (or back on duty). On-leave drivers are
   /// excluded from the daily truck-assignment gate and from trip assignment.
   Future<void> setDriverLeave(String phone, bool onLeave) async {
