@@ -8,6 +8,7 @@ import 'app/data/services/storage_service.dart';
 import 'app/data/services/connectivity_service.dart';
 import 'app/data/services/firebase_service.dart';
 import 'app/data/services/session_service.dart';
+import 'app/data/services/auth_service.dart';
 import 'app/data/services/push_service.dart';
 import 'app/data/notifications_controller.dart';
 import 'app/routes/app_pages.dart';
@@ -50,6 +51,8 @@ Future<void> initServices() async {
   await Get.putAsync(() => ConnectivityService().init());
   // Initialize Session (current logged-in owner identity) — depends on storage
   await Get.putAsync(() => SessionService().init());
+  // Auth state listener (sign-out / token-revocation auto-redirect)
+  await Get.putAsync(() => AuthService().init());
   // Initialize Firebase Service (Firestore CRUD) — resolves owner via session
   await Get.putAsync(() => FirebaseService().init());
   // App-wide notifications feed (bell badge for driver + admin)

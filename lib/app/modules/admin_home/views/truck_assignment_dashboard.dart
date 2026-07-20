@@ -5,7 +5,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:transport/widgets/app_text.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
-import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/app/core/utils/image_url.dart';
 import '../controllers/admin_home_controller.dart';
 import '../../../core/theme/app_colors.dart';
@@ -223,6 +222,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
       final pendingTrucks = uiTrucks.where((t) => t.status == 'Pending Acceptance').toList();
       final assignedTrucks = uiTrucks.where((t) => t.status != 'Pending Acceptance').toList();
 
+      final bool hasExpandedAssignedCard = assignedTrucks.any((t) => t.hasActiveTrip || t.hasLoadingPass || t.hasDestinationSetup);
+      final double assignedContainerHeight = hasExpandedAssignedCard ? 480.0 : 210.0;
+
       // Check auto reset condition reactively
       _checkAutoReset(dbTrucks);
 
@@ -259,90 +261,101 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
           // --- ROW 1: PENDING ASSIGNMENT (UPPER ROW) ---
-          Row(
-            children: [
-              Container(
-                width: 4,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF97316),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: AppText(
-                  'Unassigned Trucks (${pendingTrucks.length})',
-                  style: AppTextStyle.bodyLarge,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 260,
-            child: pendingTrucks.isEmpty
-                ? _buildEmptyPlaceholder('All trucks assigned! Look below. 🎉')
-                : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    child: Row(
-                      children: pendingTrucks.map((truck) {
-                        return Padding(
-                          key: ValueKey(truck.id),
-                          padding: const EdgeInsets.only(right: 16, bottom: 8),
-                          child: _buildInteractiveCard(truck),
-                        );
-                      }).toList(),
-                    ),
+          if (pendingTrucks.isNotEmpty) ...[
+            Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF97316),
+                    borderRadius: BorderRadius.circular(2),
                   ),
-          ),
-          const SizedBox(height: 24),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: AppText(
+                    'Unassigned Trucks (${pendingTrucks.length})',
+                    style: AppTextStyle.bodyLarge,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 205,
+              child: pendingTrucks.isEmpty
+                  ? _buildEmptyPlaceholder('All trucks assigned! Look below. 🎉')
+                  : SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: pendingTrucks.map((truck) {
+                          return Padding(
+                            key: ValueKey(truck.id),
+                            padding: const EdgeInsets.only(right: 16, bottom: 8),
+                            child: _buildInteractiveCard(truck),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+            ),
+            const SizedBox(height: 12),
+          ],
 
           // --- ROW 2: ASSIGNED & ACCEPTED (LOWER ROW) ---
-          Row(
-            children: [
-              Container(
-                width: 4,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3B82F6),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: AppText(
-                  'Assigned & Accepted Trucks (${assignedTrucks.length})',
-                  style: AppTextStyle.bodyLarge,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 510,
-            child: assignedTrucks.isEmpty
-                ? _buildEmptyPlaceholder('No trucks assigned yet. Assign a truck from above.')
-                : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    child: Row(
-                      children: assignedTrucks.map((truck) {
-                        return Padding(
-                          key: ValueKey(truck.id),
-                          padding: const EdgeInsets.only(right: 16, bottom: 8),
-                          child: _buildInteractiveCard(truck),
-                        );
-                      }).toList(),
-                    ),
+          if (assignedTrucks.isNotEmpty || pendingTrucks.isNotEmpty) ...[
+            Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3B82F6),
+                    borderRadius: BorderRadius.circular(2),
                   ),
-          ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: AppText(
+                    'Assigned & Accepted Trucks (${assignedTrucks.length})',
+                    style: AppTextStyle.bodyLarge,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: assignedContainerHeight,
+              child: assignedTrucks.isEmpty
+                  ? _buildEmptyPlaceholder('No trucks assigned yet. Assign a truck from above.')
+                  : SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: assignedTrucks.map((truck) {
+                          return Padding(
+                            key: ValueKey(truck.id),
+                            padding: const EdgeInsets.only(right: 16, bottom: 8),
+                            child: _buildInteractiveCard(truck),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+            ),
+          ] else ...[
+            SizedBox(
+              height: 200,
+              child: _buildEmptyPlaceholder('No trucks available.'),
+            ),
+          ],
         ],
       );
     });
@@ -1462,50 +1475,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
   }
 
   // Automatically reset all cards to top row if everything is assigned
-  void _checkAutoReset(List<Map<String, dynamic>> dbTrucks) {
-    if (dbTrucks.isEmpty) return;
-    final unassigned = dbTrucks.where((t) => (t['assignedTo'] ?? '').toString().isEmpty).toList();
-    if (unassigned.isEmpty && !isResetting) {
-      isResetting = true;
-      Future.delayed(const Duration(milliseconds: 1800), () async {
-        try {
-          // Perform reset in Firestore
-          final futures = dbTrucks.map((t) => _firebaseService.unassignTruck((t['truckNo'] ?? '').toString()));
-          await Future.wait(futures);
-
-          if (mounted) {
-            setState(() {
-              _tempSelections.clear();
-              isResetting = false;
-            });
-
-            Get.dialog(
-              AlertDialog(
-                backgroundColor: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                title: const Row(
-                  children: [
-                    Icon(Icons.celebration_rounded, color: Colors.amber),
-                    SizedBox(width: 8),
-                    Text('Mission Completed!', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                content: const Text('All trucks have been assigned to their respective drivers! Board is resetting to unassigned row.'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Get.back(),
-                    child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
-                  ),
-                ],
-              ),
-            );
-          }
-        } catch (_) {
-          isResetting = false;
-        }
-      });
-    }
-  }
+  void _checkAutoReset(List<Map<String, dynamic>> dbTrucks) {}
 
   void _showProblemReportDialog(BuildContext context, MockTruck truck) {
     final controller = Get.find<AdminHomeController>();

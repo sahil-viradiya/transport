@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:transport/app/data/services/auth_service.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/app/data/services/storage_service.dart';
 import 'package:transport/app/data/services/session_service.dart';
@@ -121,9 +122,8 @@ class AdminHomeController extends GetxController {
     _trucksSub = _firebaseService
         .watchAllTrucks()
         .listen(trucks.assignAll, onError: (e) => _onStreamError('trucks', e));
-    _vendorsSub = _firebaseService
-        .watchVendors()
-        .listen(vendors.assignAll, onError: (e) => _onStreamError('vendors', e));
+    _vendorsSub = _firebaseService.watchVendors().listen(vendors.assignAll,
+        onError: (e) => _onStreamError('vendors', e));
   }
 
   // ---------------------------------------------------------------------------
@@ -133,9 +133,8 @@ class AdminHomeController extends GetxController {
   // ---------------------------------------------------------------------------
 
   /// All non-admin users (drivers), leave or not.
-  List<Map<String, dynamic>> get allDrivers => users
-      .where((u) => (u['role'] ?? 'driver') != 'admin')
-      .toList();
+  List<Map<String, dynamic>> get allDrivers =>
+      users.where((u) => (u['role'] ?? 'driver') != 'admin').toList();
 
   bool isOnLeave(Map<String, dynamic> user) =>
       user['onLeave'] == true || user['availability'] == 'on_leave';
@@ -213,7 +212,8 @@ class AdminHomeController extends GetxController {
   // ---------------------------------------------------------------------------
   // ADMIN TRIPS TAB: search + status filter + pagination
   // ---------------------------------------------------------------------------
-  final RxString tripStatusFilter = 'All'.obs; // All|En Route|Pending|Completed|Cancelled
+  final RxString tripStatusFilter =
+      'All'.obs; // All|En Route|Pending|Completed|Cancelled
   final RxString tripSearch = ''.obs;
   final tripSearchController = TextEditingController();
   final Rx<DateTime?> tripDateFilter = Rx<DateTime?>(null);
@@ -229,8 +229,18 @@ class AdminHomeController extends GetxController {
   };
 
   static const _monthAbbr = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec'
   ];
 
   bool _tripMatchesFilter(Map<String, dynamic> t) {
@@ -254,8 +264,13 @@ class AdminHomeController extends GetxController {
     if (q.isEmpty) return true;
     final driver =
         driverNameFor((t['driverPhone'] ?? '').toString()).toLowerCase();
-    return [t['id'], t['vendorName'], t['truckNo'], t['pickupCity'], t['dropCity']]
-            .any((v) => (v ?? '').toString().toLowerCase().contains(q)) ||
+    return [
+          t['id'],
+          t['vendorName'],
+          t['truckNo'],
+          t['pickupCity'],
+          t['dropCity']
+        ].any((v) => (v ?? '').toString().toLowerCase().contains(q)) ||
         driver.contains(q);
   }
 
@@ -289,7 +304,9 @@ class AdminHomeController extends GetxController {
   List<Map<String, dynamic>> get filteredTrips {
     final list = trips
         .where((t) =>
-            _tripMatchesFilter(t) && _tripMatchesSearch(t) && _tripMatchesDate(t))
+            _tripMatchesFilter(t) &&
+            _tripMatchesSearch(t) &&
+            _tripMatchesDate(t))
         .toList();
     list.sort((a, b) {
       final weightA = _statusSortWeight((a['status'] ?? '').toString());
@@ -389,8 +406,8 @@ class AdminHomeController extends GetxController {
 
   /// Set the drop destination for a trip (typically while the truck is
   /// loading). The driver sees it only after the load is approved.
-  Future<void> setDestination(String tripId, String dropCity,
-      String dropLocation,
+  Future<void> setDestination(
+      String tripId, String dropCity, String dropLocation,
       {String customerName = '', String customerAddress = ''}) async {
     AppPopup.showLoading(message: 'Setting destination...');
     try {
@@ -402,7 +419,8 @@ class AdminHomeController extends GetxController {
       AppPopup.hideLoading();
       AppSnackBar.showSuccess(
           title: 'Destination Set 📍',
-          message: '$dropCity — $dropLocation. Ab load approve kar sakte hain.');
+          message:
+              '$dropCity — $dropLocation. Ab load approve kar sakte hain.');
     } catch (e) {
       AppPopup.hideLoading();
       AppSnackBar.showError(title: 'Error', message: e.toString());
@@ -421,7 +439,7 @@ class AdminHomeController extends GetxController {
       AppSnackBar.showSuccess(
           title: 'Truck Assigned 🚛',
           message: '$truckNo assigned. Driver ko inspection ke liye '
-               'notification bhej di gayi.');
+              'notification bhej di gayi.');
     } catch (e) {
       AppPopup.hideLoading();
       AppSnackBar.showError(title: 'Error', message: e.toString());
@@ -515,8 +533,9 @@ class AdminHomeController extends GetxController {
 
   Map<String, dynamic>? activeTripForDriver(String phone) {
     try {
-      return trips.firstWhere(
-          (t) => t['isActive'] == true && (t['driverPhone'] ?? '').toString() == phone);
+      return trips.firstWhere((t) =>
+          t['isActive'] == true &&
+          (t['driverPhone'] ?? '').toString() == phone);
     } catch (_) {
       return null;
     }
@@ -560,9 +579,11 @@ class AdminHomeController extends GetxController {
     if (trip == null) return false;
     final tripDateStr = (trip['date'] ?? '').toString();
     if (tripDateStr.isEmpty) return false;
-    
-    final formattedSelected = "${selectedDate.value!.year}-${selectedDate.value!.month.toString().padLeft(2, '0')}-${selectedDate.value!.day.toString().padLeft(2, '0')}";
-    return tripDateStr.contains(formattedSelected) || formattedSelected.contains(tripDateStr);
+
+    final formattedSelected =
+        "${selectedDate.value!.year}-${selectedDate.value!.month.toString().padLeft(2, '0')}-${selectedDate.value!.day.toString().padLeft(2, '0')}";
+    return tripDateStr.contains(formattedSelected) ||
+        formattedSelected.contains(tripDateStr);
   }
 
   // ---- Truck kanban helpers (dashboard) ----
@@ -570,19 +591,23 @@ class AdminHomeController extends GetxController {
       .where((t) =>
           (t['assignedTo'] ?? '').toString().isEmpty &&
           _matchesQuery((t['truckNo'] ?? '').toString(), '') &&
-          (selectedStatus.value == 'All Status' || selectedStatus.value == 'Idle'))
+          (selectedStatus.value == 'All Status' ||
+              selectedStatus.value == 'Idle'))
       .toList();
 
   List<Map<String, dynamic>> get problemTrucks => trucks
       .where((t) =>
           t['inspectionStatus'] == 'problem' &&
-          _matchesQuery((t['truckNo'] ?? '').toString(), (t['assignedTo'] ?? '').toString()) &&
-          (selectedStatus.value == 'All Status' || selectedStatus.value == 'Breakdown'))
+          _matchesQuery((t['truckNo'] ?? '').toString(),
+              (t['assignedTo'] ?? '').toString()) &&
+          (selectedStatus.value == 'All Status' ||
+              selectedStatus.value == 'Breakdown'))
       .toList();
 
   List<Map<String, dynamic>> get assignedTrucks => trucks.where((t) {
         final assignedTo = (t['assignedTo'] ?? '').toString();
-        if (assignedTo.isEmpty || t['inspectionStatus'] == 'problem') return false;
+        if (assignedTo.isEmpty || t['inspectionStatus'] == 'problem')
+          return false;
         final trip = currentTripForDriver(assignedTo);
         return _matchesQuery((t['truckNo'] ?? '').toString(), assignedTo) &&
             _matchesStatus(t, trip) &&
@@ -658,6 +683,7 @@ class AdminHomeController extends GetxController {
   Future<void> loadData() async {
     isLoading.value = true;
     try {
+      // await _firebaseService.migratePhoneKeys();
       // Fetch users
       final fetchedUsers = await _firebaseService.getUsers();
       users.assignAll(fetchedUsers);
@@ -681,7 +707,8 @@ class AdminHomeController extends GetxController {
     }
   }
 
-  Future<void> _syncExistingAvatars(List<Map<String, dynamic>> fetchedUsers) async {
+  Future<void> _syncExistingAvatars(
+      List<Map<String, dynamic>> fetchedUsers) async {
     for (final u in fetchedUsers) {
       if ((u['role'] ?? 'driver') == 'driver') {
         final phone = (u['phone'] ?? '').toString();
@@ -736,7 +763,8 @@ class AdminHomeController extends GetxController {
     try {
       await _firebaseService.saveTrip(tripId, tripData);
       AppPopup.hideLoading();
-      AppSnackBar.showSuccess(title: 'Trip Updated', message: 'Trip details modified.');
+      AppSnackBar.showSuccess(
+          title: 'Trip Updated', message: 'Trip details modified.');
       await loadData();
     } catch (e) {
       AppPopup.hideLoading();
@@ -754,7 +782,8 @@ class AdminHomeController extends GetxController {
         try {
           await _firebaseService.deleteTrip(tripId);
           AppPopup.hideLoading();
-          AppSnackBar.showSuccess(title: 'Deleted', message: 'Trip removed from database.');
+          AppSnackBar.showSuccess(
+              title: 'Deleted', message: 'Trip removed from database.');
           await loadData();
         } catch (e) {
           AppPopup.hideLoading();
@@ -770,11 +799,13 @@ class AdminHomeController extends GetxController {
       // Force transition to DELIVERY_REQUESTED if not set (fallback safety)
       final doc = await _firebaseService.getTripData(tripId) ?? {};
       if (doc['status'] != 'DELIVERY_REQUESTED') {
-        await _firebaseService.saveTrip(tripId, {'status': 'DELIVERY_REQUESTED'});
+        await _firebaseService
+            .saveTrip(tripId, {'status': 'DELIVERY_REQUESTED'});
       }
       await _firebaseService.approveDelivery(tripId);
       AppPopup.hideLoading();
-      Get.snackbar('Approved', 'Trip delivery has been approved successfully.', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar('Approved', 'Trip delivery has been approved successfully.',
+          snackPosition: SnackPosition.BOTTOM);
       await loadData();
     } catch (e) {
       AppPopup.hideLoading();
@@ -788,11 +819,13 @@ class AdminHomeController extends GetxController {
       // Force transition to DELIVERY_REQUESTED if not set (fallback safety)
       final doc = await _firebaseService.getTripData(tripId) ?? {};
       if (doc['status'] != 'DELIVERY_REQUESTED') {
-        await _firebaseService.saveTrip(tripId, {'status': 'DELIVERY_REQUESTED'});
+        await _firebaseService
+            .saveTrip(tripId, {'status': 'DELIVERY_REQUESTED'});
       }
       await _firebaseService.rejectDelivery(tripId, reason: reason);
       AppPopup.hideLoading();
-      Get.snackbar('Rejected', 'Trip delivery has been rejected.', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar('Rejected', 'Trip delivery has been rejected.',
+          snackPosition: SnackPosition.BOTTOM);
       await loadData();
     } catch (e) {
       AppPopup.hideLoading();
@@ -807,7 +840,8 @@ class AdminHomeController extends GetxController {
     try {
       await _firebaseService.saveTruck(truckNo, truckData);
       AppPopup.hideLoading();
-      AppSnackBar.showSuccess(title: 'Truck Registered', message: 'Truck added successfully.');
+      AppSnackBar.showSuccess(
+          title: 'Truck Registered', message: 'Truck added successfully.');
       await loadData();
     } catch (e) {
       AppPopup.hideLoading();
@@ -820,7 +854,8 @@ class AdminHomeController extends GetxController {
     try {
       await _firebaseService.saveTruck(truckNo, truckData);
       AppPopup.hideLoading();
-      AppSnackBar.showSuccess(title: 'Truck Updated', message: 'Truck profile updated.');
+      AppSnackBar.showSuccess(
+          title: 'Truck Updated', message: 'Truck profile updated.');
       await loadData();
     } catch (e) {
       AppPopup.hideLoading();
@@ -831,14 +866,16 @@ class AdminHomeController extends GetxController {
   Future<void> deleteTruck(String truckNo) async {
     AppPopup.showConfirmation(
       title: 'Delete Truck?',
-      description: 'Are you sure you want to permanently delete Truck $truckNo?',
+      description:
+          'Are you sure you want to permanently delete Truck $truckNo?',
       confirmText: 'Delete',
       onConfirm: () async {
         AppPopup.showLoading(message: 'Deleting Truck...');
         try {
           await _firebaseService.deleteTruck(truckNo);
           AppPopup.hideLoading();
-          AppSnackBar.showSuccess(title: 'Deleted', message: 'Truck removed from database.');
+          AppSnackBar.showSuccess(
+              title: 'Deleted', message: 'Truck removed from database.');
           await loadData();
         } catch (e) {
           AppPopup.hideLoading();
@@ -855,7 +892,8 @@ class AdminHomeController extends GetxController {
     try {
       await _firebaseService.saveUser(phone, userData);
       AppPopup.hideLoading();
-      AppSnackBar.showSuccess(title: 'User Added', message: 'User profile registered.');
+      AppSnackBar.showSuccess(
+          title: 'User Added', message: 'User profile registered.');
       await loadData();
     } catch (e) {
       AppPopup.hideLoading();
@@ -906,7 +944,8 @@ class AdminHomeController extends GetxController {
     try {
       await _firebaseService.updateUserRole(phone, newRole);
       AppPopup.hideLoading();
-      AppSnackBar.showSuccess(title: 'Role Updated', message: 'Role set to: $newRole');
+      AppSnackBar.showSuccess(
+          title: 'Role Updated', message: 'Role set to: $newRole');
       await loadData();
     } catch (e) {
       AppPopup.hideLoading();
@@ -917,14 +956,16 @@ class AdminHomeController extends GetxController {
   Future<void> deleteUser(String phone) async {
     AppPopup.showConfirmation(
       title: 'Delete User?',
-      description: 'Are you sure you want to permanently delete profile for $phone?',
+      description:
+          'Are you sure you want to permanently delete profile for $phone?',
       confirmText: 'Delete',
       onConfirm: () async {
         AppPopup.showLoading(message: 'Deleting profile...');
         try {
           await _firebaseService.deleteUser(phone);
           AppPopup.hideLoading();
-          AppSnackBar.showSuccess(title: 'Deleted', message: 'User profile removed.');
+          AppSnackBar.showSuccess(
+              title: 'Deleted', message: 'User profile removed.');
           await loadData();
         } catch (e) {
           AppPopup.hideLoading();
@@ -956,7 +997,8 @@ class AdminHomeController extends GetxController {
     final reasonCtrl = TextEditingController();
     AppPopup.showConfirmation(
       title: 'Reject Expense?',
-      description: 'This claim will be marked rejected and the driver notified.',
+      description:
+          'This claim will be marked rejected and the driver notified.',
       confirmText: 'Reject',
       onConfirm: () async {
         AppPopup.showLoading(message: 'Rejecting...');
@@ -965,7 +1007,8 @@ class AdminHomeController extends GetxController {
               reason: reasonCtrl.text.trim());
           AppPopup.hideLoading();
           AppSnackBar.showInfo(
-              title: 'Expense Rejected', message: 'The driver has been notified.');
+              title: 'Expense Rejected',
+              message: 'The driver has been notified.');
         } catch (e) {
           AppPopup.hideLoading();
           AppSnackBar.showError(title: 'Error', message: e.toString());
@@ -982,7 +1025,8 @@ class AdminHomeController extends GetxController {
       AppPopup.hideLoading();
       AppSnackBar.showSuccess(
         title: 'Inspection Approved ✅',
-        message: 'Truck $truckNo inspection approved. Driver ko notification bhej di gayi.',
+        message:
+            'Truck $truckNo inspection approved. Driver ko notification bhej di gayi.',
       );
       await loadData();
     } catch (e) {
@@ -998,7 +1042,8 @@ class AdminHomeController extends GetxController {
       AppPopup.hideLoading();
       AppSnackBar.showInfo(
         title: 'Inspection Rejected ❌',
-        message: 'Truck $truckNo inspection rejected. Driver ko inspect karne ko keh diya hai.',
+        message:
+            'Truck $truckNo inspection rejected. Driver ko inspect karne ko keh diya hai.',
       );
       await loadData();
     } catch (e) {
@@ -1014,16 +1059,9 @@ class AdminHomeController extends GetxController {
       description: 'Do you want to sign out and end your active admin session?',
       confirmText: 'Sign Out',
       onConfirm: () async {
-        try {
-          await FirebaseAuth.instance.signOut();
-        } catch (_) {}
-        
-        await _storage.remove('isLoggedIn');
-        await _storage.remove('userPhone');
-        await _storage.remove('userRole');
-        
-        Get.offAllNamed(Routes.LOGIN);
-        AppSnackBar.showSuccess(title: 'Logged Out', message: 'Session closed successfully.');
+        await Get.find<AuthService>().signOut();
+        AppSnackBar.showSuccess(
+            title: 'Logged Out', message: 'Session closed successfully.');
       },
     );
   }
@@ -1036,7 +1074,8 @@ class AdminHomeController extends GetxController {
     } catch (_) {}
   }
 
-  Future<void> updateAdminProfile(String phone, String name, String avatarUrl) async {
+  Future<void> updateAdminProfile(
+      String phone, String name, String avatarUrl) async {
     AppPopup.showLoading(message: 'Updating Profile...');
     try {
       await _firebaseService.saveUser(phone, {
@@ -1046,7 +1085,9 @@ class AdminHomeController extends GetxController {
       final session = Get.find<SessionService>();
       await session.updateCachedProfile(name: name, avatarUrl: avatarUrl);
       AppPopup.hideLoading();
-      AppSnackBar.showSuccess(title: 'Profile Updated', message: 'Admin profile updated successfully.');
+      AppSnackBar.showSuccess(
+          title: 'Profile Updated',
+          message: 'Admin profile updated successfully.');
     } catch (e) {
       AppPopup.hideLoading();
       AppSnackBar.showError(title: 'Error', message: e.toString());

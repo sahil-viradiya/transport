@@ -60,7 +60,7 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({
       'isLoggedIn': true,
-      'userPhone': '+919876543210',
+      'userPhone': '919876543210',
       'userRole': 'owner',
       'userName': 'Rajeshbhai Patel',
     });
@@ -213,17 +213,17 @@ void main() {
     final session = SessionService(storage: storage);
     await session.init();
     await session.setSession(
-        phone: '+919876543210', name: 'Rajeshbhai Patel Transport', role: 'owner');
+        phone: '919876543210', name: 'Rajeshbhai Patel Transport', role: 'owner');
     Get.put<SessionService>(session);
     await Get.putAsync<ConnectivityService>(() => _OnlineConnectivity().init());
 
     final firestore = FakeFirebaseFirestore();
-    await firestore.collection('users').doc('+919876543210').set(
+    await firestore.collection('users').doc('919876543210').set(
         {'name': 'Rajeshbhai Patel Transport', 'avatarUrl': ''});
     await firestore.collection('trips').doc('TRP-1').set({
       'truckNo': 'GJ-01-AB-1234',
-      'ownerId': '+919876543210',
-      'driverPhone': '+919876543210',
+      'ownerId': '919876543210',
+      'driverPhone': '919876543210',
       'status': 'ACTIVE NOW',
       'isActive': true,
       'currentMilestone': 3,
@@ -236,10 +236,10 @@ void main() {
       ],
     });
     await firestore.collection('trucks').doc('t1').set(
-        {'truckNo': 'GJ-01-AB-1234', 'model': 'Tata Signa 5530.S', 'ownerId': '+919876543210'});
+        {'truckNo': 'GJ-01-AB-1234', 'model': 'Tata Signa 5530.S', 'ownerId': '919876543210'});
 
     Get.put(FirebaseService(
-        firestore: firestore, ownerKeyResolver: () => '+919876543210'));
+        firestore: firestore, ownerKeyResolver: () => '919876543210'));
     Get.put(HomeController());
     Get.put(TripsController());
     Get.put(DashboardController());
@@ -268,18 +268,18 @@ void main() {
     final session = SessionService(storage: storage);
     await session.init();
     await session.setSession(
-        phone: '+919876543210', name: 'Rajesh', role: 'owner');
+        phone: '919876543210', name: 'Rajesh', role: 'owner');
     Get.put<SessionService>(session);
     await Get.putAsync<ConnectivityService>(() => _OnlineConnectivity().init());
 
     final firestore = FakeFirebaseFirestore();
     await firestore.collection('trucks').doc('GJ-01').set({
       'truckNo': 'GJ-01',
-      'assignedTo': '+919876543210',
+      'assignedTo': '919876543210',
       'inspectionStatus': 'pending',
     });
     Get.put(FirebaseService(
-        firestore: firestore, ownerKeyResolver: () => '+919876543210'));
+        firestore: firestore, ownerKeyResolver: () => '919876543210'));
     Get.put(HomeController());
     Get.put(TripsController());
     Get.put(DashboardController());
@@ -300,18 +300,18 @@ void main() {
     Get.put<StorageService>(storage);
     final session = SessionService(storage: storage);
     await session.init();
-    await session.setSession(phone: '+919999999999', role: 'admin', name: 'Admin');
+    await session.setSession(phone: '919999999999', role: 'admin', name: 'Admin');
     Get.put<SessionService>(session);
     await Get.putAsync<ConnectivityService>(() => _OnlineConnectivity().init());
 
     final firestore = FakeFirebaseFirestore();
-    await firestore.collection('users').doc('+919876543210').set(
-        {'name': 'Rajesh Kumar', 'phone': '+919876543210', 'role': 'driver'});
+    await firestore.collection('users').doc('919876543210').set(
+        {'name': 'Rajesh Kumar', 'phone': '919876543210', 'role': 'driver'});
     for (final id in ['123', '222']) {
       await firestore.collection('trips').doc(id).set({
         'truckNo': 'MH-12-BV-0045',
-        'ownerId': '+919876543210',
-        'driverPhone': '+919876543210',
+        'ownerId': '919876543210',
+        'driverPhone': '919876543210',
         'status': 'DELIVERED',
         'isActive': false,
         'currentMilestone': 4,
@@ -328,10 +328,10 @@ void main() {
       });
     }
     await firestore.collection('trucks').doc('t1').set(
-        {'truckNo': 'MH-12-BV-0045', 'model': 'Tata Signa', 'ownerId': '+919876543210'});
+        {'truckNo': 'MH-12-BV-0045', 'model': 'Tata Signa', 'ownerId': '919876543210'});
 
     Get.put(FirebaseService(
-        firestore: firestore, ownerKeyResolver: () => '+919999999999'));
+        firestore: firestore, ownerKeyResolver: () => '919999999999'));
     Get.put(NotificationsController());
     Get.put(AdminHomeController());
   }
@@ -435,7 +435,7 @@ void main() {
     Get.put<StorageService>(storage);
     final session = SessionService(storage: storage);
     await session.init();
-    await session.setSession(phone: '+919999999999', role: 'admin', name: 'Admin');
+    await session.setSession(phone: '919999999999', role: 'admin', name: 'Admin');
     Get.put<SessionService>(session);
 
     final firestore = FakeFirebaseFirestore();
@@ -444,11 +444,11 @@ void main() {
       'pickupCity': 'Surat',
       'dropCity': 'Rajkot',
       'currentMilestone': 3,
-      'ownerId': '+919876543210',
-      'driverPhone': '+919876543210',
+      'ownerId': '919876543210',
+      'driverPhone': '919876543210',
     });
     Get.put(FirebaseService(
-        firestore: firestore, ownerKeyResolver: () => '+919999999999'));
+        firestore: firestore, ownerKeyResolver: () => '919999999999'));
 
     await tester.pumpWidget(_app(
       const Scaffold(),
@@ -478,7 +478,7 @@ void main() {
     Get.put<SessionService>(session);
     Get.put(FirebaseService(
         firestore: FakeFirebaseFirestore(),
-        ownerKeyResolver: () => '+919876543210'));
+        ownerKeyResolver: () => '919876543210'));
 
     await tester.pumpWidget(_app(
       const Scaffold(),
@@ -513,13 +513,13 @@ void main() {
     final session = SessionService(storage: storage);
     await session.init();
     await session.setSession(
-        phone: '+919876543210', name: 'Rajesh', role: 'owner');
+        phone: '919876543210', name: 'Rajesh', role: 'owner');
     Get.put<SessionService>(session);
 
     final firestore = FakeFirebaseFirestore();
     await firestore.collection('trips').doc('TRP-LONG').set({
-      'ownerId': '+919876543210',
-      'driverPhone': '+919876543210',
+      'ownerId': '919876543210',
+      'driverPhone': '919876543210',
       'truckNo': 'GJ-01-AB-1234-XY',
       'status': 'DELIVERY_REQUESTED',
       'priority': true,
@@ -531,7 +531,7 @@ void main() {
       'date': 'Today',
     });
     Get.put(FirebaseService(
-        firestore: firestore, ownerKeyResolver: () => '+919876543210'));
+        firestore: firestore, ownerKeyResolver: () => '919876543210'));
     Get.put(TripsController());
 
     await mockNetworkImagesFor(() async {
@@ -549,20 +549,20 @@ void main() {
     Get.put<StorageService>(storage);
     final session = SessionService(storage: storage);
     await session.init();
-    await session.setSession(phone: '+919999999999', role: 'admin', name: 'Admin');
+    await session.setSession(phone: '919999999999', role: 'admin', name: 'Admin');
     Get.put<SessionService>(session);
     await Get.putAsync<ConnectivityService>(() => _OnlineConnectivity().init());
 
     final firestore = FakeFirebaseFirestore();
-    await firestore.collection('users').doc('+919876543210').set({
+    await firestore.collection('users').doc('919876543210').set({
       'name': 'Rajesh Kumar',
-      'phone': '+919876543210',
+      'phone': '919876543210',
       'role': 'driver',
       'availability': 'available',
       'checkInAddress': 'Surat Depot',
     });
     Get.put(FirebaseService(
-        firestore: firestore, ownerKeyResolver: () => '+919999999999'));
+        firestore: firestore, ownerKeyResolver: () => '919999999999'));
     Get.put(AdminHomeController());
 
     await mockNetworkImagesFor(() async {
@@ -588,18 +588,18 @@ void main() {
     Get.put<SessionService>(session);
 
     final firestore = FakeFirebaseFirestore();
-    await firestore.collection('users').doc('+919876543210').set({
+    await firestore.collection('users').doc('919876543210').set({
       'name': 'Rajesh Kumar',
-      'phone': '+919876543210',
+      'phone': '919876543210',
       'role': 'driver',
       'availability': 'available',
     });
-    await firestore.collection('drivers').doc('+919876543210').set({
+    await firestore.collection('drivers').doc('919876543210').set({
       'vehicleNo': 'GJ-01-AB-1234',
       'vehicleModel': 'Tata Signa',
     });
     Get.put(FirebaseService(
-        firestore: firestore, ownerKeyResolver: () => '+919876543210'));
+        firestore: firestore, ownerKeyResolver: () => '919876543210'));
 
     await mockNetworkImagesFor(() async {
       await tester.pumpWidget(_app(const Scaffold(), pages: [
@@ -608,7 +608,7 @@ void main() {
             page: () => const DriverDetailView(),
             binding: DriverDetailBinding()),
       ]));
-      Get.toNamed(Routes.DRIVER_DETAIL, arguments: {'phone': '+919876543210'});
+      Get.toNamed(Routes.DRIVER_DETAIL, arguments: {'phone': '919876543210'});
       for (var i = 0; i < 6; i++) {
         await tester.pump(const Duration(milliseconds: 120));
       }

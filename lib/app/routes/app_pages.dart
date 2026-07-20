@@ -24,6 +24,7 @@ import '../modules/driver_detail/bindings/driver_detail_binding.dart';
 import '../modules/driver_detail/views/driver_detail_view.dart';
 import '../modules/expense_detail/bindings/expense_detail_binding.dart';
 import '../modules/expense_detail/views/expense_detail_view.dart';
+import '../core/middleware/auth_middleware.dart';
 
 part 'app_routes.dart';
 
@@ -62,40 +63,48 @@ class AppPages {
       name: _Paths.HOME,
       page: () => const HomeView(),
       binding: HomeBinding(),
+      middlewares: [AuthMiddleware()],
     ),
     GetPage(
       name: _Paths.TRIP_DETAILS,
       page: () => const TripStatusView(),
       binding: TripDetailsBinding(),
+      middlewares: [AuthMiddleware()],
     ),
     GetPage(
       name: _Paths.PROOF_OF_DELIVERY,
       page: () => const ProofOfDeliveryView(),
       binding: ProofOfDeliveryBinding(),
+      middlewares: [AuthMiddleware()],
     ),
     GetPage(
       name: _Paths.ADMIN_HOME,
       page: () => const AdminHomeView(),
       binding: AdminHomeBinding(),
+      middlewares: [AuthMiddleware()],
     ),
     GetPage(
       name: _Paths.NOTIFICATION_DETAIL,
       page: () => const NotificationDetailView(),
       binding: NotificationDetailBinding(),
+      middlewares: [AuthMiddleware()],
     ),
     GetPage(
       name: _Paths.ACTIVE_DRIVERS,
       page: () => const ActiveDriversView(),
+      middlewares: [AuthMiddleware()],
     ),
     GetPage(
       name: _Paths.DRIVER_DETAIL,
       page: () => const DriverDetailView(),
       binding: DriverDetailBinding(),
+      middlewares: [AuthMiddleware()],
     ),
     GetPage(
       name: _Paths.EXPENSE_DETAIL,
       page: () => const ExpenseDetailView(),
       binding: ExpenseDetailBinding(),
+      middlewares: [AuthMiddleware()],
     ),
   ];
 }

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:transport/app/data/services/auth_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
@@ -196,7 +197,7 @@ class DashboardController extends GetxController {
     AppPopup.showLoading(message: accept ? 'Accepting truck...' : 'Rejecting truck...');
     try {
       if (accept) {
-        await Get.find<FirebaseService>().acceptTruckAssignment(truckNo);
+        await Get.find<FirebaseService>().acceptTruckAssignment(truckNo, _session.phone.value);
         AppPopup.hideLoading();
         Get.to(() => TruckInspectionFormView());
       } else {
@@ -483,12 +484,7 @@ class DashboardController extends GetxController {
       description: 'Do you want to end your active driver terminal session?',
       confirmText: 'Sign Out',
       onConfirm: () async {
-        try {
-          await FirebaseAuth.instance.signOut();
-        } catch (_) {}
-
-        await _session.clear();
-        Get.offAllNamed(Routes.LOGIN);
+        await Get.find<AuthService>().signOut();
         AppSnackBar.showSuccess(title: 'Logged Out', message: 'Session closed successfully.');
       },
     );

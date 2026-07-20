@@ -113,6 +113,6 @@ class SessionService extends GetxService {
   /// Normalise a phone string to the `+<countrycode><number>` form used as the
   /// canonical key. Strips spaces, dashes and parentheses.
   static String normalizePhone(String raw) {
-    return raw.replaceAll(RegExp(r'[\s\-()]'), '').trim();
+    return raw.replaceAll(RegExp(r'[\s\-()+]'), '').trim();
   }
 }

@@ -1,9 +1,11 @@
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:get/get.dart';
 import 'package:transport/app/modules/trips/controllers/trips_controller.dart';
 import 'package:transport/app/data/services/session_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 /// Firestore + Storage data layer.
@@ -23,6 +25,8 @@ class FirebaseService extends GetxService {
   final FirebaseFirestore _db;
   final FirebaseStorage? _injectedStorage;
   final String Function()? _ownerKeyResolver;
+
+  bool _phoneKeysMigrated = false;
 
   FirebaseService({
     FirebaseFirestore? firestore,
@@ -56,7 +60,8 @@ class FirebaseService extends GetxService {
             'Rules deploy karein: firebase deploy --only firestore:rules');
       }
       if (e.code == 'unavailable') {
-        throw Exception('$action: Firestore reachable nahi hai — internet check karein.');
+        throw Exception(
+            '$action: Firestore reachable nahi hai — internet check karein.');
       }
       throw Exception('$action: ${e.message ?? e.code}');
     }
@@ -137,8 +142,10 @@ class FirebaseService extends GetxService {
     final owner = (key == null || key.isEmpty) ? ownerKey : key;
     if (owner.isEmpty) return [];
     try {
-      final snapshot =
-          await _db.collection('trips').where('ownerId', isEqualTo: owner).get();
+      final snapshot = await _db
+          .collection('trips')
+          .where('ownerId', isEqualTo: owner)
+          .get();
       return snapshot.docs.map((d) => _tripFromDoc(d.id, d.data())).toList();
     } catch (_) {
       return [];
@@ -169,8 +176,10 @@ class FirebaseService extends GetxService {
   /// Live stream of all trips for the admin operations dashboard, so milestone
   /// progress and last-known locations update without a manual refresh.
   Stream<List<TripItemModel>> watchAllTrips() {
-    return _db.collection('trips').snapshots().map(
-        (s) => s.docs.map((d) => _tripFromDoc(d.id, d.data())).toList());
+    return _db
+        .collection('trips')
+        .snapshots()
+        .map((s) => s.docs.map((d) => _tripFromDoc(d.id, d.data())).toList());
   }
 
   Future<Map<String, dynamic>?> getTripData(String tripId) async {
@@ -229,7 +238,8 @@ class FirebaseService extends GetxService {
   /// admin who assigned it is notified.
   Future<void> acceptTrip(String tripId, {String? driverName}) async {
     try {
-      final data = (await _db.collection('trips').doc(tripId).get()).data() ?? {};
+      final data =
+          (await _db.collection('trips').doc(tripId).get()).data() ?? {};
       if (data['status'] != 'PENDING') return; // already handled
       await _db.collection('trips').doc(tripId).set({
         'status': 'ASSIGNED',
@@ -254,7 +264,8 @@ class FirebaseService extends GetxService {
   Future<void> rejectTrip(String tripId,
       {String reason = '', String? driverName}) async {
     try {
-      final data = (await _db.collection('trips').doc(tripId).get()).data() ?? {};
+      final data =
+          (await _db.collection('trips').doc(tripId).get()).data() ?? {};
       if (data['status'] != 'PENDING') return; // already handled
       await _db.collection('trips').doc(tripId).set({
         'status': 'REJECTED',
@@ -438,19 +449,23 @@ class FirebaseService extends GetxService {
     try {
       final data =
           (await _db.collection('trips').doc(tripId).get()).data() ?? {};
-      if (data['status'] != 'LOAD_REQUESTED' && data['status'] != 'LOADING') return false;
+      if (data['status'] != 'LOAD_REQUESTED' && data['status'] != 'LOADING')
+        return false;
       if (data['destinationReminderSent'] == true) return false;
       if ((data['dropCity'] ?? '').toString().isNotEmpty) return false;
 
-      await _db.collection('trips').doc(tripId).set(
-          {'destinationReminderSent': true}, SetOptions(merge: true));
+      await _db
+          .collection('trips')
+          .doc(tripId)
+          .set({'destinationReminderSent': true}, SetOptions(merge: true));
 
       final assignedBy = data['assignedBy']?.toString() ?? '';
       if (assignedBy.isNotEmpty) {
         await createNotification(
           toPhone: assignedBy,
           title: 'Reminder: Destination Set Karein ⏰',
-          body: 'Trip $tripId ka truck loaded/loading status me hai aur 10 minute ho gaye — '
+          body:
+              'Trip $tripId ka truck loaded/loading status me hai aur 10 minute ho gaye — '
               'destination set karein.',
           type: 'set_destination_reminder',
           tripId: tripId,
@@ -465,7 +480,8 @@ class FirebaseService extends GetxService {
   /// Upload a loading-proof photo taken at the vendor site.
   Future<String> uploadLoadingPhoto(String tripId, Uint8List? bytes) async {
     final owner = ownerKey.isEmpty ? 'unknown' : ownerKey;
-    const placeholder = 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=600';
+    const placeholder =
+        'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=600';
     if (bytes == null || bytes.isEmpty || useMockStorage) return placeholder;
     try {
       final ref = _storage
@@ -485,7 +501,8 @@ class FirebaseService extends GetxService {
   /// Upload a gate pass photo taken at the vendor site.
   Future<String> uploadGatePassPhoto(String tripId, Uint8List? bytes) async {
     final owner = ownerKey.isEmpty ? 'unknown' : ownerKey;
-    const placeholder = 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600';
+    const placeholder =
+        'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600';
     if (bytes == null || bytes.isEmpty || useMockStorage) return placeholder;
     try {
       final ref = _storage
@@ -580,7 +597,8 @@ class FirebaseService extends GetxService {
         tripId,
         3,
         status: 'ACTIVE NOW',
-        locationName: (data['pickupLocation'] ?? 'Approved by admin').toString(),
+        locationName:
+            (data['pickupLocation'] ?? 'Approved by admin').toString(),
         latitude: (data['pickupLatitude'] as num?)?.toDouble(),
         longitude: (data['pickupLongitude'] as num?)?.toDouble(),
       );
@@ -606,16 +624,19 @@ class FirebaseService extends GetxService {
   /// Admin rejects the load — the trip goes back to LOAD_REJECTED and the driver is
   /// told why.
   Future<void> rejectLoad(String tripId,
-      {String reason = '', String flaggedPhoto = 'both', String? adminName}) async {
+      {String reason = '',
+      String flaggedPhoto = 'both',
+      String? adminName}) async {
     try {
       final docRef = _db.collection('trips').doc(tripId);
       final data = (await docRef.get()).data() ?? {};
       if (data['status'] != 'LOAD_REQUESTED') return; // already handled
-      
-      final currentRejectCount = (data['loadRejectCount'] as num?)?.toInt() ?? 0;
+
+      final currentRejectCount =
+          (data['loadRejectCount'] as num?)?.toInt() ?? 0;
       final newRejectCount = currentRejectCount + 1;
       final needsEscalation = newRejectCount >= 3;
-      
+
       final auditEntry = {
         'timestamp': DateTime.now().toIso8601String(),
         'reason': reason,
@@ -639,7 +660,8 @@ class FirebaseService extends GetxService {
         await createNotification(
           toPhone: driverPhone,
           title: 'Load Rejected - Reupload Required ⚠️',
-          body: 'Admin rejected loading photos. Reason: $reason. Please reupload.',
+          body:
+              'Admin rejected loading photos. Reason: $reason. Please reupload.',
           type: 'load_rejected',
           tripId: tripId,
         );
@@ -715,8 +737,8 @@ class FirebaseService extends GetxService {
         tripId,
         4,
         status: 'DELIVERED',
-        locationName: (data['currentAddress'] ?? data['dropLocation'] ?? '')
-            .toString(),
+        locationName:
+            (data['currentAddress'] ?? data['dropLocation'] ?? '').toString(),
         latitude: (data['currentLatitude'] as num?)?.toDouble(),
         longitude: (data['currentLongitude'] as num?)?.toDouble(),
       );
@@ -750,10 +772,11 @@ class FirebaseService extends GetxService {
       final docRef = _db.collection('trips').doc(tripId);
       final data = (await docRef.get()).data() ?? {};
       if (data['status'] != 'DELIVERY_REQUESTED') return; // already handled
-      
-      final currentRejectCount = (data['deliveryRejectCount'] as num?)?.toInt() ?? 0;
+
+      final currentRejectCount =
+          (data['deliveryRejectCount'] as num?)?.toInt() ?? 0;
       final newRejectCount = currentRejectCount + 1;
-      
+
       final auditEntry = {
         'timestamp': DateTime.now().toIso8601String(),
         'reason': reason,
@@ -787,7 +810,8 @@ class FirebaseService extends GetxService {
   // TRIP EXPENSES WITH PROOF + APPROVAL
   // ---------------------------------------------------------------------------
 
-  Future<String> uploadExpenseReceipt(String expenseId, Uint8List? bytes) async {
+  Future<String> uploadExpenseReceipt(
+      String expenseId, Uint8List? bytes) async {
     final owner = ownerKey.isEmpty ? 'unknown' : ownerKey;
     const placeholder =
         'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=600';
@@ -1162,8 +1186,11 @@ class FirebaseService extends GetxService {
       final logEntry = {
         'milestone': milestone,
         'label': labels[milestone] ?? 'Updated',
-        'timestamp':
-            DateTime.now().toIso8601String().split('T').join(' ').substring(0, 16),
+        'timestamp': DateTime.now()
+            .toIso8601String()
+            .split('T')
+            .join(' ')
+            .substring(0, 16),
         'address': locationName ?? 'Terminal Gate',
         'latitude': latitude ?? 0.0,
         'longitude': longitude ?? 0.0,
@@ -1192,7 +1219,8 @@ class FirebaseService extends GetxService {
         'currentAddress': address,
         'lastLocationUpdate': FieldValue.serverTimestamp(),
       };
-      if (remainingDistance != null) updates['remainingDistance'] = remainingDistance;
+      if (remainingDistance != null)
+        updates['remainingDistance'] = remainingDistance;
       if (estimatedTime != null) updates['estimatedTime'] = estimatedTime;
       await _db
           .collection('trips')
@@ -1262,11 +1290,12 @@ class FirebaseService extends GetxService {
     return _ownerDoc(key).snapshots().map((d) => d.data() ?? {});
   }
 
-  Future<void> updateDriverProfile(Map<String, dynamic> data, [String? key]) async {
+  Future<void> updateDriverProfile(Map<String, dynamic> data,
+      [String? key]) async {
     try {
       final id = (key == null || key.isEmpty) ? ownerKey : key;
       await _ownerDoc(id).set(data, SetOptions(merge: true));
-      
+
       final userUpdates = <String, dynamic>{};
       if (data.containsKey('driverName')) {
         userUpdates['name'] = data['driverName'];
@@ -1278,7 +1307,10 @@ class FirebaseService extends GetxService {
         userUpdates['avatarUrl'] = data['avatarUrl'];
       }
       if (userUpdates.isNotEmpty) {
-        await _db.collection('users').doc(id).set(userUpdates, SetOptions(merge: true));
+        await _db
+            .collection('users')
+            .doc(id)
+            .set(userUpdates, SetOptions(merge: true));
       }
     } catch (_) {}
   }
@@ -1314,7 +1346,8 @@ class FirebaseService extends GetxService {
   Future<void> updateDriverDocuments(List<Map<String, dynamic>> docsList,
       [String? key]) async {
     try {
-      await _ownerDoc(key).set({'documents': docsList}, SetOptions(merge: true));
+      await _ownerDoc(key)
+          .set({'documents': docsList}, SetOptions(merge: true));
     } catch (_) {}
   }
 
@@ -1431,8 +1464,10 @@ class FirebaseService extends GetxService {
     final owner = (key == null || key.isEmpty) ? ownerKey : key;
     if (owner.isEmpty) return [];
     try {
-      final snapshot =
-          await _db.collection('trucks').where('ownerId', isEqualTo: owner).get();
+      final snapshot = await _db
+          .collection('trucks')
+          .where('ownerId', isEqualTo: owner)
+          .get();
       return snapshot.docs.map((doc) => doc.data()).toList();
     } catch (_) {
       return [];
@@ -1465,36 +1500,48 @@ class FirebaseService extends GetxService {
     try {
       // Rule: same truck same time 2 driver ko assign nahi ho sakte, and a driver can only have one truck assigned at a time.
       // 1. Unassign this driver from any other trucks
-      final existingQuery = await _db.collection('trucks').where('assignedTo', isEqualTo: p).get();
+      final existingQuery = await _db
+          .collection('trucks')
+          .where('assignedTo', isEqualTo: p)
+          .get();
       for (final doc in existingQuery.docs) {
         if (doc.id != truckNo) {
-          await doc.reference.update({
-            'assignedTo': FieldValue.delete(),
-            'inspectionStatus': FieldValue.delete(),
-            'inspectionIssue': FieldValue.delete(),
-            'inspectionIssueImage': FieldValue.delete(),
-            'inspectionRemarks': FieldValue.delete(),
-            'inspectionResults': FieldValue.delete(),
-            'inspectionImages': FieldValue.delete(),
-          });
+          await _updateTruckDoc(
+            doc.id,
+            {
+              'assignedTo': FieldValue.delete(),
+              'inspectionStatus': FieldValue.delete(),
+              'inspectionIssue': FieldValue.delete(),
+              'inspectionIssueImage': FieldValue.delete(),
+              'inspectionRemarks': FieldValue.delete(),
+              'inspectionResults': FieldValue.delete(),
+              'inspectionImages': FieldValue.delete(),
+            },
+            action: 'assignTruckToDriver_unassign_existing',
+          );
         }
       }
 
       // 2. Assign the truck to this driver (will overwrite any previous driver assigned to this truckNo)
-      await _db.collection('trucks').doc(truckNo).set({
-        'truckNo': truckNo,
-        'ownerId': ownerKey,
-        if (model != null && model.isNotEmpty) 'model': model,
-        'assignedTo': p,
-        'assignedBy': ownerKey,
-        'assignedAt': FieldValue.serverTimestamp(),
-        'inspectionStatus': 'pending_confirmation',
-        'inspectionIssue': FieldValue.delete(),
-        'inspectionIssueImage': FieldValue.delete(),
-        'inspectionRemarks': FieldValue.delete(),
-        'inspectionResults': FieldValue.delete(),
-        'inspectionImages': FieldValue.delete(),
-      }, SetOptions(merge: true));
+      await _setTruckDoc(
+        truckNo,
+        {
+          'truckNo': truckNo,
+          'ownerId': ownerKey,
+          if (model != null && model.isNotEmpty) 'model': model,
+          'assignedTo': p,
+          'assignedBy': ownerKey,
+          'assignedAt': FieldValue.serverTimestamp(),
+          'inspectionStatus': 'pending_confirmation',
+          'inspectionIssue': FieldValue.delete(),
+          'inspectionIssueImage': FieldValue.delete(),
+          'inspectionRemarks': FieldValue.delete(),
+          'inspectionResults': FieldValue.delete(),
+          'inspectionImages': FieldValue.delete(),
+        },
+        options: SetOptions(merge: true),
+        action: 'assignTruckToDriver',
+      );
 
       await createNotification(
         toPhone: p,
@@ -1504,7 +1551,13 @@ class FirebaseService extends GetxService {
         type: 'truck_assigned',
         refId: truckNo,
       );
-    } catch (_) {}
+    } on FirebaseException catch (e) {
+      debugPrint('[FirebaseService] assignTruckToDriver failed: $e');
+      rethrow;
+    } catch (e) {
+      debugPrint('[FirebaseService] assignTruckToDriver failed: $e');
+      rethrow;
+    }
   }
 
   /// Upload a truck-issue photo (web + mobile safe bytes).
@@ -1527,13 +1580,28 @@ class FirebaseService extends GetxService {
   }
 
   /// Driver accepts the truck assignment (transitions status from pending_confirmation to pending)
-  Future<void> acceptTruckAssignment(String truckNo) async {
+  Future<void> acceptTruckAssignment(
+      String truckNo, String sessionPhone) async {
     if (truckNo.isEmpty) return;
     try {
-      await _db.collection('trucks').doc(truckNo).update({
-        'inspectionStatus': 'pending',
-      });
-    } catch (_) {}
+      await _updateTruckDoc(
+        truckNo,
+        {
+          'inspectionStatus': 'pending',
+          'assignedTo': sessionPhone,
+        },
+        action: 'acceptTruckAssignment',
+      );
+      print('Truck assigned successfully!');
+    } on FirebaseException catch (e) {
+      print('Update failed: $e');
+      debugPrint('[FirebaseService] acceptTruckAssignment failed: $e');
+      rethrow;
+    } catch (e) {
+      print('Update failed: $e');
+      debugPrint('[FirebaseService] acceptTruckAssignment failed: $e');
+      rethrow;
+    }
   }
 
   /// Driver reports a problem found during inspection. Admins are notified with
@@ -1546,12 +1614,17 @@ class FirebaseService extends GetxService {
   }) async {
     if (truckNo.isEmpty) return;
     try {
-      await _db.collection('trucks').doc(truckNo).set({
-        'inspectionStatus': 'problem',
-        'inspectionIssue': reason,
-        if (imageUrl.isNotEmpty) 'inspectionIssueImage': imageUrl,
-        'inspectedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      await _setTruckDoc(
+        truckNo,
+        {
+          'inspectionStatus': 'problem',
+          'inspectionIssue': reason,
+          if (imageUrl.isNotEmpty) 'inspectionIssueImage': imageUrl,
+          'inspectedAt': FieldValue.serverTimestamp(),
+        },
+        options: SetOptions(merge: true),
+        action: 'reportTruckIssue',
+      );
 
       await notifyAdmins(
         title: 'Truck Problem ⚠️',
@@ -1559,7 +1632,13 @@ class FirebaseService extends GetxService {
         type: 'truck_issue',
         refId: truckNo,
       );
-    } catch (_) {}
+    } on FirebaseException catch (e) {
+      debugPrint('[FirebaseService] reportTruckIssue failed: $e');
+      rethrow;
+    } catch (e) {
+      debugPrint('[FirebaseService] reportTruckIssue failed: $e');
+      rethrow;
+    }
   }
 
   /// Driver submits truck inspection for review.
@@ -1572,20 +1651,26 @@ class FirebaseService extends GetxService {
   }) async {
     if (truckNo.isEmpty) return;
     final hasIssues = results.values.any((good) => !good);
-    final failedItems = results.entries.where((e) => !e.value).map((e) => e.key).toList();
+    final failedItems =
+        results.entries.where((e) => !e.value).map((e) => e.key).toList();
     final reason = [
       if (failedItems.isNotEmpty) failedItems.join(', '),
       if (remarks.trim().isNotEmpty) remarks.trim(),
     ].join(' — ');
 
-    await _db.collection('trucks').doc(truckNo).set({
-      'inspectionStatus': hasIssues ? 'problem' : 'ready',
-      'inspectionResults': results,
-      'inspectionRemarks': remarks,
-      'inspectionImages': imageUrls,
-      'inspectionIssue': reason.isNotEmpty ? reason : 'All items good',
-      'inspectedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    await _setTruckDoc(
+      truckNo,
+      {
+        'inspectionStatus': hasIssues ? 'problem' : 'ready',
+        'inspectionResults': results,
+        'inspectionRemarks': remarks,
+        'inspectionImages': imageUrls,
+        'inspectionIssue': reason.isNotEmpty ? reason : 'All items good',
+        'inspectedAt': FieldValue.serverTimestamp(),
+      },
+      options: SetOptions(merge: true),
+      action: 'submitTruckInspection',
+    );
 
     await notifyAdmins(
       title: hasIssues ? 'Truck Inspection (Issue) ⚠️' : 'Truck Ready ✅',
@@ -1600,18 +1685,25 @@ class FirebaseService extends GetxService {
   /// Admin approves the truck inspection condition.
   Future<void> approveTruckInspection(String truckNo) async {
     if (truckNo.isEmpty) return;
-    final data = (await _db.collection('trucks').doc(truckNo).get()).data() ?? {};
+    final data =
+        (await _db.collection('trucks').doc(truckNo).get()).data() ?? {};
     final driver = (data['assignedTo'] ?? '').toString();
-    
-    await _db.collection('trucks').doc(truckNo).set({
-      'inspectionStatus': 'approved_pending_accept',
-    }, SetOptions(merge: true));
+
+    await _setTruckDoc(
+      truckNo,
+      {
+        'inspectionStatus': 'approved_pending_accept',
+      },
+      options: SetOptions(merge: true),
+      action: 'approveTruckInspection',
+    );
 
     if (driver.isNotEmpty) {
       await createNotification(
         toPhone: driver,
         title: 'Inspection Approved ✅',
-        body: 'Truck $truckNo ka inspection approve ho gaya hai. Dashboard par accept karein.',
+        body:
+            'Truck $truckNo ka inspection approve ho gaya hai. Dashboard par accept karein.',
         type: 'inspection_approved',
         refId: truckNo,
       );
@@ -1621,23 +1713,31 @@ class FirebaseService extends GetxService {
   /// Admin rejects/requests re-inspection of the truck.
   Future<void> rejectTruckInspection(String truckNo) async {
     if (truckNo.isEmpty) return;
-    final data = (await _db.collection('trucks').doc(truckNo).get()).data() ?? {};
+    final data =
+        (await _db.collection('trucks').doc(truckNo).get()).data() ?? {};
     final driver = (data['assignedTo'] ?? '').toString();
-    
-    await _db.collection('trucks').doc(truckNo).set({
-      'inspectionStatus': 'pending', // back to pending state so they re-inspect
-      'inspectionRemarks': FieldValue.delete(),
-      'inspectionResults': FieldValue.delete(),
-      'inspectionImages': FieldValue.delete(),
-      'inspectionIssue': FieldValue.delete(),
-      'inspectionIssueImage': FieldValue.delete(),
-    }, SetOptions(merge: true));
+
+    await _setTruckDoc(
+      truckNo,
+      {
+        'inspectionStatus':
+            'pending', // back to pending state so they re-inspect
+        'inspectionRemarks': FieldValue.delete(),
+        'inspectionResults': FieldValue.delete(),
+        'inspectionImages': FieldValue.delete(),
+        'inspectionIssue': FieldValue.delete(),
+        'inspectionIssueImage': FieldValue.delete(),
+      },
+      options: SetOptions(merge: true),
+      action: 'rejectTruckInspection',
+    );
 
     if (driver.isNotEmpty) {
       await createNotification(
         toPhone: driver,
         title: 'Inspection Rejected ❌',
-        body: 'Truck $truckNo ka inspection reject ho gaya hai. Kripya fir se inspect karein.',
+        body:
+            'Truck $truckNo ka inspection reject ho gaya hai. Kripya fir se inspect karein.',
         type: 'inspection_rejected',
         refId: truckNo,
       );
@@ -1649,12 +1749,17 @@ class FirebaseService extends GetxService {
   Future<void> acceptTruck(String truckNo, {String? driverName}) async {
     if (truckNo.isEmpty) return;
     try {
-      await _db.collection('trucks').doc(truckNo).set({
-        'inspectionStatus': 'ready',
-        'inspectionIssue': FieldValue.delete(),
-        'inspectionIssueImage': FieldValue.delete(),
-        'inspectedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      await _setTruckDoc(
+        truckNo,
+        {
+          'inspectionStatus': 'ready',
+          'inspectionIssue': FieldValue.delete(),
+          'inspectionIssueImage': FieldValue.delete(),
+          'inspectedAt': FieldValue.serverTimestamp(),
+        },
+        options: SetOptions(merge: true),
+        action: 'acceptTruck',
+      );
 
       await notifyAdmins(
         title: 'Truck Ready ✅',
@@ -1663,7 +1768,13 @@ class FirebaseService extends GetxService {
         type: 'truck_ready',
         refId: truckNo,
       );
-    } catch (_) {}
+    } on FirebaseException catch (e) {
+      debugPrint('[FirebaseService] acceptTruck failed: $e');
+      rethrow;
+    } catch (e) {
+      debugPrint('[FirebaseService] acceptTruck failed: $e');
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>?> getTruck(String truckNo) async {
@@ -1685,11 +1796,16 @@ class FirebaseService extends GetxService {
     try {
       final data =
           (await _db.collection('trucks').doc(truckNo).get()).data() ?? {};
-      await _db.collection('trucks').doc(truckNo).set({
-        'inspectionStatus': 'ready',
-        'inspectionIssue': FieldValue.delete(),
-        'inspectionIssueImage': FieldValue.delete(),
-      }, SetOptions(merge: true));
+      await _setTruckDoc(
+        truckNo,
+        {
+          'inspectionStatus': 'ready',
+          'inspectionIssue': FieldValue.delete(),
+          'inspectionIssueImage': FieldValue.delete(),
+        },
+        options: SetOptions(merge: true),
+        action: 'clearTruckIssue',
+      );
       final driver = (data['assignedTo'] ?? '').toString();
       if (driver.isNotEmpty) {
         await createNotification(
@@ -1701,51 +1817,93 @@ class FirebaseService extends GetxService {
           refId: truckNo,
         );
       }
-    } catch (_) {}
+    } on FirebaseException catch (e) {
+      debugPrint('[FirebaseService] clearTruckIssue failed: $e');
+      rethrow;
+    } catch (e) {
+      debugPrint('[FirebaseService] clearTruckIssue failed: $e');
+      rethrow;
+    }
   }
 
   /// Admin clears assignment for a truck.
   Future<void> unassignTruck(String truckNo) async {
     if (truckNo.isEmpty) return;
     try {
-      await _db.collection('trucks').doc(truckNo).update({
-        'assignedTo': FieldValue.delete(),
-        'assignedBy': FieldValue.delete(),
-        'assignedAt': FieldValue.delete(),
-        'inspectionStatus': FieldValue.delete(),
-        'inspectionIssue': FieldValue.delete(),
-        'inspectionIssueImage': FieldValue.delete(),
-        'inspectionRemarks': FieldValue.delete(),
-        'inspectionResults': FieldValue.delete(),
-        'inspectionImages': FieldValue.delete(),
-        'loadingPass': FieldValue.delete(),
-        'hasLoadingPass': FieldValue.delete(),
-        'destinationSetup': FieldValue.delete(),
-        'hasDestinationSetup': FieldValue.delete(),
-      });
-    } catch (_) {}
+      debugPrint('[FirebaseService] unassignTruck called for $truckNo');
+      debugPrintStack();
+      await _updateTruckDoc(
+        truckNo,
+        {
+          'assignedTo': FieldValue.delete(),
+          'assignedBy': FieldValue.delete(),
+          'assignedAt': FieldValue.delete(),
+          'inspectionStatus': FieldValue.delete(),
+          'inspectionIssue': FieldValue.delete(),
+          'inspectionIssueImage': FieldValue.delete(),
+          'inspectionRemarks': FieldValue.delete(),
+          'inspectionResults': FieldValue.delete(),
+          'inspectionImages': FieldValue.delete(),
+          'loadingPass': FieldValue.delete(),
+          'hasLoadingPass': FieldValue.delete(),
+          'destinationSetup': FieldValue.delete(),
+          'hasDestinationSetup': FieldValue.delete(),
+        },
+        action: 'unassignTruck',
+      );
+    } on FirebaseException catch (e) {
+      debugPrint('[FirebaseService] unassignTruck failed: $e');
+      rethrow;
+    } catch (e) {
+      debugPrint('[FirebaseService] unassignTruck failed: $e');
+      rethrow;
+    }
   }
 
   /// Admin saves loading pass details for a truck.
-  Future<void> saveLoadingPass(String truckNo, Map<String, dynamic> passData) async {
+  Future<void> saveLoadingPass(
+      String truckNo, Map<String, dynamic> passData) async {
     if (truckNo.isEmpty) return;
     try {
-      await _db.collection('trucks').doc(truckNo).set({
-        'loadingPass': passData,
-        'hasLoadingPass': true,
-      }, SetOptions(merge: true));
-    } catch (_) {}
+      await _setTruckDoc(
+        truckNo,
+        {
+          'loadingPass': passData,
+          'hasLoadingPass': true,
+        },
+        options: SetOptions(merge: true),
+        action: 'saveLoadingPass',
+      );
+    } on FirebaseException catch (e) {
+      debugPrint('[FirebaseService] saveLoadingPass failed: $e');
+      rethrow;
+    } catch (e) {
+      debugPrint('[FirebaseService] saveLoadingPass failed: $e');
+      rethrow;
+    }
   }
 
   /// Admin saves destination setup details for a truck.
-  Future<void> saveDestinationSetup(String truckNo, Map<String, dynamic> destData) async {
+  Future<void> saveDestinationSetup(
+      String truckNo, Map<String, dynamic> destData) async {
     if (truckNo.isEmpty) return;
     try {
-      await _db.collection('trucks').doc(truckNo).set({
-        'destinationSetup': destData,
-        'hasDestinationSetup': true,
-      }, SetOptions(merge: true));
-    } catch (_) {}
+      await _setTruckDoc(
+        truckNo,
+        {
+          'destinationSetup': destData,
+          'hasDestinationSetup': true,
+        },
+        options: SetOptions(merge: true),
+        action: 'saveDestinationSetup',
+      );
+    } on FirebaseException catch (e) {
+      debugPrint('[FirebaseService] saveDestinationSetup failed: $e');
+      rethrow;
+    } catch (e) {
+      debugPrint('[FirebaseService] saveDestinationSetup failed: $e');
+      rethrow;
+    }
   }
 
   /// Live: the truck currently assigned to this driver (null if none).
@@ -1764,14 +1922,82 @@ class FirebaseService extends GetxService {
     });
   }
 
+  Future<void> _logTruckWrite(
+      String truckNo, Map<String, dynamic> payload, String action) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final session = Get.find<SessionService>();
+      final isUserAdmin = session.isAdmin;
+      print("Project Id: ${Firebase.app().options.projectId}");
+      print("UID: ${user?.uid}");
+      print("Phone: ${user?.phoneNumber}");
+      final docSnapshot = await _db.collection('trucks').doc(truckNo).get();
+      final existingDoc = docSnapshot.data() ?? {};
+
+      // Calculate merged document
+      final mergedDoc = Map<String, dynamic>.from(existingDoc);
+      payload.forEach((key, value) {
+        if (value is FieldValue) {
+          if (value.toString().contains('delete')) {
+            mergedDoc.remove(key);
+          } else {
+            mergedDoc[key] = '<FieldValue>';
+          }
+        } else {
+          mergedDoc[key] = value;
+        }
+      });
+
+      debugPrint('--- FIRESTORE WRITE DEBUG LOGS ($action) ---');
+      debugPrint('Write target path: trucks/$truckNo');
+      debugPrint('Full existing document: $existingDoc');
+      debugPrint('Full update payload: $payload');
+      debugPrint('Merged document after update: $mergedDoc');
+      debugPrint('Authenticated UID: ${user?.uid}');
+      debugPrint('Authenticated phone: ${user?.phoneNumber}');
+      debugPrint('Session phone: ${session.phone.value}');
+      debugPrint('ownerId: ${mergedDoc['ownerId']}');
+      debugPrint('assignedTo: ${mergedDoc['assignedTo']}');
+      debugPrint('Admin role: ${session.role.value}');
+      debugPrint('Firestore rule expected to pass: '
+          '${isUserAdmin ? "isAdmin()" : "ownsIncoming() / ownsExisting() / isPhoneMatch(assignedTo)"}');
+      debugPrint('-------------------------------------------');
+    } catch (e) {
+      debugPrint('Error printing debug logs: $e');
+    }
+  }
+
+  Future<void> _setTruckDoc(
+    String truckNo,
+    Map<String, dynamic> data, {
+    SetOptions? options,
+    required String action,
+  }) async {
+    await _logTruckWrite(truckNo, data, action);
+    final docRef = _db.collection('trucks').doc(truckNo);
+    await _write(
+      'Truck doc set failed ($action)',
+      () => options != null ? docRef.set(data, options) : docRef.set(data),
+    );
+  }
+
+  Future<void> _updateTruckDoc(
+    String truckNo,
+    Map<String, dynamic> data, {
+    required String action,
+  }) async {
+    await _logTruckWrite(truckNo, data, action);
+    final docRef = _db.collection('trucks').doc(truckNo);
+    await _write(
+      'Truck doc update failed ($action)',
+      () => docRef.update(data),
+    );
+  }
+
   Future<void> saveTruck(String truckId, Map<String, dynamic> truckData) {
     truckData.putIfAbsent('ownerId', () => ownerKey);
-    return _write(
-        'Truck save nahi hua',
-        () => _db
-            .collection('trucks')
-            .doc(truckId)
-            .set(truckData, SetOptions(merge: true)));
+    return _setTruckDoc(truckId, truckData,
+        options: SetOptions(merge: true), action: 'saveTruck');
   }
 
   Future<void> deleteTruck(String truckId) {
@@ -1840,8 +2066,10 @@ class FirebaseService extends GetxService {
 
   Future<List<Map<String, dynamic>>> getExpensesForTrip(String tripId) async {
     try {
-      final snapshot =
-          await _db.collection('expenses').where('tripId', isEqualTo: tripId).get();
+      final snapshot = await _db
+          .collection('expenses')
+          .where('tripId', isEqualTo: tripId)
+          .get();
       return snapshot.docs.map((doc) {
         final data = doc.data();
         data['id'] = doc.id;
@@ -1857,7 +2085,10 @@ class FirebaseService extends GetxService {
       expenseData.putIfAbsent('ownerId', () => ownerKey);
       final id =
           expenseData['id'] ?? 'EXP-${DateTime.now().millisecondsSinceEpoch}';
-      await _db.collection('expenses').doc(id).set(expenseData, SetOptions(merge: true));
+      await _db
+          .collection('expenses')
+          .doc(id)
+          .set(expenseData, SetOptions(merge: true));
     } catch (_) {}
   }
 
@@ -2067,7 +2298,8 @@ class FirebaseService extends GetxService {
   void _warnStorage(String what, Object e) {
     debugPrint('------------------------------------------------------------');
     debugPrint('WARNING: Firebase Storage upload failed for $what: $e');
-    debugPrint('If you see a 404, your Firebase Storage bucket is not enabled.');
+    debugPrint(
+        'If you see a 404, your Firebase Storage bucket is not enabled.');
     debugPrint('Open Firebase Console > Storage > Get Started to enable it.');
     debugPrint('Falling back to the local file path for now.');
     debugPrint('------------------------------------------------------------');
@@ -2114,18 +2346,179 @@ class FirebaseService extends GetxService {
           await doc.reference.delete();
         }
       }
-      
+
       // Reset the seededDemo flag on the current user so they don't get re-seeded automatically
       if (ownerKey.isNotEmpty) {
         try {
-          await _db.collection('users').doc(ownerKey).update({'seededDemo': false});
+          await _db
+              .collection('users')
+              .doc(ownerKey)
+              .update({'seededDemo': false});
         } catch (_) {}
         try {
-          await _db.collection('drivers').doc(ownerKey).update({'seededDemo': false});
+          await _db
+              .collection('drivers')
+              .doc(ownerKey)
+              .update({'seededDemo': false});
         } catch (_) {}
       }
     } catch (e) {
       debugPrint('Error clearing database: $e');
+    }
+  }
+
+  Future<void> migratePhoneKeys() async {
+    if (_phoneKeysMigrated) return;
+    try {
+      bool isUserAdmin = false;
+      try {
+        final session = Get.find<SessionService>();
+        isUserAdmin = session.role.value == 'admin';
+      } catch (_) {
+        isUserAdmin = _ownerKeyResolver != null;
+      }
+
+      if (!isUserAdmin) {
+        return;
+      }
+
+      _phoneKeysMigrated = true;
+      debugPrint('[Migration] Starting phone number key migration...');
+      // 1. Migrate Users
+      final users = await _db.collection('users').get();
+      for (var doc in users.docs) {
+        final id = doc.id;
+        if (id.startsWith('+')) {
+          final newId = id.replaceFirst('+', '');
+          final data = doc.data();
+          if (data['phone'] != null) {
+            data['phone'] = (data['phone'] as String).replaceFirst('+', '');
+          }
+          await _db
+              .collection('users')
+              .doc(newId)
+              .set(data, SetOptions(merge: true));
+          await doc.reference.delete();
+          debugPrint('[Migration] Migrated user $id to $newId');
+        }
+      }
+
+      // 2. Migrate Drivers
+      final drivers = await _db.collection('drivers').get();
+      for (var doc in drivers.docs) {
+        final id = doc.id;
+        if (id.startsWith('+')) {
+          final newId = id.replaceFirst('+', '');
+          final data = doc.data();
+          if (data['phone'] != null) {
+            data['phone'] = (data['phone'] as String).replaceFirst('+', '');
+          }
+          await _db
+              .collection('drivers')
+              .doc(newId)
+              .set(data, SetOptions(merge: true));
+          await doc.reference.delete();
+          debugPrint('[Migration] Migrated driver $id to $newId');
+        }
+      }
+
+      // 3. Migrate Trucks (fields ownerId, assignedTo)
+      final trucks = await _db.collection('trucks').get();
+      for (var doc in trucks.docs) {
+        final data = doc.data();
+        bool changed = false;
+        if (data['ownerId'] != null &&
+            (data['ownerId'] as String).startsWith('+')) {
+          data['ownerId'] = (data['ownerId'] as String).replaceFirst('+', '');
+          changed = true;
+        }
+        if (data['assignedTo'] != null &&
+            (data['assignedTo'] as String).startsWith('+')) {
+          data['assignedTo'] =
+              (data['assignedTo'] as String).replaceFirst('+', '');
+          changed = true;
+        }
+        if (data['assignedBy'] != null &&
+            (data['assignedBy'] as String).startsWith('+')) {
+          data['assignedBy'] =
+              (data['assignedBy'] as String).replaceFirst('+', '');
+          changed = true;
+        }
+        if (changed) {
+          await doc.reference.set(data, SetOptions(merge: true));
+          debugPrint('[Migration] Migrated fields for truck ${doc.id}');
+        }
+      }
+
+      // 4. Migrate Trips (fields ownerId, driverPhone, assignedBy)
+      final trips = await _db.collection('trips').get();
+      for (var doc in trips.docs) {
+        final data = doc.data();
+        bool changed = false;
+        if (data['ownerId'] != null &&
+            (data['ownerId'] as String).startsWith('+')) {
+          data['ownerId'] = (data['ownerId'] as String).replaceFirst('+', '');
+          changed = true;
+        }
+        if (data['driverPhone'] != null &&
+            (data['driverPhone'] as String).startsWith('+')) {
+          data['driverPhone'] =
+              (data['driverPhone'] as String).replaceFirst('+', '');
+          changed = true;
+        }
+        if (data['assignedBy'] != null &&
+            (data['assignedBy'] as String).startsWith('+')) {
+          data['assignedBy'] =
+              (data['assignedBy'] as String).replaceFirst('+', '');
+          changed = true;
+        }
+        if (changed) {
+          await doc.reference.set(data, SetOptions(merge: true));
+          debugPrint('[Migration] Migrated fields for trip ${doc.id}');
+        }
+      }
+
+      // 5. Migrate Expenses (fields ownerId, driverPhone)
+      final expenses = await _db.collection('expenses').get();
+      for (var doc in expenses.docs) {
+        final data = doc.data();
+        bool changed = false;
+        if (data['ownerId'] != null &&
+            (data['ownerId'] as String).startsWith('+')) {
+          data['ownerId'] = (data['ownerId'] as String).replaceFirst('+', '');
+          changed = true;
+        }
+        if (data['driverPhone'] != null &&
+            (data['driverPhone'] as String).startsWith('+')) {
+          data['driverPhone'] =
+              (data['driverPhone'] as String).replaceFirst('+', '');
+          changed = true;
+        }
+        if (changed) {
+          await doc.reference.set(data, SetOptions(merge: true));
+          debugPrint('[Migration] Migrated fields for expense ${doc.id}');
+        }
+      }
+
+      // 6. Migrate Notifications (toPhone)
+      final notifications = await _db.collection('notifications').get();
+      for (var doc in notifications.docs) {
+        final data = doc.data();
+        bool changed = false;
+        if (data['toPhone'] != null &&
+            (data['toPhone'] as String).startsWith('+')) {
+          data['toPhone'] = (data['toPhone'] as String).replaceFirst('+', '');
+          changed = true;
+        }
+        if (changed) {
+          await doc.reference.set(data, SetOptions(merge: true));
+          debugPrint('[Migration] Migrated fields for notification ${doc.id}');
+        }
+      }
+
+      debugPrint('[Migration] Migration completed successfully.');
+    } catch (e) {
+      debugPrint('[Migration] Migration failed: $e');
     }
   }
 }

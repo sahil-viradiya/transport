@@ -11,7 +11,7 @@ import 'package:transport/app/data/services/firebase_service.dart';
 /// This exercises the real Firestore lifecycle + the exact filter the admin
 /// dashboard uses.
 void main() {
-  const driver = '+919876543210';
+  const driver = '919876543210';
 
   late FakeFirebaseFirestore db;
   late FirebaseService fb;
@@ -75,7 +75,7 @@ void main() {
     await fb.assignTruckToDriver('GJ01-SA-1114', driver);
     expect((await trucks()).first['inspectionStatus'], 'pending_confirmation');
 
-    await fb.acceptTruckAssignment('GJ01-SA-1114');
+    await fb.acceptTruckAssignment('GJ01-SA-1114', driver);
     expect((await trucks()).first['inspectionStatus'], 'pending');
 
     // Driver completes and submits the inspection (All Good).
@@ -93,7 +93,7 @@ void main() {
     // Reset and assign again to test problem reporting
     await fb.unassignTruck('GJ01-SA-1114');
     await fb.assignTruckToDriver('GJ01-SA-1114', driver);
-    await fb.acceptTruckAssignment('GJ01-SA-1114');
+    await fb.acceptTruckAssignment('GJ01-SA-1114', driver);
 
     // Driver completes and submits an inspection with a problem.
     await fb.submitTruckInspection(

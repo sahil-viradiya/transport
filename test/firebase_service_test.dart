@@ -12,8 +12,8 @@ void main() {
   FirebaseService service() =>
       FirebaseService(firestore: firestore, ownerKeyResolver: () => owner);
 
-  const ownerA = '+919876543210';
-  const ownerB = '+918000000000';
+  const ownerA = '919876543210';
+  const ownerB = '918000000000';
 
   setUp(() {
     firestore = FakeFirebaseFirestore();
@@ -21,10 +21,10 @@ void main() {
   });
 
   group('SessionService.normalizePhone', () {
-    test('strips spaces, dashes and parentheses', () {
-      expect(SessionService.normalizePhone('+91 98765-43210'), '+919876543210');
-      expect(SessionService.normalizePhone('+91 (987) 654 3210'), '+919876543210');
-      expect(SessionService.normalizePhone('+919876543210'), '+919876543210');
+    test('strips spaces, dashes, parentheses and plus signs', () {
+      expect(SessionService.normalizePhone('+91 98765-43210'), '919876543210');
+      expect(SessionService.normalizePhone('+91 (987) 654 3210'), '919876543210');
+      expect(SessionService.normalizePhone('+919876543210'), '919876543210');
     });
   });
 
@@ -64,7 +64,7 @@ void main() {
     });
 
     test('admin-assigned trip reaches the driver, not the admin', () async {
-      const adminPhone = '+919999999999';
+      const adminPhone = '919999999999';
       final svc = service();
 
       // Admin is signed in and assigns a trip to a driver, typing the phone
@@ -72,7 +72,7 @@ void main() {
       owner = adminPhone;
       await svc.saveTrip('TRP-1', {
         'truckNo': 'GJ-01',
-        'driverPhone': '+91 98765 43210',
+        'driverPhone': '91 98765 43210',
         'pickupCity': 'Surat',
       });
 
@@ -180,11 +180,11 @@ void main() {
 
     test('emergency contact writes go to the owner doc', () async {
       final svc = service();
-      await svc.updateEmergencyContact('Sunita', 'Wife', '+919999999999');
+      await svc.updateEmergencyContact('Sunita', 'Wife', '919999999999');
 
       final doc = await firestore.collection('drivers').doc(ownerA).get();
       expect(doc.data()!['emergencyName'], 'Sunita');
-      expect(doc.data()!['phone'], '+919999999999');
+      expect(doc.data()!['phone'], '919999999999');
     });
   });
 
@@ -198,7 +198,7 @@ void main() {
         'amount': '₹8,500',
       });
 
-      final result = await svc.getExpensesForDriver('+91 98765 43210');
+      final result = await svc.getExpensesForDriver('91 98765 43210');
       expect(result.length, 1);
       expect(result.first['title'], 'Diesel');
     });
@@ -257,7 +257,7 @@ void main() {
   });
 
   group('Trip confirmation workflow', () {
-    const admin = '+919999999999';
+    const admin = '919999999999';
 
     test('assignTripToDriver writes PENDING + notifies the driver', () async {
       owner = admin; // admin is signed in
@@ -315,7 +315,7 @@ void main() {
   });
 
   group('Load approval gate', () {
-    const admin = '+919999999999';
+    const admin = '919999999999';
 
     test('requestLoadApproval → LOAD_REQUESTED (not active) + notifies admin',
         () async {
@@ -403,7 +403,7 @@ void main() {
   });
 
   group('Vendor journey (assign → on-the-way → loading → destination gate)', () {
-    const admin = '+919999999999';
+    const admin = '919999999999';
 
     Future<FirebaseService> setupAssigned(FirebaseService svc) async {
       owner = admin;
@@ -496,7 +496,7 @@ void main() {
   });
 
   group('Delivery approval gate', () {
-    const admin = '+919999999999';
+    const admin = '919999999999';
 
     test('requestDelivery → DELIVERY_REQUESTED + notifies admin with location',
         () async {
@@ -554,7 +554,7 @@ void main() {
   });
 
   group('Trip expenses with proof + approval', () {
-    const admin = '+919999999999';
+    const admin = '919999999999';
     Future<void> seedAdmin() =>
         firestore.collection('users').doc(admin).set({'role': 'admin'});
 
@@ -617,7 +617,7 @@ void main() {
   });
 
   group('Truck assignment + inspection', () {
-    const admin = '+919999999999';
+    const admin = '919999999999';
     Future<void> seedAdmin() =>
         firestore.collection('users').doc(admin).set({'role': 'admin'});
 
@@ -626,7 +626,7 @@ void main() {
       owner = admin;
       final svc = service();
 
-      await svc.assignTruckToDriver('GJ-01-AB-1234', '+91 98765 43210',
+      await svc.assignTruckToDriver('GJ-01-AB-1234', '91 98765 43210',
           model: 'Tata Signa');
 
       var t = (await firestore.collection('trucks').doc('GJ-01-AB-1234').get())
@@ -635,7 +635,7 @@ void main() {
       expect(t['assignedBy'], admin);
       expect(t['inspectionStatus'], 'pending_confirmation');
 
-      await svc.acceptTruckAssignment('GJ-01-AB-1234');
+      await svc.acceptTruckAssignment('GJ-01-AB-1234', ownerA);
       t = (await firestore.collection('trucks').doc('GJ-01-AB-1234').get())
           .data()!;
       expect(t['inspectionStatus'], 'pending');
@@ -650,7 +650,7 @@ void main() {
       owner = admin;
       final svc = service();
       await svc.assignTruckToDriver('GJ-01', ownerA);
-      await svc.acceptTruckAssignment('GJ-01');
+      await svc.acceptTruckAssignment('GJ-01', ownerA);
 
       owner = ownerA;
       await svc.reportTruckIssue('GJ-01',
@@ -673,7 +673,7 @@ void main() {
       owner = admin;
       final svc = service();
       await svc.assignTruckToDriver('GJ-01', ownerA);
-      await svc.acceptTruckAssignment('GJ-01');
+      await svc.acceptTruckAssignment('GJ-01', ownerA);
       owner = ownerA;
       await svc.reportTruckIssue('GJ-01', reason: 'Brake loose');
 
@@ -693,7 +693,7 @@ void main() {
       final svc = service();
       await svc.assignTruckToDriver('GJ-07', ownerA);
 
-      final t = await svc.watchTruckForDriver('+91 98765 43210').first;
+      final t = await svc.watchTruckForDriver('91 98765 43210').first;
       expect(t, isNotNull);
       expect(t!['truckNo'], 'GJ-07');
 
@@ -748,7 +748,7 @@ void main() {
   });
 
   group('Driver check-in / check-out', () {
-    const admin = '+919999999999';
+    const admin = '919999999999';
 
     Future<void> seedAdmin() =>
         firestore.collection('users').doc(admin).set({'role': 'admin'});
@@ -795,14 +795,14 @@ void main() {
 
     test('notifyAdmins reaches every admin, not drivers', () async {
       await seedAdmin();
-      await firestore.collection('users').doc('+918111111111').set({'role': 'admin'});
+      await firestore.collection('users').doc('918111111111').set({'role': 'admin'});
       await firestore.collection('users').doc(ownerA).set({'role': 'driver'});
       final svc = service();
 
       await svc.notifyAdmins(title: 'T', body: 'B', type: 'info');
 
       expect((await svc.getNotifications(admin)).length, 1);
-      expect((await svc.getNotifications('+918111111111')).length, 1);
+      expect((await svc.getNotifications('918111111111')).length, 1);
       expect((await svc.getNotifications(ownerA)).length, 0);
     });
 

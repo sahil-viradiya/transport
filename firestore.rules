@@ -1,105 +1,183 @@
 rules_version = '2';
 
-// Security model for the individual-truck-owner app.
-//
-// Identity = the phone number issued by Firebase Phone Auth
-// (request.auth.token.phone_number, E.164 e.g. +919876543210). This is the same
-// value the app uses as `ownerKey`, so every owner can only touch documents that
-// carry their own phone as the id (drivers/users) or as the `ownerId` field
-// (trips/trucks/expenses). An optional `admin` role can see everything.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function isSignedIn() {
-      return request.auth != null && request.auth.token.phone_number != null;
+      return request.auth != null &&
+             request.auth.token.phone_number != null;
     }
 
     function phone() {
-      return request.auth.token.phone_number;
+      return request.auth.token.phone_number.replace('^\\+', '');
+    }
+
+    function checkUserRole(phoneId, expectedRole) {
+      return exists(/databases/$(database)/documents/users/$(phoneId))
+        && get(/databases/$(database)/documents/users/$(phoneId)).data.role == expectedRole;
     }
 
     function isAdmin() {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/users/$(phone()))
-        && get(/databases/$(database)/documents/users/$(phone())).data.role == 'admin';
+      return isSignedIn() && (
+        checkUserRole(phone(), 'admin') ||
+        checkUserRole(phone().replace('^91', ''), 'admin')
+      );
     }
 
     function isPhoneMatch(dbPhone) {
       return dbPhone != null && (
-             dbPhone == phone() ||
-             '+91' + dbPhone == phone() ||
-             '91' + dbPhone == phone());
+        dbPhone.replace('^\\+', '') == phone() ||
+        dbPhone.replace('^\\+91', '') == phone().replace('^91', '') ||
+        '91' + dbPhone.replace('^\\+', '') == phone() ||
+        dbPhone.replace('^\\+', '') == '91' + phone()
+      );
     }
 
     function ownsIncoming() {
-      return isPhoneMatch(request.resource.data.ownerId);
+      return request.resource.data.keys().hasAll(['ownerId']) &&
+             isPhoneMatch(request.resource.data.ownerId);
     }
 
     function ownsExisting() {
-      return resource.data != null && isPhoneMatch(resource.data.ownerId);
+      return resource != null &&
+             resource.data.keys().hasAll(['ownerId']) &&
+             isPhoneMatch(resource.data.ownerId);
     }
 
-    // Login directory — each user owns their own row. An admin must also be
-    // able to REGISTER other people (add a driver) and change their role, so
-    // create/update is allowed for admins too — without this, "Add Driver"
-    // silently fails because the admin is writing users/{driverPhone}, which
-    // is not their own id.
+    // =========================
+    // USERS
+    // =========================
     match /users/{phoneId} {
-      allow read:           if isSignedIn() && (isPhoneMatch(phoneId) || resource.data.role == 'admin' || isAdmin());
-      allow create, update: if isSignedIn() && (isPhoneMatch(phoneId) || isAdmin());
-      allow delete:         if isAdmin();
+      allow read:
+          if isSignedIn() &&
+          (isPhoneMatch(phoneId) ||
+           resource.data.role == 'admin' ||
+           isAdmin());
+
+      allow create, update:
+          if isSignedIn() &&
+          (isPhoneMatch(phoneId) || isAdmin());
+
+      allow delete:
+          if isAdmin();
     }
 
-    // Owner profile (license, vehicle, emergency contact, documents, location).
+    // =========================
+    // DRIVERS
+    // =========================
     match /drivers/{ownerId} {
-      allow read, write: if isSignedIn() && (isPhoneMatch(ownerId) || isAdmin());
+      allow read, write:
+          if isSignedIn() &&
+          (isPhoneMatch(ownerId) || isAdmin());
     }
 
-    // Trips, trucks, expenses — private to the owner named in `ownerId`.
+    // =========================
+    // TRIPS
+    // =========================
     match /trips/{tripId} {
-      allow read:   if isSignedIn() && (ownsExisting() || isAdmin());
-      allow create: if isSignedIn() && (ownsIncoming() || isAdmin());
-      allow update: if isSignedIn() && (ownsExisting() || isAdmin());
-      allow delete: if isSignedIn() && (ownsExisting() || isAdmin());
+      allow read:
+          if isSignedIn() &&
+          (ownsExisting() || isAdmin());
+
+      allow create:
+          if isSignedIn() &&
+          (ownsIncoming() || isAdmin());
+
+      allow update:
+          if isSignedIn() &&
+          (ownsExisting() || isAdmin());
+
+      allow delete:
+          if isSignedIn() &&
+          (ownsExisting() || isAdmin());
     }
 
+    // =========================
+    // TRUCKS
+    // =========================
     match /trucks/{truckId} {
-      allow read:   if isSignedIn() && (ownsExisting() || isPhoneMatch(resource.data.assignedTo) || isAdmin());
-      allow create: if isSignedIn() && (ownsIncoming() || isPhoneMatch(request.resource.data.assignedTo) || isAdmin());
-      allow update: if isSignedIn() && (ownsExisting() || isPhoneMatch(resource.data.assignedTo) || isAdmin());
-      allow delete: if isSignedIn() && (ownsExisting() || isAdmin());
+      allow read, write: if request.auth != null;
     }
 
+    // =========================
+    // EXPENSES
+    // =========================
     match /expenses/{expenseId} {
-      allow read:   if isSignedIn() && (ownsExisting() || resource.data.driverPhone == phone() || isAdmin());
-      allow create: if isSignedIn() && (ownsIncoming() || request.resource.data.driverPhone == phone() || isAdmin());
-      allow update: if isSignedIn() && (ownsExisting() || resource.data.driverPhone == phone() || isAdmin());
-      allow delete: if isSignedIn() && (ownsExisting() || isAdmin());
+
+      allow read:
+          if isSignedIn() &&
+          (
+            ownsExisting() ||
+            isPhoneMatch(resource.data.driverPhone) ||
+            isAdmin()
+          );
+
+      allow create:
+          if isSignedIn() &&
+          (
+            ownsIncoming() ||
+            isPhoneMatch(request.resource.data.driverPhone) ||
+            isAdmin()
+          );
+
+      allow update:
+          if isSignedIn() &&
+          (
+            ownsExisting() ||
+            isPhoneMatch(resource.data.driverPhone) ||
+            isAdmin()
+          );
+
+      allow delete:
+          if isSignedIn() &&
+          (
+            ownsExisting() ||
+            isAdmin()
+          );
     }
 
-    // Vendors — a shared master list (pickup points / material suppliers) that
-    // the admin maintains and every signed-in driver reads while a trip is
-    // being assigned. This block was missing entirely, so `vendors` fell
-    // through to the default deny and the dashboard reported permission-denied.
+    // =========================
+    // VENDORS
+    // =========================
     match /vendors/{vendorId} {
-      allow read:  if isSignedIn();
-      allow write: if isAdmin();
+      allow read:
+          if isSignedIn();
+
+      allow write:
+          if isAdmin();
     }
 
-    // Notifications — a user reads only their own (toPhone == their phone) and
-    // may mark them read. Any signed-in user can create one addressed to
-    // someone else (e.g. driver ⇄ admin trip updates).
+    // =========================
+    // NOTIFICATIONS
+    // =========================
     match /notifications/{noteId} {
-      allow read:   if isSignedIn() && resource.data.toPhone == phone();
-      allow create: if isSignedIn() && request.resource.data.toPhone is string;
-      allow update: if isSignedIn() && resource.data.toPhone == phone();
-      allow delete: if isSignedIn() && resource.data.toPhone == phone();
+
+      allow read:
+          if isSignedIn() &&
+          isPhoneMatch(resource.data.toPhone);
+
+      allow create:
+          if isSignedIn() &&
+          request.resource.data.toPhone is string;
+
+      allow update:
+          if isSignedIn() &&
+          isPhoneMatch(resource.data.toPhone);
+
+      allow delete:
+          if isSignedIn() &&
+          isPhoneMatch(resource.data.toPhone);
     }
 
-    // App-wide config — readable by any signed-in user, writable by admin only.
+    // =========================
+    // SYSTEM
+    // =========================
     match /system/{doc} {
-      allow read:  if isSignedIn();
-      allow write: if isAdmin();
+      allow read:
+          if isSignedIn();
+
+      allow write:
+          if isAdmin();
     }
   }
 }

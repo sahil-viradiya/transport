@@ -11,7 +11,7 @@ service firebase.storage {
     }
 
     function phone() {
-      return request.auth.token.phone_number;
+      return request.auth.token.phone_number.replace('^\\+', '');
     }
 
     function isImageUnder(maxMb) {
