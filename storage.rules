@@ -1,57 +1,58 @@
 rules_version = '2';
 
-// Storage paths mirror the Firestore ownership model.
-// Avatars:  avatars/{phone}.jpg
-// POD:       proof_of_delivery/{ownerPhone}/{tripId}.jpg
+// Storage rules for Transport App bucket
 service firebase.storage {
   match /b/{bucket}/o {
 
     function isSignedIn() {
-      return request.auth != null && request.auth.token.phone_number != null;
+      return request.auth != null;
     }
 
-    function phone() {
-      return request.auth.token.phone_number.replace('^\\+', '');
+    function isFileUnder(maxMb) {
+      return request.resource.size < maxMb * 1024 * 1024;
     }
 
-    function isImageUnder(maxMb) {
-      return request.resource.size < maxMb * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
-    }
-
+    // Avatars
     match /avatars/{fileName} {
-      allow read:  if request.auth != null;
-      allow write: if isSignedIn()
-        && fileName == phone() + '.jpg'
-        && isImageUnder(5);
+      allow read: if request.auth != null;
+      allow write: if isSignedIn() && isFileUnder(10);
     }
- 
+
+    // Driver Documents
+    match /driver_documents/{ownerId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if isSignedIn() && isFileUnder(10);
+    }
+
+    // Proof of Delivery (POD)
     match /proof_of_delivery/{ownerId}/{fileName} {
-      allow read:  if request.auth != null;
-      allow write: if isSignedIn()
-        && ownerId == phone()
-        && isImageUnder(10);
+      allow read: if request.auth != null;
+      allow write: if isSignedIn() && isFileUnder(10);
     }
- 
+
+    // Loading Photos
     match /loading_photos/{ownerId}/{fileName} {
-      allow read:  if request.auth != null;
-      allow write: if isSignedIn()
-        && ownerId == phone()
-        && isImageUnder(10);
+      allow read: if request.auth != null;
+      allow write: if isSignedIn() && isFileUnder(10);
     }
- 
+
+    // Gate Pass Photos
     match /gate_pass_photos/{ownerId}/{fileName} {
-      allow read:  if request.auth != null;
-      allow write: if isSignedIn()
-        && ownerId == phone()
-        && isImageUnder(10);
+      allow read: if request.auth != null;
+      allow write: if isSignedIn() && isFileUnder(10);
     }
- 
+
+    // Expense Receipts
     match /expense_receipts/{ownerId}/{fileName} {
-      allow read:  if request.auth != null;
-      allow write: if isSignedIn()
-        && ownerId == phone()
-        && isImageUnder(10);
+      allow read: if request.auth != null;
+      allow write: if isSignedIn() && isFileUnder(10);
+    }
+
+    // Truck Issues
+    match /truck_issues/{ownerId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if isSignedIn() && isFileUnder(10);
     }
   }
 }
+

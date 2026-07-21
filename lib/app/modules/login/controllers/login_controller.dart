@@ -64,10 +64,13 @@ class LoginController extends GetxController {
             _signInWithCredential(credential);
           },
           verificationFailed: (FirebaseAuthException e) {
+            debugPrint('------------------------------------------------------------');
+            debugPrint('ERROR: Firebase Phone Auth Failed: [${e.code}] ${e.message}');
+            debugPrint('------------------------------------------------------------');
             AppPopup.hideLoading();
             isLoading.value = false;
             AppSnackBar.showError(
-              title: 'Verification Failed',
+              title: 'Verification Failed (${e.code})',
               message: e.message ?? 'Unknown error occurred.',
             );
           },

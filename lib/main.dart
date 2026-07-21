@@ -1,3 +1,4 @@
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -34,8 +35,14 @@ Future<void> initServices() async {
           appId: "1:1048359203148:web:5e3d6694adb35a22765fe9",
         ),
       );
+      
     } else {
       await Firebase.initializeApp();
+
+  // await FirebaseAppCheck.instance.activate(
+  //   androidProvider: kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
+  //   appleProvider: kDebugMode ? AppleProvider.debug : AppleProvider.appAttest,
+  // );
     }
     // Set locale to suppress "X-Firebase-Locale was null" warning
     FirebaseAuth.instance.setLanguageCode('en');

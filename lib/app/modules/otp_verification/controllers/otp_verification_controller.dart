@@ -270,9 +270,12 @@ class OtpVerificationController extends GetxController {
             }
           },
           verificationFailed: (FirebaseAuthException e) {
+            debugPrint('------------------------------------------------------------');
+            debugPrint('ERROR: Firebase Phone Auth Resend Failed: [${e.code}] ${e.message}');
+            debugPrint('------------------------------------------------------------');
             AppPopup.hideLoading();
             isLoading.value = false;
-            AppSnackBar.showError(title: 'Resend Failed', message: e.message ?? '');
+            AppSnackBar.showError(title: 'Resend Failed (${e.code})', message: e.message ?? '');
           },
           codeSent: (String newVerificationId, int? resendToken) {
             verificationId = newVerificationId;

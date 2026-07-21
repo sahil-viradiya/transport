@@ -294,11 +294,25 @@ class AdminHomeController extends GetxController {
     // 1. Check if dateStr contains "Today"
     if (dateStr.toLowerCase().contains('today')) return true;
 
-    // 2. Check if dateStr contains today's formatted date e.g. "21 Jul"
+    // 2. Check if dateStr matches YYYY-MM-DD (e.g. "2026-07-22")
+    final yyyymmdd = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    if (dateStr.contains(yyyymmdd)) return true;
+
+    // 3. Check if dateStr contains today's formatted date e.g. "21 Jul"
     final todayTag = '${now.day} ${_monthAbbr[now.month - 1]}';
     if (dateStr.contains(todayTag)) return true;
 
-    // 3. Check createdAt field
+    // 4. Try parsing dateStr as a DateTime
+    final parsedDate = DateTime.tryParse(dateStr);
+    if (parsedDate != null) {
+      if (parsedDate.year == now.year &&
+          parsedDate.month == now.month &&
+          parsedDate.day == now.day) {
+        return true;
+      }
+    }
+
+    // 5. Check createdAt field
     final createdAt = t['createdAt'];
     if (createdAt != null) {
       final s = createdAt.toString();

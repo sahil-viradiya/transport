@@ -25,11 +25,12 @@ class AppOtpField extends StatelessWidget {
 
     // Define standard PinTheme
     final defaultPinTheme = PinTheme(
-      width: 48,
-      height: 52,
+      width: 42,
+      height: 48,
       textStyle: theme.textTheme.headlineMedium?.copyWith(
         color: isDark ? Colors.white : AppColors.textPrimary,
         fontWeight: FontWeight.bold,
+        fontSize: 20,
       ),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -81,6 +82,7 @@ class AppOtpField extends StatelessWidget {
       onChanged: onChanged,
       showCursor: true,
       hapticFeedbackType: HapticFeedbackType.lightImpact,
+      separatorBuilder: (index) => const SizedBox(width: 8),
     );
   }
 }

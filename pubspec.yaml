@@ -54,6 +54,7 @@ dependencies:
   geocoding: ^4.0.0
   url_launcher: ^6.3.0
   flutter_local_notifications: ^22.0.1
+  firebase_app_check: ^0.3.2+10
 
 dev_dependencies:
   flutter_test:
