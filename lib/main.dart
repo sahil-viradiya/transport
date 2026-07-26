@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'app/core/config/app_config.dart';
+import 'app/core/translations/app_translations.dart';
 import 'app/core/theme/app_theme.dart';
 import 'app/data/services/storage_service.dart';
+import 'app/data/services/secure_storage_service.dart';
 import 'app/data/services/connectivity_service.dart';
 import 'app/data/services/firebase_service.dart';
 import 'app/data/services/session_service.dart';
@@ -22,6 +25,12 @@ void main() async {
 
 Future<void> initServices() async {
   debugPrint('Initializing critical GetX services...');
+  
+  // Initialize Shared Preferences Storage & Global Configuration first
+  await Get.putAsync(() => StorageService().init());
+  await Get.putAsync(() => SecureStorageService().init());
+  AppConfig.init();
+
   // Initialize Firebase Core
   try {
     if (kIsWeb) {
@@ -35,25 +44,24 @@ Future<void> initServices() async {
           appId: "1:1048359203148:web:5e3d6694adb35a22765fe9",
         ),
       );
-      
     } else {
       await Firebase.initializeApp();
 
-  // await FirebaseAppCheck.instance.activate(
-  //   androidProvider: kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
-  //   appleProvider: kDebugMode ? AppleProvider.debug : AppleProvider.appAttest,
-  // );
+      // Activate App Check ONLY in Release builds to avoid blocking local Debug mode
+      if (kReleaseMode && !AppConfig.isMock) {
+        await FirebaseAppCheck.instance.activate(
+          androidProvider: AndroidProvider.playIntegrity,
+          appleProvider: AppleProvider.appAttest,
+        );
+      }
     }
     // Set locale to suppress "X-Firebase-Locale was null" warning
     FirebaseAuth.instance.setLanguageCode('en');
     debugPrint('Firebase initialized successfully.');
   } catch (e) {
-    debugPrint('Firebase initialization failed: $e');
-    debugPrint('App running in Mock Mode.');
+    debugPrint('Firebase initialization warning: $e');
   }
 
-  // Initialize Shared Preferences Storage
-  await Get.putAsync(() => StorageService().init());
   // Initialize Live Connectivity Checker
   await Get.putAsync(() => ConnectivityService().init());
   // Initialize Session (current logged-in owner identity) — depends on storage
@@ -76,13 +84,18 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: 'Transport App UI Showcase',
+      title: 'The Highway Authority Fleet OS',
       debugShowCheckedModeBanner: false,
-      
+
+      // Internationalization & Localization
+      translations: AppTranslations(),
+      locale: AppConfig.currentLocale.value,
+      fallbackLocale: const Locale('en', 'US'),
+
       // Themes Setup matching guidelines
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.light, // Change to ThemeMode.system or ThemeMode.dark as required
+      themeMode: ThemeMode.light,
 
       // Routes Setup
       initialRoute: AppPages.INITIAL,

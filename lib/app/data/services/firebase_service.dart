@@ -7,6 +7,7 @@ import 'package:transport/app/modules/trips/controllers/trips_controller.dart';
 import 'package:transport/app/data/services/session_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:transport/app/core/config/app_config.dart';
 
 /// Firestore + Storage data layer.
 ///
@@ -18,9 +19,8 @@ import 'package:flutter/material.dart';
 /// the service can be unit-tested with `fake_cloud_firestore`.
 class FirebaseService extends GetxService {
   // When true, image uploads return public mock URLs instead of hitting
-  // Firebase Storage. Kept false so uploads actually go to Firebase; the
-  // upload methods still fall back gracefully if the bucket isn't enabled.
-  static const bool useMockStorage = false;
+  // Firebase Storage. Dynamically connected to global AppConfig.
+  static bool get useMockStorage => AppConfig.isMock;
 
   final FirebaseFirestore _db;
   final FirebaseStorage? _injectedStorage;

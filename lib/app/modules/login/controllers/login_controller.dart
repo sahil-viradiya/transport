@@ -7,6 +7,8 @@ import 'package:transport/app/routes/app_pages.dart';
 import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 
+import 'package:transport/app/core/config/app_config.dart';
+
 class LoginController extends GetxController {
   // Inputs
   final phoneController = TextEditingController();
@@ -14,23 +16,40 @@ class LoginController extends GetxController {
 
   // State Variables
   final RxBool isLoading = false.obs;
-  final RxBool isMockMode = false.obs;
+  final RxString selectedCountryCode = '+91'.obs;
+  
+  /// Global reactive mock mode state
+  RxBool get isMockMode => AppConfig.isMockMode;
 
   @override
   void onInit() {
     super.onInit();
-    // Set to false to use real Firebase Phone Auth, true for mock/developer testing
-    isMockMode.value = false;
     debugPrint('Firebase Auth mode: ${isMockMode.value ? "MOCK" : "LIVE"}');
+  }
+
+  /// Change application language
+  void changeLanguage(String langCode) {
+    AppConfig.changeLanguage(langCode);
+  }
+
+  /// Toggle app mode globally between LIVE and MOCK
+  void toggleMockMode() {
+    AppConfig.toggleMode();
+    AppSnackBar.showInfo(
+      title: 'Mode Switched',
+      message: AppConfig.isMock
+          ? 'Switched to MOCK MODE (Test OTP: 123456)'
+          : 'Switched to LIVE MODE (Real Firebase SMS)',
+    );
   }
 
   // Send Verification Code (Phone Number)
   Future<void> sendOtp() async {
     if (!formKey.currentState!.validate()) return;
 
-    // User only types the 10-digit number — +91 is prepended silently here.
+    // Build international E.164 phone number
     final digits = phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
-    final phone = '+91$digits';
+    final phone = '${selectedCountryCode.value}$digits';
     isLoading.value = true;
     AppPopup.showLoading(message: 'Requesting OTP...');
 
