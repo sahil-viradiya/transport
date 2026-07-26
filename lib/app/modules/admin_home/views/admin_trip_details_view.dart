@@ -12,6 +12,7 @@ import 'package:transport/app/core/utils/image_url.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
+import 'package:transport/app/core/utils/image_picker_helper.dart';
 
 class AdminTripDetailsView extends GetView<AdminHomeController> {
   const AdminTripDetailsView({super.key});
@@ -1584,6 +1585,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
     final ownerNameCtrl = TextEditingController();
     final remarksCtrl = TextEditingController();
     String? passPhotoUrl;
+    String? adminPhotoUrl;
 
     Get.dialog(
       StatefulBuilder(
@@ -1671,13 +1673,70 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                               ),
                             ),
                             TextButton(
-                              onPressed: () {
-                                setStateDialog(() {
-                                  passPhotoUrl = 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600';
-                                });
+                              onPressed: () async {
+                                final url = await ImagePickerHelper.pickImageAsBase64(context, isDark);
+                                if (url != null) {
+                                  setStateDialog(() {
+                                    passPhotoUrl = url;
+                                  });
+                                }
                               },
                               child: Text(passPhotoUrl != null ? 'Change' : 'Attach'),
                             ),
+                            if (passPhotoUrl != null)
+                              IconButton(
+                                icon: const Icon(Icons.close_rounded, size: 18, color: Colors.red),
+                                onPressed: () {
+                                  setStateDialog(() {
+                                    passPhotoUrl = null;
+                                  });
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white10 : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              adminPhotoUrl != null ? Icons.check_circle_rounded : Icons.add_a_photo_rounded,
+                              color: adminPhotoUrl != null ? Colors.green : Colors.blue,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                adminPhotoUrl != null ? 'Admin Photo Attached ✅' : 'Upload Admin Photo (Optional)',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                final url = await ImagePickerHelper.pickImageAsBase64(context, isDark);
+                                if (url != null) {
+                                  setStateDialog(() {
+                                    adminPhotoUrl = url;
+                                  });
+                                }
+                              },
+                              child: Text(adminPhotoUrl != null ? 'Change' : 'Attach'),
+                            ),
+                            if (adminPhotoUrl != null)
+                              IconButton(
+                                icon: const Icon(Icons.close_rounded, size: 18, color: Colors.red),
+                                onPressed: () {
+                                  setStateDialog(() {
+                                    adminPhotoUrl = null;
+                                  });
+                                },
+                              ),
                           ],
                         ),
                       ),
@@ -1702,6 +1761,8 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                         'ownerName': ownerNameCtrl.text.trim(),
                         'remarks': remarksCtrl.text.trim(),
                         'generatedAt': DateTime.now().toString().substring(0, 16),
+                        if (adminPhotoUrl != null && adminPhotoUrl!.isNotEmpty)
+                          'adminPhotoUrl': adminPhotoUrl,
                       };
                       final err = await Get.find<FirebaseService>().approveLoad(
                         tripId,

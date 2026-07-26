@@ -6,6 +6,7 @@ import 'package:transport/app/routes/app_pages.dart';
 import '../controllers/trips_controller.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../core/theme/app_colors.dart';
+import 'package:transport/widgets/app_image_view.dart';
 
 /// A 4-step loading workflow widget shown inside the trip card for active
 /// trips (ASSIGNED → EN_ROUTE_VENDOR → LOADING → LOAD_REQUESTED → ACTIVE NOW).
@@ -20,6 +21,39 @@ class DriverLoadingWorkflow extends StatefulWidget {
 class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
   Uint8List? _loadingPhotoBytes;
   Uint8List? _gatePassPhotoBytes;
+
+  void _showFullImageDialog(String imageUrl) {
+    Get.dialog(
+      Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(Icons.close_rounded,
+                    color: Colors.white, size: 28),
+                onPressed: () => Get.back(),
+              ),
+            ),
+            Container(
+              constraints:
+                  const BoxConstraints(maxHeight: 500, maxWidth: 500),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: AppImageView(
+                  imagePath: imageUrl,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   /// Maps trip status to step index (0-based).
   int get _currentStep {
@@ -421,11 +455,11 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                                 borderRadius: BorderRadius.circular(10.5),
                                 child: widget.trip.loadingPhotoUrl != null &&
                                         widget.trip.loadingPhotoUrl!.isNotEmpty
-                                    ? Image.network(
-                                        widget.trip.loadingPhotoUrl!,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => const Center(
-                                          child: Icon(Icons.broken_image_rounded, color: Colors.grey),
+                                    ? GestureDetector(
+                                        onTap: () => _showFullImageDialog(widget.trip.loadingPhotoUrl!),
+                                        child: AppImageView(
+                                          imagePath: widget.trip.loadingPhotoUrl!,
+                                          fit: BoxFit.cover,
                                         ),
                                       )
                                     : const Center(
@@ -591,11 +625,11 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                                 borderRadius: BorderRadius.circular(10.5),
                                 child: widget.trip.gatePassPhotoUrl != null &&
                                         widget.trip.gatePassPhotoUrl!.isNotEmpty
-                                    ? Image.network(
-                                        widget.trip.gatePassPhotoUrl!,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => const Center(
-                                          child: Icon(Icons.broken_image_rounded, color: Colors.grey),
+                                    ? GestureDetector(
+                                        onTap: () => _showFullImageDialog(widget.trip.gatePassPhotoUrl!),
+                                        child: AppImageView(
+                                          imagePath: widget.trip.gatePassPhotoUrl!,
+                                          fit: BoxFit.cover,
                                         ),
                                       )
                                     : const Center(
@@ -894,6 +928,70 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
               style: AppTextStyle.bodyMedium,
               color: isDark ? Colors.white70 : Colors.grey.shade700,
             ),
+          if (widget.trip.truckOwnerPassData != null &&
+              widget.trip.truckOwnerPassData!['adminPhotoUrl'] != null &&
+              widget.trip.truckOwnerPassData!['adminPhotoUrl'].toString().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GestureDetector(
+                  onTap: () => _showFullImageDialog(
+                    widget.trip.truckOwnerPassData!['adminPhotoUrl'].toString(),
+                  ),
+                  child: Stack(
+                    children: [
+                      AppImageView(
+                        imagePath: widget.trip.truckOwnerPassData!['adminPhotoUrl'].toString(),
+                        height: 80,
+                        width: 80,
+                        fit: BoxFit.cover,
+                        borderRadius: 8,
+                      ),
+                      Positioned(
+                        right: 4,
+                        bottom: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Icon(
+                            Icons.fullscreen_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppText(
+                        'Admin Photo',
+                        style: AppTextStyle.labelMedium,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                        color: isDark ? Colors.white54 : Colors.grey.shade600,
+                      ),
+                      const SizedBox(height: 4),
+                      AppText(
+                        'Attached by admin during approval',
+                        style: AppTextStyle.bodyMedium,
+                        fontSize: 10,
+                        color: isDark ? Colors.white38 : Colors.grey.shade500,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

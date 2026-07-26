@@ -6,6 +6,7 @@ import 'package:transport/widgets/app_text.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/core/utils/image_url.dart';
+import 'package:transport/app/core/utils/image_picker_helper.dart';
 import '../controllers/admin_home_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import 'admin_trip_details_view.dart';
@@ -63,10 +64,12 @@ class MockTruck {
 class TruckAssignmentDashboard extends StatefulWidget {
   final bool isDark;
   final Function(Map<String, dynamic> initialPassData)? onOpenTripForm;
-  const TruckAssignmentDashboard({super.key, required this.isDark, this.onOpenTripForm});
+  const TruckAssignmentDashboard(
+      {super.key, required this.isDark, this.onOpenTripForm});
 
   @override
-  State<TruckAssignmentDashboard> createState() => _TruckAssignmentDashboardState();
+  State<TruckAssignmentDashboard> createState() =>
+      _TruckAssignmentDashboardState();
 }
 
 class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
@@ -93,7 +96,17 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     final phone = (u['phone'] ?? '').toString().trim();
     final name = (u['name'] ?? 'Driver').toString().trim();
 
-    String avatar = (u['avatarUrl'] ?? u['photoUrl'] ?? u['profileImage'] ?? u['image'] ?? u['avatar'] ?? u['photo'] ?? u['profilePhotoUrl'] ?? u['driverPhotoUrl'] ?? '').toString().trim();
+    String avatar = (u['avatarUrl'] ??
+            u['photoUrl'] ??
+            u['profileImage'] ??
+            u['image'] ??
+            u['avatar'] ??
+            u['photo'] ??
+            u['profilePhotoUrl'] ??
+            u['driverPhotoUrl'] ??
+            '')
+        .toString()
+        .trim();
 
     if (avatar.isEmpty) {
       final docs = u['documents'] as List?;
@@ -101,8 +114,14 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         for (final doc in docs) {
           if (doc is Map) {
             final t = (doc['title'] ?? '').toString().toLowerCase();
-            final url = (doc['url'] ?? doc['documentUrl'] ?? doc['fileUrl'] ?? '').toString().trim();
-            if ((t.contains('photo') || t.contains('profile') || t.contains('avatar')) && url.isNotEmpty) {
+            final url =
+                (doc['url'] ?? doc['documentUrl'] ?? doc['fileUrl'] ?? '')
+                    .toString()
+                    .trim();
+            if ((t.contains('photo') ||
+                    t.contains('profile') ||
+                    t.contains('avatar')) &&
+                url.isNotEmpty) {
               avatar = url;
               break;
             }
@@ -119,8 +138,11 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
   }
 
   Widget _buildDriverAvatar(DriverInfo driver, {double radius = 14}) {
-    final hasImage = driver.avatarUrl.isNotEmpty && driver.avatarUrl.startsWith('http');
-    final initial = driver.name.isNotEmpty ? driver.name.substring(0, 1).toUpperCase() : 'D';
+    final hasImage =
+        driver.avatarUrl.isNotEmpty && driver.avatarUrl.startsWith('http');
+    final initial = driver.name.isNotEmpty
+        ? driver.name.substring(0, 1).toUpperCase()
+        : 'D';
     final colors = [
       const Color(0xFF10B981),
       const Color(0xFF3B82F6),
@@ -201,9 +223,14 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         if (assignedTo.isNotEmpty) {
           final cleanAssigned = assignedTo.replaceAll(RegExp(r'\D'), '');
           final u = controller.users.firstWhereOrNull((u) {
-            final userPhone = (u['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
+            final userPhone =
+                (u['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
             return (u['phone'] ?? '') == assignedTo ||
-                (userPhone.isNotEmpty && cleanAssigned.isNotEmpty && (userPhone == cleanAssigned || userPhone.endsWith(cleanAssigned) || cleanAssigned.endsWith(userPhone)));
+                (userPhone.isNotEmpty &&
+                    cleanAssigned.isNotEmpty &&
+                    (userPhone == cleanAssigned ||
+                        userPhone.endsWith(cleanAssigned) ||
+                        cleanAssigned.endsWith(userPhone)));
           });
           if (u != null) {
             selectedDriver = _driverFromMap(u);
@@ -211,7 +238,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             final avatarUrl = controller.driverAvatarFor(assignedTo);
             final name = controller.driverNameFor(assignedTo);
             selectedDriver = DriverInfo(
-              name: name.isNotEmpty && name != assignedTo ? name : 'Assigned Driver',
+              name: name.isNotEmpty && name != assignedTo
+                  ? name
+                  : 'Assigned Driver',
               phone: assignedTo,
               avatarUrl: avatarUrl,
             );
@@ -226,7 +255,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         final destinationSetup = t['destinationSetup'] as Map<String, dynamic>?;
 
         // Check if this truck already has an active (non-completed) trip
-        String cleanTruck(String val) => val.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+        String cleanTruck(String val) =>
+            val.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
 
         final truckTrips = controller.trips.where((trip) {
           final tripTruck = (trip['truckNo'] ?? '').toString();
@@ -234,7 +264,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         }).toList();
 
         // Sort by ID descending to get the latest trip first
-        truckTrips.sort((a, b) => (b['id'] ?? '').toString().compareTo((a['id'] ?? '').toString()));
+        truckTrips.sort((a, b) =>
+            (b['id'] ?? '').toString().compareTo((a['id'] ?? '').toString()));
 
         final hasActiveTrip = assignedTo.isNotEmpty &&
             truckTrips.isNotEmpty &&
@@ -253,19 +284,30 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           hasDestinationSetup: hasDestinationSetup,
           destinationSetup: destinationSetup,
           hasActiveTrip: hasActiveTrip,
-          activeTripStatus: hasActiveTrip ? truckTrips.first['status'].toString() : null,
-          activeTripPhotoUrl: hasActiveTrip ? truckTrips.first['loadingPhotoUrl']?.toString() : null,
-          activeTripGatePassUrl: hasActiveTrip ? truckTrips.first['gatePassPhotoUrl']?.toString() : null,
-          activeTripPodUrl: hasActiveTrip ? truckTrips.first['podUrl']?.toString() : null,
-          activeTripRemarks: hasActiveTrip ? truckTrips.first['remarks']?.toString() : null,
+          activeTripStatus:
+              hasActiveTrip ? truckTrips.first['status'].toString() : null,
+          activeTripPhotoUrl: hasActiveTrip
+              ? truckTrips.first['loadingPhotoUrl']?.toString()
+              : null,
+          activeTripGatePassUrl: hasActiveTrip
+              ? truckTrips.first['gatePassPhotoUrl']?.toString()
+              : null,
+          activeTripPodUrl:
+              hasActiveTrip ? truckTrips.first['podUrl']?.toString() : null,
+          activeTripRemarks:
+              hasActiveTrip ? truckTrips.first['remarks']?.toString() : null,
         );
       }).toList();
 
-      final pendingTrucks = uiTrucks.where((t) => t.status == 'Pending Acceptance').toList();
-      final assignedTrucks = uiTrucks.where((t) => t.status != 'Pending Acceptance').toList();
+      final pendingTrucks =
+          uiTrucks.where((t) => t.status == 'Pending Acceptance').toList();
+      final assignedTrucks =
+          uiTrucks.where((t) => t.status != 'Pending Acceptance').toList();
 
-      final bool hasExpandedAssignedCard = assignedTrucks.any((t) => t.hasActiveTrip || t.hasLoadingPass || t.hasDestinationSetup);
-      final double assignedContainerHeight = hasExpandedAssignedCard ? 480.0 : 210.0;
+      final bool hasExpandedAssignedCard = assignedTrucks.any(
+          (t) => t.hasActiveTrip || t.hasLoadingPass || t.hasDestinationSetup);
+      final double assignedContainerHeight =
+          hasExpandedAssignedCard ? 480.0 : 210.0;
 
       // Check auto reset condition reactively
       _checkAutoReset(dbTrucks);
@@ -295,11 +337,17 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                   ],
                 ),
               ),
-              if (dbTrucks.any((t) => (t['assignedTo'] ?? '').toString().isNotEmpty || _tempSelections.isNotEmpty))
+              if (dbTrucks.any((t) =>
+                  (t['assignedTo'] ?? '').toString().isNotEmpty ||
+                  _tempSelections.isNotEmpty))
                 TextButton.icon(
                   onPressed: _resetDemo,
-                  icon: const Icon(Icons.refresh_rounded, size: 16, color: AppColors.primary),
-                  label: const Text('Reset All', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                  icon: const Icon(Icons.refresh_rounded,
+                      size: 16, color: AppColors.primary),
+                  label: const Text('Reset All',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary)),
                 ),
             ],
           ),
@@ -331,7 +379,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             SizedBox(
               height: 205,
               child: pendingTrucks.isEmpty
-                  ? _buildEmptyPlaceholder('All trucks assigned! Look below. 🎉')
+                  ? _buildEmptyPlaceholder(
+                      'All trucks assigned! Look below. 🎉')
                   : SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
@@ -340,7 +389,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         children: pendingTrucks.map((truck) {
                           return Padding(
                             key: ValueKey(truck.id),
-                            padding: const EdgeInsets.only(right: 16, bottom: 8),
+                            padding:
+                                const EdgeInsets.only(right: 16, bottom: 8),
                             child: _buildInteractiveCard(truck),
                           );
                         }).toList(),
@@ -376,7 +426,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             SizedBox(
               height: assignedContainerHeight,
               child: assignedTrucks.isEmpty
-                  ? _buildEmptyPlaceholder('No trucks assigned yet. Assign a truck from above.')
+                  ? _buildEmptyPlaceholder(
+                      'No trucks assigned yet. Assign a truck from above.')
                   : SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
@@ -385,7 +436,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         children: assignedTrucks.map((truck) {
                           return Padding(
                             key: ValueKey(truck.id),
-                            padding: const EdgeInsets.only(right: 16, bottom: 8),
+                            padding:
+                                const EdgeInsets.only(right: 16, bottom: 8),
                             child: _buildInteractiveCard(truck),
                           );
                         }).toList(),
@@ -408,7 +460,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
       width: double.infinity,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: widget.isDark ? const Color(0xFF1E293B).withOpacity(0.5) : const Color(0xFFF8FAFC),
+        color: widget.isDark
+            ? const Color(0xFF1E293B).withOpacity(0.5)
+            : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: widget.isDark ? Colors.white10 : Colors.grey.shade200,
@@ -456,8 +510,11 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AppText(truck.truckNo, style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
-                    AppText(truck.name, style: AppTextStyle.labelMedium, color: Colors.grey),
+                    AppText(truck.truckNo,
+                        style: AppTextStyle.bodyMedium,
+                        fontWeight: FontWeight.bold),
+                    AppText(truck.name,
+                        style: AppTextStyle.labelMedium, color: Colors.grey),
                   ],
                 ),
               ),
@@ -473,7 +530,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         child: Icon(
                           Icons.refresh_rounded,
                           size: 14,
-                          color: widget.isDark ? Colors.white38 : Colors.grey.shade400,
+                          color: widget.isDark
+                              ? Colors.white38
+                              : Colors.grey.shade400,
                         ),
                       ),
                     ),
@@ -487,7 +546,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           // Truck Types Chips
           Row(
             children: [
-              const AppText('Type: ', style: AppTextStyle.labelMedium, color: Colors.grey),
+              const AppText('Type: ',
+                  style: AppTextStyle.labelMedium, color: Colors.grey),
               const SizedBox(width: 4),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -504,10 +564,13 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                   ),
                 ),
               ),
-              if (truck.hasLoadingPass && truck.loadingPass != null && truck.loadingPass!['itemName'] != null) ...[
+              if (truck.hasLoadingPass &&
+                  truck.loadingPass != null &&
+                  truck.loadingPass!['itemName'] != null) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: Colors.teal.shade700,
                     borderRadius: BorderRadius.circular(6),
@@ -524,11 +587,16 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               ],
             ],
           ),
-          if (truck.hasLoadingPass && truck.loadingPass != null && truck.loadingPass!['generatedAt'] != null) ...[
+          if (truck.hasLoadingPass &&
+              truck.loadingPass != null &&
+              truck.loadingPass!['generatedAt'] != null) ...[
             const SizedBox(height: 8),
             Row(
               children: [
-                Icon(Icons.calendar_month_rounded, size: 12, color: widget.isDark ? Colors.white38 : Colors.grey.shade500),
+                Icon(Icons.calendar_month_rounded,
+                    size: 12,
+                    color:
+                        widget.isDark ? Colors.white38 : Colors.grey.shade500),
                 const SizedBox(width: 4),
                 AppText(
                   'Pass Gen: ${truck.loadingPass!['generatedAt']}',
@@ -543,14 +611,20 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
 
           // Driver Selection Dropdown
           InkWell(
-            onTap: state == 'Pending Acceptance' ? () => _showDriverSelector(truck) : null,
+            onTap: state == 'Pending Acceptance'
+                ? () => _showDriverSelector(truck)
+                : null,
             borderRadius: BorderRadius.circular(8),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               decoration: BoxDecoration(
-                color: widget.isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                color: widget.isDark
+                    ? const Color(0xFF0F172A)
+                    : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: widget.isDark ? Colors.white10 : Colors.grey.shade100),
+                border: Border.all(
+                    color:
+                        widget.isDark ? Colors.white10 : Colors.grey.shade100),
               ),
               child: Row(
                 children: [
@@ -561,32 +635,56 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          AppText(truck.selectedDriver!.name, style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
-                          AppText(_formatPhoneNumber(truck.selectedDriver!.phone), style: AppTextStyle.labelMedium, color: Colors.grey),
+                          AppText(truck.selectedDriver!.name,
+                              style: AppTextStyle.labelMedium,
+                              fontWeight: FontWeight.bold),
+                          AppText(
+                              _formatPhoneNumber(truck.selectedDriver!.phone),
+                              style: AppTextStyle.labelMedium,
+                              color: Colors.grey),
                         ],
                       ),
                     ),
                   ] else ...[
                     CircleAvatar(
                       radius: 14,
-                      backgroundColor: widget.isDark ? Colors.white10 : Colors.grey.shade200,
-                      child: Icon(Icons.person_add_rounded, size: 14, color: widget.isDark ? Colors.white38 : Colors.grey.shade600),
+                      backgroundColor:
+                          widget.isDark ? Colors.white10 : Colors.grey.shade200,
+                      child: Icon(Icons.person_add_rounded,
+                          size: 14,
+                          color: widget.isDark
+                              ? Colors.white38
+                              : Colors.grey.shade600),
                     ),
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          AppText('Select Driver', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey),
-                          AppText('No driver assigned yet', style: AppTextStyle.labelMedium, color: Colors.grey, fontSize: 9),
+                          AppText('Select Driver',
+                              style: AppTextStyle.labelMedium,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey),
+                          AppText('No driver assigned yet',
+                              style: AppTextStyle.labelMedium,
+                              color: Colors.grey,
+                              fontSize: 9),
                         ],
                       ),
                     ),
                   ],
                   if (state == 'Pending Acceptance')
-                    Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: widget.isDark ? Colors.white54 : Colors.grey.shade600)
+                    Icon(Icons.keyboard_arrow_down_rounded,
+                        size: 16,
+                        color: widget.isDark
+                            ? Colors.white54
+                            : Colors.grey.shade600)
                   else
-                  Icon(Icons.lock_rounded, size: 10, color: widget.isDark ? Colors.white24 : Colors.grey.shade300),
+                    Icon(Icons.lock_rounded,
+                        size: 10,
+                        color: widget.isDark
+                            ? Colors.white24
+                            : Colors.grey.shade300),
                 ],
               ),
             ),
@@ -611,10 +709,11 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
 
   Widget _buildActiveTripStatusWidget(MockTruck truck) {
     final status = truck.activeTripStatus ?? '';
-    
+
     // Find active trip ID
     final controller = Get.find<AdminHomeController>();
-    String cleanTruck(String val) => val.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    String cleanTruck(String val) =>
+        val.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
     final activeTrip = controller.trips.firstWhereOrNull((trip) {
       final tripTruck = (trip['truckNo'] ?? '').toString();
       final tripStatus = (trip['status'] ?? '').toString();
@@ -682,17 +781,22 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         color = Colors.grey;
     }
 
-    final hasPhoto = truck.activeTripPhotoUrl != null && truck.activeTripPhotoUrl!.isNotEmpty;
-    final hasGatePassPhoto = truck.activeTripGatePassUrl != null && truck.activeTripGatePassUrl!.isNotEmpty;
-    final hasPodPhoto = truck.activeTripPodUrl != null && truck.activeTripPodUrl!.isNotEmpty;
-    final hasRemarks = truck.activeTripRemarks != null && truck.activeTripRemarks!.isNotEmpty;
+    final hasPhoto = truck.activeTripPhotoUrl != null &&
+        truck.activeTripPhotoUrl!.isNotEmpty;
+    final hasGatePassPhoto = truck.activeTripGatePassUrl != null &&
+        truck.activeTripGatePassUrl!.isNotEmpty;
+    final hasPodPhoto =
+        truck.activeTripPodUrl != null && truck.activeTripPodUrl!.isNotEmpty;
+    final hasRemarks =
+        truck.activeTripRemarks != null && truck.activeTripRemarks!.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
         InkWell(
-          onTap: () => Get.to(() => const AdminTripDetailsView(), arguments: {'tripId': tripId}),
+          onTap: () => Get.to(() => const AdminTripDetailsView(),
+              arguments: {'tripId': tripId}),
           borderRadius: BorderRadius.circular(10),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -724,9 +828,14 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: widget.isDark ? const Color(0xFF451A03) : const Color(0xFFFEF2F2),
+              color: widget.isDark
+                  ? const Color(0xFF451A03)
+                  : const Color(0xFFFEF2F2),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: widget.isDark ? const Color(0xFF78350F) : const Color(0xFFFCA5A5)),
+              border: Border.all(
+                  color: widget.isDark
+                      ? const Color(0xFF78350F)
+                      : const Color(0xFFFCA5A5)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -735,7 +844,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                   'Rejection Reason: ${activeTrip['loadRejectReason'] ?? 'None'}',
                   style: TextStyle(
                     fontSize: 11,
-                    color: widget.isDark ? const Color(0xFFFDBA74) : const Color(0xFF991B1B),
+                    color: widget.isDark
+                        ? const Color(0xFFFDBA74)
+                        : const Color(0xFF991B1B),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -744,7 +855,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                   'Flagged Photo: ${activeTrip['flaggedPhoto'] == 'loading' ? 'Loading Photo Only' : activeTrip['flaggedPhoto'] == 'gate_pass' ? 'Gate Pass Photo Only' : 'Both Photos'}',
                   style: TextStyle(
                     fontSize: 10,
-                    color: widget.isDark ? const Color(0xFFF59E0B) : const Color(0xFFB91C1C),
+                    color: widget.isDark
+                        ? const Color(0xFFF59E0B)
+                        : const Color(0xFFB91C1C),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -757,9 +870,14 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: widget.isDark ? const Color(0xFF451A03) : const Color(0xFFFEF2F2),
+              color: widget.isDark
+                  ? const Color(0xFF451A03)
+                  : const Color(0xFFFEF2F2),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: widget.isDark ? const Color(0xFF78350F) : const Color(0xFFFCA5A5)),
+              border: Border.all(
+                  color: widget.isDark
+                      ? const Color(0xFF78350F)
+                      : const Color(0xFFFCA5A5)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -768,7 +886,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                   'Rejection Reason: ${activeTrip['deliveryRejectReason'] ?? 'None'}',
                   style: TextStyle(
                     fontSize: 11,
-                    color: widget.isDark ? const Color(0xFFFDBA74) : const Color(0xFF991B1B),
+                    color: widget.isDark
+                        ? const Color(0xFFFDBA74)
+                        : const Color(0xFF991B1B),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -776,21 +896,26 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             ),
           ),
         ],
-        if (status == 'LOAD_REQUESTED' || (status == 'DELIVERY_REQUESTED' && hasPodPhoto)) ...[
+        if (status == 'LOAD_REQUESTED' ||
+            (status == 'DELIVERY_REQUESTED' && hasPodPhoto)) ...[
           const SizedBox(height: 8),
           Row(
             children: [
               if (status == 'LOAD_REQUESTED') ...[
                 _buildPhotoPreview(
                   context,
-                  hasPhoto ? truck.activeTripPhotoUrl! : 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=600',
+                  hasPhoto
+                      ? truck.activeTripPhotoUrl!
+                      : 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=600',
                   'Loading Proof',
                   widget.isDark,
                 ),
                 const SizedBox(width: 10),
                 _buildPhotoPreview(
                   context,
-                  hasGatePassPhoto ? truck.activeTripGatePassUrl! : 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600',
+                  hasGatePassPhoto
+                      ? truck.activeTripGatePassUrl!
+                      : 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600',
                   'Gate Pass',
                   widget.isDark,
                 ),
@@ -834,12 +959,15 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 child: OutlinedButton.icon(
                   onPressed: () => _showRejectLoadDialog(tripId),
                   icon: const Icon(Icons.close_rounded, size: 12),
-                  label: const Text('Reject', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  label: const Text('Reject',
+                      style:
+                          TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFFDC2626),
                     side: const BorderSide(color: Color(0xFFDC2626)),
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ),
@@ -848,12 +976,15 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 child: ElevatedButton.icon(
                   onPressed: () => _approveLoadDirectly(tripId),
                   icon: const Icon(Icons.check_rounded, size: 12),
-                  label: const Text('Approve', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  label: const Text('Approve',
+                      style:
+                          TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF10B981),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                     elevation: 0,
                   ),
                 ),
@@ -869,12 +1000,15 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 child: OutlinedButton.icon(
                   onPressed: () => _showRejectDeliveryDialog(tripId),
                   icon: const Icon(Icons.close_rounded, size: 12),
-                  label: const Text('Reject', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  label: const Text('Reject',
+                      style:
+                          TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFFDC2626),
                     side: const BorderSide(color: Color(0xFFDC2626)),
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ),
@@ -883,12 +1017,15 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 child: ElevatedButton.icon(
                   onPressed: () => _approveDeliveryDirectly(tripId),
                   icon: const Icon(Icons.check_rounded, size: 12),
-                  label: const Text('Approve', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  label: const Text('Approve',
+                      style:
+                          TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF10B981),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                     elevation: 0,
                   ),
                 ),
@@ -900,7 +1037,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     );
   }
 
-  Widget _buildPhotoPreview(BuildContext context, String url, String label, bool isDark) {
+  Widget _buildPhotoPreview(
+      BuildContext context, String url, String label, bool isDark) {
     final safeUrl = corsSafeImageUrl(url);
     return GestureDetector(
       onTap: () => _showFullImageDialog(url),
@@ -940,7 +1078,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 child: const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.broken_image_rounded, size: 20, color: Colors.grey),
+                    Icon(Icons.broken_image_rounded,
+                        size: 20, color: Colors.grey),
                     SizedBox(height: 2),
                     Text(
                       'Failed',
@@ -967,21 +1106,25 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             Align(
               alignment: Alignment.centerRight,
               child: IconButton(
-                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 30),
+                icon: const Icon(Icons.close_rounded,
+                    color: Colors.white, size: 30),
                 onPressed: () => Get.back(),
               ),
             ),
             Hero(
               tag: imageUrl,
               child: Container(
-                constraints: const BoxConstraints(maxHeight: 500, maxWidth: 500),
+                constraints:
+                    const BoxConstraints(maxHeight: 500, maxWidth: 500),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: CachedNetworkImage(
                     imageUrl: safeUrl,
                     fit: BoxFit.contain,
-                    placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-                    errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white),
+                    placeholder: (context, url) =>
+                        const Center(child: CircularProgressIndicator()),
+                    errorWidget: (context, url, error) =>
+                        const Icon(Icons.error, color: Colors.white),
                   ),
                 ),
               ),
@@ -998,24 +1141,30 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
 
   void _showTruckOwnerPassApprovalDialog(String tripId) {
     final formKey = GlobalKey<FormState>();
-    final passIdCtrl = TextEditingController(text: 'TOP-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}');
+    final passIdCtrl = TextEditingController(
+        text:
+            'TOP-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}');
     final ownerNameCtrl = TextEditingController();
     final remarksCtrl = TextEditingController();
     String? passPhotoUrl;
+    String? adminPhotoUrl;
 
     Get.dialog(
       StatefulBuilder(
         builder: (context, setStateDialog) {
           return AlertDialog(
-            backgroundColor: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            backgroundColor:
+                widget.isDark ? const Color(0xFF1E293B) : Colors.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(
               children: [
-                const Icon(Icons.assignment_turned_in_rounded, color: Color(0xFF10B981)),
+                const Icon(Icons.assignment_turned_in_rounded,
+                    color: Color(0xFF10B981)),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    'Generate Truck Owner Pass',
+                    'Generate Supplier Pass',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
@@ -1030,71 +1179,163 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'Driver ne loading proof upload kar diya hai. Ab naya Truck Owner Pass banayein aur upload karein. Iske baad hi driver ko Step 4 customer details dikhenge.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
+                      // const Text(
+                      //   'Driver ne loading proof upload kar diya hai. Ab naya Truck Owner Pass banayein aur upload karein. Iske baad hi driver ko Step 4 customer details dikhenge.',
+                      //   style: TextStyle(fontSize: 12, color: Colors.grey),
+                      // ),
+                      // const SizedBox(height: 16),
+                      // TextFormField(
+                      //   controller: passIdCtrl,
+                      //   decoration: InputDecoration(
+                      //     labelText: 'Truck Owner Pass ID *',
+                      //     prefixIcon: const Icon(
+                      //         Icons.confirmation_number_rounded,
+                      //         size: 18),
+                      //     border: OutlineInputBorder(
+                      //         borderRadius: BorderRadius.circular(10)),
+                      //   ),
+                      //   validator: (v) => (v == null || v.trim().isEmpty)
+                      //       ? 'Pass ID enter karein'
+                      //       : null,
+                      // ),
+                      // const SizedBox(height: 12),
+                      // TextFormField(
+                      //   controller: ownerNameCtrl,
+                      //   decoration: InputDecoration(
+                      //     labelText: 'Truck Owner / Transporter Name',
+                      //     prefixIcon:
+                      //         const Icon(Icons.business_rounded, size: 18),
+                      //     border: OutlineInputBorder(
+                      //         borderRadius: BorderRadius.circular(10)),
+                      //   ),
+                      // ),
+                      // const SizedBox(height: 12),
+                      // TextFormField(
+                      //   controller: remarksCtrl,
+                      //   decoration: InputDecoration(
+                      //     labelText: 'Pass Remarks / Notes (Optional)',
+                      //     prefixIcon: const Icon(Icons.notes_rounded, size: 18),
+                      //     border: OutlineInputBorder(
+                      //         borderRadius: BorderRadius.circular(10)),
+                      //   ),
+                      // ),
                       const SizedBox(height: 16),
-
-                      TextFormField(
-                        controller: passIdCtrl,
-                        decoration: InputDecoration(
-                          labelText: 'Truck Owner Pass ID *',
-                          prefixIcon: const Icon(Icons.confirmation_number_rounded, size: 18),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Pass ID enter karein' : null,
-                      ),
-                      const SizedBox(height: 12),
-
-                      TextFormField(
-                        controller: ownerNameCtrl,
-                        decoration: InputDecoration(
-                          labelText: 'Truck Owner / Transporter Name',
-                          prefixIcon: const Icon(Icons.business_rounded, size: 18),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      TextFormField(
-                        controller: remarksCtrl,
-                        decoration: InputDecoration(
-                          labelText: 'Pass Remarks / Notes (Optional)',
-                          prefixIcon: const Icon(Icons.notes_rounded, size: 18),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
+                      // Container(
+                      //   padding: const EdgeInsets.all(12),
+                      //   decoration: BoxDecoration(
+                      //     color: widget.isDark
+                      //         ? Colors.white10
+                      //         : const Color(0xFFF8FAFC),
+                      //     borderRadius: BorderRadius.circular(10),
+                      //     border: Border.all(
+                      //         color: widget.isDark
+                      //             ? Colors.white24
+                      //             : Colors.grey.shade300),
+                      //   ),
+                      //   child: Row(
+                      //     children: [
+                      //       Icon(
+                      //         passPhotoUrl != null
+                      //             ? Icons.check_circle_rounded
+                      //             : Icons.upload_file_rounded,
+                      //         color: passPhotoUrl != null
+                      //             ? Colors.green
+                      //             : AppColors.primary,
+                      //       ),
+                      //       const SizedBox(width: 10),
+                      //       Expanded(
+                      //         child: Text(
+                      //           passPhotoUrl != null
+                      //               ? 'Truck Owner Pass Attached ✅'
+                      //               : 'Upload Truck Owner Pass Document',
+                      //           style: const TextStyle(
+                      //               fontWeight: FontWeight.bold, fontSize: 12),
+                      //         ),
+                      //       ),
+                      //       TextButton(
+                      //         onPressed: () async {
+                      //           final url =
+                      //               await ImagePickerHelper.pickImageAsBase64(
+                      //                   context, widget.isDark);
+                      //           if (url != null) {
+                      //             setStateDialog(() {
+                      //               passPhotoUrl = url;
+                      //             });
+                      //           }
+                      //         },
+                      //         child: Text(
+                      //             passPhotoUrl != null ? 'Change' : 'Attach'),
+                      //       ),
+                      //       if (passPhotoUrl != null)
+                      //         IconButton(
+                      //           icon: const Icon(Icons.close_rounded,
+                      //               size: 18, color: Colors.red),
+                      //           onPressed: () {
+                      //             setStateDialog(() {
+                      //               passPhotoUrl = null;
+                      //             });
+                      //           },
+                      //         ),
+                      //     ],
+                      //   ),
+                      // ),
+                      // const SizedBox(height: 12),
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: widget.isDark ? Colors.white10 : const Color(0xFFF8FAFC),
+                          color: widget.isDark
+                              ? Colors.white10
+                              : const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: widget.isDark ? Colors.white24 : Colors.grey.shade300),
+                          border: Border.all(
+                              color: widget.isDark
+                                  ? Colors.white24
+                                  : Colors.grey.shade300),
                         ),
                         child: Row(
                           children: [
                             Icon(
-                              passPhotoUrl != null ? Icons.check_circle_rounded : Icons.upload_file_rounded,
-                              color: passPhotoUrl != null ? Colors.green : AppColors.primary,
+                              adminPhotoUrl != null
+                                  ? Icons.check_circle_rounded
+                                  : Icons.add_a_photo_rounded,
+                              color: adminPhotoUrl != null
+                                  ? Colors.green
+                                  : AppColors.primary,
                             ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                passPhotoUrl != null ? 'Truck Owner Pass Attached ✅' : 'Upload Truck Owner Pass Document',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                adminPhotoUrl != null
+                                    ? 'Supplier Photo Attached ✅'
+                                    : 'Upload Supplier Pass Photo',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 12),
                               ),
                             ),
                             TextButton(
-                              onPressed: () {
-                                setStateDialog(() {
-                                  passPhotoUrl = 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600';
-                                });
+                              onPressed: () async {
+                                final url =
+                                    await ImagePickerHelper.pickImageAsBase64(
+                                        context, widget.isDark);
+                                if (url != null) {
+                                  setStateDialog(() {
+                                    adminPhotoUrl = url;
+                                  });
+                                }
                               },
-                              child: Text(passPhotoUrl != null ? 'Change' : 'Attach'),
+                              child: Text(
+                                  adminPhotoUrl != null ? 'Change' : 'Attach'),
                             ),
+                            if (adminPhotoUrl != null)
+                              IconButton(
+                                icon: const Icon(Icons.close_rounded,
+                                    size: 18, color: Colors.red),
+                                onPressed: () {
+                                  setStateDialog(() {
+                                    adminPhotoUrl = null;
+                                  });
+                                },
+                              ),
                           ],
                         ),
                       ),
@@ -1109,35 +1350,50 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 child: const Text('Cancel'),
               ),
               ElevatedButton.icon(
-                onPressed: () async {
-                  if (formKey.currentState!.validate()) {
-                    Get.back();
-                    AppPopup.showLoading(message: 'Generating Pass & Activating Trip...');
-                    try {
-                      final ownerPassData = {
-                        'passId': passIdCtrl.text.trim(),
-                        'ownerName': ownerNameCtrl.text.trim(),
-                        'remarks': remarksCtrl.text.trim(),
-                        'generatedAt': DateTime.now().toString().substring(0, 16),
-                      };
-                      final err = await _firebaseService.approveLoad(
-                        tripId,
-                        truckOwnerPassId: passIdCtrl.text.trim(),
-                        truckOwnerPassUrl: passPhotoUrl ?? '',
-                        truckOwnerPassData: ownerPassData,
-                      );
-                      AppPopup.hideLoading();
-                      if (err != null) {
-                        Get.snackbar('Alert', err, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.orangeAccent);
-                      } else {
-                        Get.snackbar('Success', 'Truck Owner Pass uploaded & Trip activated! 🚛', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
-                      }
-                    } catch (e) {
-                      AppPopup.hideLoading();
-                      Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent);
-                    }
-                  }
-                },
+                onPressed: adminPhotoUrl == null
+                    ? null
+                    : () async {
+                        if (formKey.currentState!.validate()) {
+                          Get.back();
+                          AppPopup.showLoading(
+                              message: 'Generating Pass & Activating Trip...');
+                          try {
+                            final ownerPassData = {
+                              'passId': passIdCtrl.text.trim(),
+                              'ownerName': ownerNameCtrl.text.trim(),
+                              'remarks': remarksCtrl.text.trim(),
+                              'generatedAt':
+                                  DateTime.now().toString().substring(0, 16),
+                              if (adminPhotoUrl != null &&
+                                  adminPhotoUrl!.isNotEmpty)
+                                'adminPhotoUrl': adminPhotoUrl,
+                            };
+                            final err = await _firebaseService.approveLoad(
+                              tripId,
+                              truckOwnerPassId: passIdCtrl.text.trim(),
+                              truckOwnerPassUrl: passPhotoUrl ?? '',
+                              truckOwnerPassData: ownerPassData,
+                            );
+                            AppPopup.hideLoading();
+                            if (err != null) {
+                              Get.snackbar('Alert', err,
+                                  snackPosition: SnackPosition.BOTTOM,
+                                  backgroundColor: Colors.orangeAccent);
+                            } else {
+                              Get.snackbar('Success',
+                                  'Truck Owner Pass uploaded & Trip activated! 🚛',
+                                  snackPosition: SnackPosition.BOTTOM,
+                                  backgroundColor: Colors.green,
+                                  colorText: Colors.white);
+                            }
+                          } catch (e) {
+                            AppPopup.hideLoading();
+                            Get.snackbar('Error', e.toString(),
+                                snackPosition: SnackPosition.BOTTOM,
+                                backgroundColor: Colors.redAccent);
+                          }
+                        }
+                      },
                 icon: const Icon(Icons.check_circle_rounded, size: 16),
                 label: const Text('Save Pass & Approve'),
                 style: ElevatedButton.styleFrom(
@@ -1165,109 +1421,139 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     final reasonCtrl = TextEditingController();
 
     Get.dialog(
-      StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            backgroundColor: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Reject Load Verification?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text('Select Rejection Reason (Mandatory):', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    dropdownColor: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
-                    value: selectedReason,
-                    items: reasons.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 13)))).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                          selectedReason = val;
-                        });
-                      }
-                    },
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
+      StatefulBuilder(builder: (context, setState) {
+        return AlertDialog(
+          backgroundColor:
+              widget.isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Reject Load Verification?',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('Select Rejection Reason (Mandatory):',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  dropdownColor:
+                      widget.isDark ? const Color(0xFF1E293B) : Colors.white,
+                  value: selectedReason,
+                  items: reasons
+                      .map((r) => DropdownMenuItem(
+                          value: r,
+                          child: Text(r, style: const TextStyle(fontSize: 13))))
+                      .toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        selectedReason = val;
+                      });
+                    }
+                  },
+                  decoration: InputDecoration(
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
-                  if (selectedReason == 'Other') ...[
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: reasonCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'Specify Custom Reason',
-                        labelStyle: const TextStyle(fontSize: 13),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  const Text('Flag Specific Photo to Re-upload:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    dropdownColor: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
-                    value: selectedPhotoFlag,
-                    items: const [
-                      DropdownMenuItem(value: 'both', child: Text('Both Photos', style: TextStyle(fontSize: 13))),
-                      DropdownMenuItem(value: 'loading', child: Text('Loading Photo Only', style: TextStyle(fontSize: 13))),
-                      DropdownMenuItem(value: 'gate_pass', child: Text('Gate Pass Photo Only', style: TextStyle(fontSize: 13))),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                          selectedPhotoFlag = val;
-                        });
-                      }
-                    },
+                ),
+                if (selectedReason == 'Other') ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: reasonCtrl,
                     decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      labelText: 'Specify Custom Reason',
+                      labelStyle: const TextStyle(fontSize: 13),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Get.back(),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
-                onPressed: () async {
-                  String finalReason = selectedReason;
-                  if (selectedReason == 'Other') {
-                    finalReason = reasonCtrl.text.trim();
-                    if (finalReason.isEmpty) {
-                      Get.snackbar('Alert', 'Please specify a custom reason');
-                      return;
+                const SizedBox(height: 16),
+                const Text('Flag Specific Photo to Re-upload:',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  dropdownColor:
+                      widget.isDark ? const Color(0xFF1E293B) : Colors.white,
+                  value: selectedPhotoFlag,
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'both',
+                        child: Text('Both Photos',
+                            style: TextStyle(fontSize: 13))),
+                    DropdownMenuItem(
+                        value: 'loading',
+                        child: Text('Loading Photo Only',
+                            style: TextStyle(fontSize: 13))),
+                    DropdownMenuItem(
+                        value: 'gate_pass',
+                        child: Text('Gate Pass Photo Only',
+                            style: TextStyle(fontSize: 13))),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        selectedPhotoFlag = val;
+                      });
                     }
+                  },
+                  decoration: InputDecoration(
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626)),
+              onPressed: () async {
+                String finalReason = selectedReason;
+                if (selectedReason == 'Other') {
+                  finalReason = reasonCtrl.text.trim();
+                  if (finalReason.isEmpty) {
+                    Get.snackbar('Alert', 'Please specify a custom reason');
+                    return;
                   }
-                  Get.back();
-                  AppPopup.showLoading(message: 'Rejecting Load...');
-                  try {
-                    await _firebaseService.rejectLoad(
-                      tripId,
-                      reason: finalReason,
-                      flaggedPhoto: selectedPhotoFlag,
-                    );
-                    AppPopup.hideLoading();
-                    Get.snackbar('Rejected', 'Load request rejected.', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent, colorText: Colors.white);
-                  } catch (e) {
-                    AppPopup.hideLoading();
-                    Get.snackbar('Error', e.toString());
-                  }
-                },
-                child: const Text('Reject', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          );
-        }
-      ),
+                }
+                Get.back();
+                AppPopup.showLoading(message: 'Rejecting Load...');
+                try {
+                  await _firebaseService.rejectLoad(
+                    tripId,
+                    reason: finalReason,
+                    flaggedPhoto: selectedPhotoFlag,
+                  );
+                  AppPopup.hideLoading();
+                  Get.snackbar('Rejected', 'Load request rejected.',
+                      snackPosition: SnackPosition.BOTTOM,
+                      backgroundColor: Colors.redAccent,
+                      colorText: Colors.white);
+                } catch (e) {
+                  AppPopup.hideLoading();
+                  Get.snackbar('Error', e.toString());
+                }
+              },
+              child:
+                  const Text('Reject', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      }),
     );
   }
 
@@ -1276,10 +1562,15 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     try {
       await _firebaseService.approveDelivery(tripId);
       AppPopup.hideLoading();
-      Get.snackbar('Success', 'Trip completed successfully! 🏁', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
+      Get.snackbar('Success', 'Trip completed successfully! 🏁',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white);
     } catch (e) {
       AppPopup.hideLoading();
-      Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent);
+      Get.snackbar('Error', e.toString(),
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.redAccent);
     }
   }
 
@@ -1289,7 +1580,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
       AlertDialog(
         backgroundColor: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Reject Completion?', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Reject Completion?',
+            style: TextStyle(fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1300,7 +1592,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               controller: reasonCtrl,
               decoration: InputDecoration(
                 labelText: 'Rejection Reason',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
           ],
@@ -1311,7 +1604,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
             onPressed: () async {
               final reason = reasonCtrl.text.trim();
               if (reason.isEmpty) {
@@ -1323,7 +1617,10 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               try {
                 await _firebaseService.rejectDelivery(tripId, reason: reason);
                 AppPopup.hideLoading();
-                Get.snackbar('Rejected', 'Delivery request rejected.', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent, colorText: Colors.white);
+                Get.snackbar('Rejected', 'Delivery request rejected.',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.redAccent,
+                    colorText: Colors.white);
               } catch (e) {
                 AppPopup.hideLoading();
                 Get.snackbar('Error', e.toString());
@@ -1388,7 +1685,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
       return ElevatedButton.icon(
         onPressed: () => _showProblemReportDialog(context, truck),
         icon: const Icon(Icons.report_problem_rounded, size: 14),
-        label: const Text('View Report & Resolve', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+        label: const Text('View Report & Resolve',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFEF4444),
           foregroundColor: Colors.white,
@@ -1407,16 +1705,26 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               child: ElevatedButton(
                 onPressed: hasDriver ? () => _assignTruck(truck) : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: hasDriver ? const Color(0xFFF97316) : (widget.isDark ? Colors.white12 : Colors.grey.shade300),
-                  foregroundColor: hasDriver ? Colors.white : (widget.isDark ? Colors.white30 : Colors.grey.shade500),
-                  disabledBackgroundColor: widget.isDark ? Colors.white12 : Colors.grey.shade300,
-                  disabledForegroundColor: widget.isDark ? Colors.white30 : Colors.grey.shade500,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  backgroundColor: hasDriver
+                      ? const Color(0xFFF97316)
+                      : (widget.isDark ? Colors.white12 : Colors.grey.shade300),
+                  foregroundColor: hasDriver
+                      ? Colors.white
+                      : (widget.isDark ? Colors.white30 : Colors.grey.shade500),
+                  disabledBackgroundColor:
+                      widget.isDark ? Colors.white12 : Colors.grey.shade300,
+                  disabledForegroundColor:
+                      widget.isDark ? Colors.white30 : Colors.grey.shade500,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
                   minimumSize: Size.zero,
                 ),
-                child: const Text('Assign Truck', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                child: const Text('Assign Truck',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
               ),
             ),
             const SizedBox(width: 6),
@@ -1424,15 +1732,21 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               child: ElevatedButton.icon(
                 onPressed: null, // Disabled until truck is assigned
                 icon: const Icon(Icons.note_add_rounded, size: 14),
-                label: const Text('Generate', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                label: const Text('Generate',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: widget.isDark ? Colors.white12 : Colors.grey.shade300,
-                  disabledForegroundColor: widget.isDark ? Colors.white30 : Colors.grey.shade500,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  disabledBackgroundColor:
+                      widget.isDark ? Colors.white12 : Colors.grey.shade300,
+                  disabledForegroundColor:
+                      widget.isDark ? Colors.white30 : Colors.grey.shade500,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
                   minimumSize: Size.zero,
                 ),
               ),
@@ -1448,14 +1762,19 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 decoration: BoxDecoration(
                   color: widget.isDark ? Colors.white10 : Colors.amber.shade50,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.amber.shade400.withOpacity(0.5)),
+                  border:
+                      Border.all(color: Colors.amber.shade400.withOpacity(0.5)),
                 ),
                 alignment: Alignment.center,
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
-                  state == 'Pending Confirmation' ? 'Waiting response' : 'Awaiting Inspection',
+                  state == 'Pending Confirmation'
+                      ? 'Waiting response'
+                      : 'Awaiting Inspection',
                   style: TextStyle(
-                    color: widget.isDark ? Colors.amber.shade200 : Colors.amber.shade900,
+                    color: widget.isDark
+                        ? Colors.amber.shade200
+                        : Colors.amber.shade900,
                     fontWeight: FontWeight.bold,
                     fontSize: 10,
                   ),
@@ -1468,13 +1787,17 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               child: ElevatedButton.icon(
                 onPressed: () => _showLoadingPassDialog(context, truck),
                 icon: const Icon(Icons.note_add_rounded, size: 14),
-                label: const Text('Generate', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                label: const Text('Generate',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
                   minimumSize: Size.zero,
                 ),
               ),
@@ -1485,11 +1808,13 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         return ElevatedButton.icon(
           onPressed: () => _showLoadingPassDialog(context, truck),
           icon: const Icon(Icons.note_add_rounded, size: 14),
-          label: const Text('Generate Loading Pass', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+          label: const Text('Generate Loading Pass',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             elevation: 0,
           ),
         );
@@ -1506,13 +1831,16 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.hourglass_empty_rounded, color: Colors.amber, size: 14),
+              const Icon(Icons.hourglass_empty_rounded,
+                  color: Colors.amber, size: 14),
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
                   'Waiting for response',
                   style: TextStyle(
-                    color: widget.isDark ? Colors.amber.shade200 : Colors.amber.shade900,
+                    color: widget.isDark
+                        ? Colors.amber.shade200
+                        : Colors.amber.shade900,
                     fontWeight: FontWeight.bold,
                     fontSize: 11,
                   ),
@@ -1526,19 +1854,26 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         return ElevatedButton(
           onPressed: hasDriver ? () => _assignTruck(truck) : null,
           style: ElevatedButton.styleFrom(
-            backgroundColor: hasDriver ? const Color(0xFFF97316) : (widget.isDark ? Colors.white12 : Colors.grey.shade300),
-            foregroundColor: hasDriver ? Colors.white : (widget.isDark ? Colors.white30 : Colors.grey.shade500),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            backgroundColor: hasDriver
+                ? const Color(0xFFF97316)
+                : (widget.isDark ? Colors.white12 : Colors.grey.shade300),
+            foregroundColor: hasDriver
+                ? Colors.white
+                : (widget.isDark ? Colors.white30 : Colors.grey.shade500),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             elevation: 0,
           ),
-          child: const Text('Assign Truck', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+          child: const Text('Assign Truck',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
         );
       } else if (state == 'Assigned') {
         return Container(
           decoration: BoxDecoration(
             color: widget.isDark ? Colors.white12 : const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: widget.isDark ? Colors.white24 : Colors.grey.shade200),
+            border: Border.all(
+                color: widget.isDark ? Colors.white24 : Colors.grey.shade200),
           ),
           alignment: Alignment.center,
           child: Row(
@@ -1557,7 +1892,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 child: Text(
                   'Awaiting Driver Inspection',
                   style: TextStyle(
-                    color: widget.isDark ? Colors.white70 : Colors.grey.shade700,
+                    color:
+                        widget.isDark ? Colors.white70 : Colors.grey.shade700,
                     fontWeight: FontWeight.bold,
                     fontSize: 11,
                   ),
@@ -1571,11 +1907,13 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         return ElevatedButton.icon(
           onPressed: () => _showDestinationSetupDialog(context, truck),
           icon: const Icon(Icons.add_location_alt_rounded, size: 14),
-          label: const Text('Setup Destination', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+          label: const Text('Setup Destination',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF3B82F6),
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             elevation: 0,
           ),
         );
@@ -1584,21 +1922,27 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         if (truck.hasActiveTrip) {
           return Container(
             decoration: BoxDecoration(
-              color: widget.isDark ? const Color(0xFF064E3B).withOpacity(0.3) : const Color(0xFFECFDF5),
+              color: widget.isDark
+                  ? const Color(0xFF064E3B).withOpacity(0.3)
+                  : const Color(0xFFECFDF5),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
+              border:
+                  Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
             ),
             alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 16),
+                const Icon(Icons.check_circle_rounded,
+                    color: Color(0xFF10B981), size: 16),
                 const SizedBox(width: 6),
                 Text(
                   'Trip Active',
                   style: TextStyle(
-                    color: widget.isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46),
+                    color: widget.isDark
+                        ? const Color(0xFF6EE7B7)
+                        : const Color(0xFF065F46),
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
                   ),
@@ -1631,11 +1975,14 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                   }
                 },
                 icon: const Icon(Icons.alt_route_rounded, size: 14),
-                label: const Text('Create Trip', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                label: const Text('Create Trip',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF10B981),
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                   elevation: 0,
                 ),
               ),
@@ -1649,14 +1996,19 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 child: Container(
                   padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
-                    color: widget.isDark ? Colors.white10 : Colors.grey.shade100,
+                    color:
+                        widget.isDark ? Colors.white10 : Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: widget.isDark ? Colors.white24 : Colors.grey.shade200),
+                    border: Border.all(
+                        color: widget.isDark
+                            ? Colors.white24
+                            : Colors.grey.shade200),
                   ),
                   child: Icon(
                     Icons.note_alt_rounded,
                     size: 13,
-                    color: widget.isDark ? Colors.white70 : Colors.grey.shade700,
+                    color:
+                        widget.isDark ? Colors.white70 : Colors.grey.shade700,
                   ),
                 ),
               ),
@@ -1670,14 +2022,19 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 child: Container(
                   padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
-                    color: widget.isDark ? Colors.white10 : Colors.grey.shade100,
+                    color:
+                        widget.isDark ? Colors.white10 : Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: widget.isDark ? Colors.white24 : Colors.grey.shade200),
+                    border: Border.all(
+                        color: widget.isDark
+                            ? Colors.white24
+                            : Colors.grey.shade200),
                   ),
                   child: Icon(
                     Icons.edit_location_alt_rounded,
                     size: 13,
-                    color: widget.isDark ? Colors.white70 : Colors.grey.shade700,
+                    color:
+                        widget.isDark ? Colors.white70 : Colors.grey.shade700,
                   ),
                 ),
               ),
@@ -1690,13 +2047,19 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
 
   Color _getCardBgColor(String state) {
     if (state == 'Accepted') {
-      return widget.isDark ? const Color(0xFF064E3B).withOpacity(0.15) : const Color(0xFFF0FDF4);
+      return widget.isDark
+          ? const Color(0xFF064E3B).withOpacity(0.15)
+          : const Color(0xFFF0FDF4);
     }
     if (state == 'Problem') {
-      return widget.isDark ? const Color(0xFF7F1D1D).withOpacity(0.15) : const Color(0xFFFEF2F2);
+      return widget.isDark
+          ? const Color(0xFF7F1D1D).withOpacity(0.15)
+          : const Color(0xFFFEF2F2);
     }
     if (state == 'Pending Confirmation') {
-      return widget.isDark ? const Color(0xFF78350F).withOpacity(0.15) : const Color(0xFFFFFBEB);
+      return widget.isDark
+          ? const Color(0xFF78350F).withOpacity(0.15)
+          : const Color(0xFFFFFBEB);
     }
     return widget.isDark ? const Color(0xFF1E293B) : Colors.white;
   }
@@ -1718,8 +2081,10 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
   Future<void> _assignTruck(MockTruck truck) async {
     if (truck.selectedDriver == null) return;
     try {
-      await _firebaseService.assignTruckToDriver(truck.truckNo, truck.selectedDriver!.phone, model: truck.name);
-      
+      await _firebaseService.assignTruckToDriver(
+          truck.truckNo, truck.selectedDriver!.phone,
+          model: truck.name);
+
       // Clean temp selections
       setState(() {
         _tempSelections.remove(truck.truckNo);
@@ -1751,10 +2116,12 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
 
   void _showProblemReportDialog(BuildContext context, MockTruck truck) {
     final controller = Get.find<AdminHomeController>();
-    final rawTruck = controller.trucks.firstWhereOrNull((t) => t['truckNo'] == truck.truckNo);
+    final rawTruck = controller.trucks
+        .firstWhereOrNull((t) => t['truckNo'] == truck.truckNo);
     if (rawTruck == null) return;
 
-    final results = rawTruck['inspectionResults'] as Map<dynamic, dynamic>? ?? {};
+    final results =
+        rawTruck['inspectionResults'] as Map<dynamic, dynamic>? ?? {};
     final remarks = rawTruck['inspectionRemarks']?.toString() ?? 'No remarks';
     final images = rawTruck['inspectionImages'] as List<dynamic>? ?? [];
     final driverName = truck.selectedDriver?.name ?? 'Driver';
@@ -1782,21 +2149,28 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                AppText('Reported By: $driverName', style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
+                AppText('Reported By: $driverName',
+                    style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
                 const Divider(height: 16),
-                const AppText('Failed Items:', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                const AppText('Failed Items:',
+                    style: AppTextStyle.labelMedium,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.redAccent),
                 const SizedBox(height: 6),
                 if (results.isEmpty)
-                  const AppText('No items recorded in results', style: AppTextStyle.bodyMedium, color: Colors.grey)
+                  const AppText('No items recorded in results',
+                      style: AppTextStyle.bodyMedium, color: Colors.grey)
                 else
                   ...results.entries.where((e) => e.value == false).map((e) {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Row(
                         children: [
-                          const Icon(Icons.cancel_rounded, color: AppColors.error, size: 16),
+                          const Icon(Icons.cancel_rounded,
+                              color: AppColors.error, size: 16),
                           const SizedBox(width: 8),
-                          AppText(e.key.toString(), style: AppTextStyle.bodyMedium),
+                          AppText(e.key.toString(),
+                              style: AppTextStyle.bodyMedium),
                         ],
                       ),
                     );
@@ -1805,7 +2179,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 AppText('Remarks: $remarks', style: AppTextStyle.bodyMedium),
                 if (images.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  const AppText('Photos:', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+                  const AppText('Photos:',
+                      style: AppTextStyle.labelMedium,
+                      fontWeight: FontWeight.bold),
                   const SizedBox(height: 8),
                   SizedBox(
                     height: 180,
@@ -1826,9 +2202,11 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                                 width: 240,
                                 height: 180,
                                 color: Colors.grey.shade100,
-                                child: const Center(child: CircularProgressIndicator()),
+                                child: const Center(
+                                    child: CircularProgressIndicator()),
                               ),
-                              errorWidget: (context, url, error) => const Icon(Icons.broken_image, size: 50),
+                              errorWidget: (context, url, error) =>
+                                  const Icon(Icons.broken_image, size: 50),
                             ),
                           ),
                         );
@@ -1853,13 +2231,20 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               try {
                 await _firebaseService.rejectTruckInspection(truck.truckNo);
                 AppPopup.hideLoading();
-                Get.snackbar('Inspection Rejected ❌', 'Driver has been requested to re-inspect.', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.orange, colorText: Colors.white);
+                Get.snackbar('Inspection Rejected ❌',
+                    'Driver has been requested to re-inspect.',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.orange,
+                    colorText: Colors.white);
               } catch (e) {
                 AppPopup.hideLoading();
-                Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent);
+                Get.snackbar('Error', e.toString(),
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.redAccent);
               }
             },
-            child: const Text('Reject & Re-inspect', style: TextStyle(color: Colors.white)),
+            child: const Text('Reject & Re-inspect',
+                style: TextStyle(color: Colors.white)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
@@ -1869,13 +2254,19 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               try {
                 await _firebaseService.clearTruckIssue(truck.truckNo);
                 AppPopup.hideLoading();
-                Get.snackbar('Issue Resolved ✅', 'Truck is now active/ready.', snackPosition: SnackPosition.BOTTOM, backgroundColor: AppColors.success, colorText: Colors.white);
+                Get.snackbar('Issue Resolved ✅', 'Truck is now active/ready.',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: AppColors.success,
+                    colorText: Colors.white);
               } catch (e) {
                 AppPopup.hideLoading();
-                Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent);
+                Get.snackbar('Error', e.toString(),
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.redAccent);
               }
             },
-            child: const Text('Resolve & Mark Active', style: TextStyle(color: Colors.white)),
+            child: const Text('Resolve & Mark Active',
+                style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -1886,10 +2277,13 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     final formKey = GlobalKey<FormState>();
     final pass = truck.loadingPass ?? {};
 
-    final vendorNameCtrl = TextEditingController(text: pass['vendorName'] ?? '');
-    final vendorSiteCtrl = TextEditingController(text: pass['vendorSite'] ?? '');
+    final vendorNameCtrl =
+        TextEditingController(text: pass['vendorName'] ?? '');
+    final vendorSiteCtrl =
+        TextEditingController(text: pass['vendorSite'] ?? '');
     final itemNameCtrl = TextEditingController(text: pass['itemName'] ?? '');
-    final royaltyNameCtrl = TextEditingController(text: pass['royaltyName'] ?? '');
+    final royaltyNameCtrl =
+        TextEditingController(text: pass['royaltyName'] ?? '');
 
     final adminController = Get.find<AdminHomeController>();
     final vendors = adminController.vendors;
@@ -1911,13 +2305,34 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         .toList();
 
     if (vendorsList.isEmpty) {
-      vendorsList.addAll(["Adani Coal", "Ultratech Cement", "Jindal Steel", "Ambuja Cement", "Reliance Ind"]);
+      vendorsList.addAll([
+        "Adani Coal",
+        "Ultratech Cement",
+        "Jindal Steel",
+        "Ambuja Cement",
+        "Reliance Ind"
+      ]);
     }
     if (sitesList.isEmpty) {
-      sitesList.addAll(["Mundra Port", "Nagpur GIDC", "Mumbai Warehouse", "Sachin GIDC", "Indore Plant"]);
+      sitesList.addAll([
+        "Mundra Port",
+        "Nagpur GIDC",
+        "Mumbai Warehouse",
+        "Sachin GIDC",
+        "Indore Plant"
+      ]);
     }
     if (itemsList.isEmpty) {
-      itemsList.addAll(["Coal", "Cement", "Iron Ore", "Steel Coils", "Bauxite", "Gypsum", "Aggregate", "Sand"]);
+      itemsList.addAll([
+        "Coal",
+        "Cement",
+        "Iron Ore",
+        "Steel Coils",
+        "Bauxite",
+        "Gypsum",
+        "Aggregate",
+        "Sand"
+      ]);
     }
 
     TextEditingController? siteFieldController;
@@ -1934,7 +2349,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             Expanded(
               child: Text(
                 'Generate Loading Pass: ${truck.truckNo}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
             ),
           ],
@@ -1963,10 +2379,13 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         return vendorsList;
                       }
                       return vendorsList.where((String option) {
-                        return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                        return option
+                            .toLowerCase()
+                            .contains(textEditingValue.text.toLowerCase());
                       });
                     },
-                    fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                    fieldViewBuilder: (context, textEditingController,
+                        focusNode, onFieldSubmitted) {
                       textEditingController.addListener(() {
                         vendorNameCtrl.text = textEditingController.text;
                       });
@@ -1976,10 +2395,15 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         decoration: InputDecoration(
                           labelText: 'Vendor Name',
                           labelStyle: const TextStyle(fontSize: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          prefixIcon: const Icon(Icons.business_rounded, size: 18),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          prefixIcon:
+                              const Icon(Icons.business_rounded, size: 18),
                         ),
-                        validator: (value) => value == null || value.trim().isEmpty ? 'Enter vendor name' : null,
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                                ? 'Enter vendor name'
+                                : null,
                       );
                     },
                     onSelected: (String selection) {
@@ -2010,10 +2434,13 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         return sitesList;
                       }
                       return sitesList.where((String option) {
-                        return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                        return option
+                            .toLowerCase()
+                            .contains(textEditingValue.text.toLowerCase());
                       });
                     },
-                    fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                    fieldViewBuilder: (context, textEditingController,
+                        focusNode, onFieldSubmitted) {
                       siteFieldController = textEditingController;
                       textEditingController.addListener(() {
                         vendorSiteCtrl.text = textEditingController.text;
@@ -2024,10 +2451,15 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         decoration: InputDecoration(
                           labelText: 'Vendor Site',
                           labelStyle: const TextStyle(fontSize: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          prefixIcon: const Icon(Icons.location_on_rounded, size: 18),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          prefixIcon:
+                              const Icon(Icons.location_on_rounded, size: 18),
                         ),
-                        validator: (value) => value == null || value.trim().isEmpty ? 'Enter vendor site' : null,
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                                ? 'Enter vendor site'
+                                : null,
                       );
                     },
                     onSelected: (String selection) {
@@ -2044,10 +2476,13 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         return itemsList;
                       }
                       return itemsList.where((String option) {
-                        return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                        return option
+                            .toLowerCase()
+                            .contains(textEditingValue.text.toLowerCase());
                       });
                     },
-                    fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                    fieldViewBuilder: (context, textEditingController,
+                        focusNode, onFieldSubmitted) {
                       itemFieldController = textEditingController;
                       textEditingController.addListener(() {
                         itemNameCtrl.text = textEditingController.text;
@@ -2058,10 +2493,15 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         decoration: InputDecoration(
                           labelText: 'Item Name',
                           labelStyle: const TextStyle(fontSize: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          prefixIcon: const Icon(Icons.category_rounded, size: 18),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          prefixIcon:
+                              const Icon(Icons.category_rounded, size: 18),
                         ),
-                        validator: (value) => value == null || value.trim().isEmpty ? 'Enter item name' : null,
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                                ? 'Enter item name'
+                                : null,
                       );
                     },
                     onSelected: (String selection) {
@@ -2076,10 +2516,14 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                     decoration: InputDecoration(
                       labelText: 'Royalty / Owner Name',
                       labelStyle: const TextStyle(fontSize: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      prefixIcon: const Icon(Icons.person_outline_rounded, size: 18),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      prefixIcon:
+                          const Icon(Icons.person_outline_rounded, size: 18),
                     ),
-                    validator: (value) => value == null || value.trim().isEmpty ? 'Enter royalty / owner name' : null,
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Enter royalty / owner name'
+                        : null,
                   ),
                 ],
               ),
@@ -2115,7 +2559,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               AppPopup.showLoading(message: 'Saving & Assigning Trip...');
               try {
                 await _firebaseService.saveLoadingPass(truck.truckNo, data);
-                
+
                 // Automatically create and assign the trip
                 if (truck.selectedDriver != null) {
                   await _autoCreateTrip({
@@ -2132,12 +2576,18 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                     'remarks': '',
                   });
                 }
-                
+
                 AppPopup.hideLoading();
-                Get.snackbar('Success', 'Loading Pass saved & Trip assigned successfully!', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.grey.shade800, colorText: Colors.white);
+                Get.snackbar('Success',
+                    'Loading Pass saved & Trip assigned successfully!',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.grey.shade800,
+                    colorText: Colors.white);
               } catch (e) {
                 AppPopup.hideLoading();
-                Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent);
+                Get.snackbar('Error', e.toString(),
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.redAccent);
               }
             },
             child: const Text('Generate Loading Pass'),
@@ -2152,10 +2602,14 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     final formKey = GlobalKey<FormState>();
     final dest = truck.destinationSetup ?? {};
 
-    final customerNameCtrl = TextEditingController(text: dest['customerName'] ?? '');
-    final customerSiteCtrl = TextEditingController(text: dest['customerSite'] ?? dest['siteName'] ?? '');
-    final customerLocCtrl = TextEditingController(text: dest['customerLocation'] ?? dest['location'] ?? '');
-    final detailsCtrl = TextEditingController(text: dest['additionalDetails'] ?? '');
+    final customerNameCtrl =
+        TextEditingController(text: dest['customerName'] ?? '');
+    final customerSiteCtrl = TextEditingController(
+        text: dest['customerSite'] ?? dest['siteName'] ?? '');
+    final customerLocCtrl = TextEditingController(
+        text: dest['customerLocation'] ?? dest['location'] ?? '');
+    final detailsCtrl =
+        TextEditingController(text: dest['additionalDetails'] ?? '');
     TextEditingController? siteTextController;
     TextEditingController? locTextController;
 
@@ -2165,25 +2619,46 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         .toList();
     final customersList = dbCustomers.isNotEmpty
         ? dbCustomers
-        : ["Tata Motors", "Mahindra Log", "L&T Construction", "Reliance Industries", "Adani Power"];
+        : [
+            "Tata Motors",
+            "Mahindra Log",
+            "L&T Construction",
+            "Reliance Industries",
+            "Adani Power"
+          ];
 
     final dbSites = adminController.customers
-        .map((c) => (c['siteName'] ?? c['customerSite'] ?? '').toString().trim())
+        .map(
+            (c) => (c['siteName'] ?? c['customerSite'] ?? '').toString().trim())
         .where((s) => s.isNotEmpty)
         .toSet()
         .toList();
     final sitesList = dbSites.isNotEmpty
         ? dbSites
-        : ["Pune Plant", "Chennai GIDC Site", "Kolkata Port Terminal", "Delhi Central Hub", "Nagpur Depot"];
+        : [
+            "Pune Plant",
+            "Chennai GIDC Site",
+            "Kolkata Port Terminal",
+            "Delhi Central Hub",
+            "Nagpur Depot"
+          ];
 
     final dbLocations = adminController.customers
-        .map((c) => (c['location'] ?? c['address'] ?? c['city'] ?? '').toString().trim())
+        .map((c) => (c['location'] ?? c['address'] ?? c['city'] ?? '')
+            .toString()
+            .trim())
         .where((l) => l.isNotEmpty)
         .toSet()
         .toList();
     final locationsList = dbLocations.isNotEmpty
         ? dbLocations
-        : ["Pune, Maharashtra", "Chennai, Tamil Nadu", "Kolkata, West Bengal", "Delhi NCR", "Nagpur, Maharashtra"];
+        : [
+            "Pune, Maharashtra",
+            "Chennai, Tamil Nadu",
+            "Kolkata, West Bengal",
+            "Delhi NCR",
+            "Nagpur, Maharashtra"
+          ];
 
     Get.dialog(
       AlertDialog(
@@ -2191,12 +2666,14 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.add_location_alt_rounded, color: Color(0xFF3B82F6)),
+            const Icon(Icons.add_location_alt_rounded,
+                color: Color(0xFF3B82F6)),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 'Destination Setup: ${truck.truckNo}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
             ),
           ],
@@ -2233,10 +2710,13 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         return currentCustomersList;
                       }
                       return currentCustomersList.where((String option) {
-                        return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                        return option
+                            .toLowerCase()
+                            .contains(textEditingValue.text.toLowerCase());
                       });
                     },
-                    fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                    fieldViewBuilder: (context, textEditingController,
+                        focusNode, onFieldSubmitted) {
                       textEditingController.addListener(() {
                         customerNameCtrl.text = textEditingController.text;
                       });
@@ -2246,19 +2726,38 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         decoration: InputDecoration(
                           labelText: 'Customer Name',
                           labelStyle: const TextStyle(fontSize: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          prefixIcon: const Icon(Icons.business_rounded, size: 18),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          prefixIcon:
+                              const Icon(Icons.business_rounded, size: 18),
                         ),
-                        validator: (value) => value == null || value.trim().isEmpty ? 'Enter customer name' : null,
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                                ? 'Enter customer name'
+                                : null,
                       );
                     },
                     onSelected: (String selection) {
                       customerNameCtrl.text = selection;
-                      final foundCust = adminController.customers.firstWhereOrNull(
-                          (c) => (c['name'] ?? '').toString().trim().toLowerCase() == selection.trim().toLowerCase());
+                      final foundCust = adminController.customers
+                          .firstWhereOrNull((c) =>
+                              (c['name'] ?? '')
+                                  .toString()
+                                  .trim()
+                                  .toLowerCase() ==
+                              selection.trim().toLowerCase());
                       if (foundCust != null) {
-                        final site = (foundCust['siteName'] ?? foundCust['customerSite'] ?? '').toString().trim();
-                        final loc = (foundCust['location'] ?? foundCust['address'] ?? foundCust['city'] ?? '').toString().trim();
+                        final site = (foundCust['siteName'] ??
+                                foundCust['customerSite'] ??
+                                '')
+                            .toString()
+                            .trim();
+                        final loc = (foundCust['location'] ??
+                                foundCust['address'] ??
+                                foundCust['city'] ??
+                                '')
+                            .toString()
+                            .trim();
                         if (site.isNotEmpty) {
                           customerSiteCtrl.text = site;
                           if (siteTextController != null) {
@@ -2281,7 +2780,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                     initialValue: TextEditingValue(text: customerSiteCtrl.text),
                     optionsBuilder: (TextEditingValue textEditingValue) {
                       final currentDbSites = adminController.customers
-                          .map((c) => (c['siteName'] ?? c['customerSite'] ?? '').toString().trim())
+                          .map((c) => (c['siteName'] ?? c['customerSite'] ?? '')
+                              .toString()
+                              .trim())
                           .where((s) => s.isNotEmpty)
                           .toSet()
                           .toList();
@@ -2293,10 +2794,13 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         return currentSitesList;
                       }
                       return currentSitesList.where((String option) {
-                        return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                        return option
+                            .toLowerCase()
+                            .contains(textEditingValue.text.toLowerCase());
                       });
                     },
-                    fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                    fieldViewBuilder: (context, textEditingController,
+                        focusNode, onFieldSubmitted) {
                       siteTextController = textEditingController;
                       textEditingController.addListener(() {
                         customerSiteCtrl.text = textEditingController.text;
@@ -2307,8 +2811,10 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         decoration: InputDecoration(
                           labelText: 'Customer Site Name',
                           labelStyle: const TextStyle(fontSize: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          prefixIcon: const Icon(Icons.factory_rounded, size: 18),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          prefixIcon:
+                              const Icon(Icons.factory_rounded, size: 18),
                         ),
                       );
                     },
@@ -2323,7 +2829,10 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                     initialValue: TextEditingValue(text: customerLocCtrl.text),
                     optionsBuilder: (TextEditingValue textEditingValue) {
                       final currentDbLocs = adminController.customers
-                          .map((c) => (c['location'] ?? c['address'] ?? c['city'] ?? '').toString().trim())
+                          .map((c) =>
+                              (c['location'] ?? c['address'] ?? c['city'] ?? '')
+                                  .toString()
+                                  .trim())
                           .where((l) => l.isNotEmpty)
                           .toSet()
                           .toList();
@@ -2335,10 +2844,13 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         return currentLocsList;
                       }
                       return currentLocsList.where((String option) {
-                        return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                        return option
+                            .toLowerCase()
+                            .contains(textEditingValue.text.toLowerCase());
                       });
                     },
-                    fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                    fieldViewBuilder: (context, textEditingController,
+                        focusNode, onFieldSubmitted) {
                       locTextController = textEditingController;
                       textEditingController.addListener(() {
                         customerLocCtrl.text = textEditingController.text;
@@ -2349,10 +2861,15 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         decoration: InputDecoration(
                           labelText: 'Delivery Address / Location',
                           labelStyle: const TextStyle(fontSize: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          prefixIcon: const Icon(Icons.pin_drop_rounded, size: 18),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          prefixIcon:
+                              const Icon(Icons.pin_drop_rounded, size: 18),
                         ),
-                        validator: (value) => value == null || value.trim().isEmpty ? 'Enter delivery location' : null,
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                                ? 'Enter delivery location'
+                                : null,
                       );
                     },
                     onSelected: (String selection) {
@@ -2368,8 +2885,10 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                     decoration: InputDecoration(
                       labelText: 'Additional Destination Details',
                       labelStyle: const TextStyle(fontSize: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      prefixIcon: const Icon(Icons.description_rounded, size: 18),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      prefixIcon:
+                          const Icon(Icons.description_rounded, size: 18),
                     ),
                   ),
                 ],
@@ -2406,11 +2925,13 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               Get.back();
               AppPopup.showLoading(message: 'Saving Destination...');
               try {
-                await _firebaseService.saveDestinationSetup(truck.truckNo, data);
-                
+                await _firebaseService.saveDestinationSetup(
+                    truck.truckNo, data);
+
                 // Find active trip for this truck in controller.trips and update it in Firestore!
                 final controller = Get.find<AdminHomeController>();
-                String cleanTruck(String val) => val.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+                String cleanTruck(String val) =>
+                    val.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
                 final activeTrip = controller.trips.firstWhereOrNull((trip) {
                   final tripTruck = (trip['truckNo'] ?? '').toString();
                   final tripStatus = (trip['status'] ?? '').toString();
@@ -2418,7 +2939,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                       tripStatus != 'DELIVERED' &&
                       tripStatus != 'REJECTED';
                 });
-                
+
                 if (activeTrip != null) {
                   final tripId = activeTrip['id'].toString();
                   await _firebaseService.setTripDestination(
@@ -2427,12 +2948,17 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                     dropLocation: combinedSite,
                   );
                 }
-                
+
                 AppPopup.hideLoading();
-                Get.snackbar('Success', 'Destination setup saved successfully!', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.grey.shade800, colorText: Colors.white);
+                Get.snackbar('Success', 'Destination setup saved successfully!',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.grey.shade800,
+                    colorText: Colors.white);
               } catch (e) {
                 AppPopup.hideLoading();
-                Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent);
+                Get.snackbar('Error', e.toString(),
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.redAccent);
               }
             },
             child: const Text('Save'),
@@ -2502,7 +3028,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
 
     // 1. Get driver phones assigned to other trucks
     final assignedPhones = controller.trucks
-        .where((t) => (t['assignedTo'] ?? '').toString().isNotEmpty && t['truckNo'] != truck.truckNo)
+        .where((t) =>
+            (t['assignedTo'] ?? '').toString().isNotEmpty &&
+            t['truckNo'] != truck.truckNo)
         .map((t) => t['assignedTo'].toString())
         .toSet();
 
@@ -2530,7 +3058,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const AppText('Select Driver', style: AppTextStyle.titleLarge, fontWeight: FontWeight.bold),
+            const AppText('Select Driver',
+                style: AppTextStyle.titleLarge, fontWeight: FontWeight.bold),
             const SizedBox(height: 12),
             const AppText(
               'Only showing available drivers. Already assigned drivers are hidden.',
@@ -2548,10 +3077,17 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                       contentPadding: EdgeInsets.zero,
                       leading: CircleAvatar(
                         backgroundColor: Colors.red.shade50,
-                        child: const Icon(Icons.person_remove_rounded, color: Colors.red, size: 16),
+                        child: const Icon(Icons.person_remove_rounded,
+                            color: Colors.red, size: 16),
                       ),
-                      title: const AppText('Remove / Unassign Driver', style: AppTextStyle.bodyMedium, color: Colors.red, fontWeight: FontWeight.bold),
-                      subtitle: const AppText('Clear this driver selection', style: AppTextStyle.labelMedium, color: Colors.grey, fontSize: 10),
+                      title: const AppText('Remove / Unassign Driver',
+                          style: AppTextStyle.bodyMedium,
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold),
+                      subtitle: const AppText('Clear this driver selection',
+                          style: AppTextStyle.labelMedium,
+                          color: Colors.grey,
+                          fontSize: 10),
                       onTap: () {
                         _resetTruck(truck);
                         Get.back();
@@ -2563,19 +3099,26 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 20),
                       child: Center(
-                        child: AppText('No available drivers left!', style: AppTextStyle.bodyMedium, color: Colors.grey),
+                        child: AppText('No available drivers left!',
+                            style: AppTextStyle.bodyMedium, color: Colors.grey),
                       ),
                     )
                   else
                     ...availableDrivers.map((driver) {
-                      final isCurrent = truck.selectedDriver?.phone == driver.phone;
+                      final isCurrent =
+                          truck.selectedDriver?.phone == driver.phone;
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: _buildDriverAvatar(driver),
-                        title: AppText(driver.name, style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
-                        subtitle: AppText(_formatPhoneNumber(driver.phone), style: AppTextStyle.labelMedium, color: Colors.grey),
+                        title: AppText(driver.name,
+                            style: AppTextStyle.bodyMedium,
+                            fontWeight: FontWeight.bold),
+                        subtitle: AppText(_formatPhoneNumber(driver.phone),
+                            style: AppTextStyle.labelMedium,
+                            color: Colors.grey),
                         trailing: isCurrent
-                            ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
+                            ? const Icon(Icons.check_circle_rounded,
+                                color: AppColors.primary)
                             : null,
                         onTap: () {
                           setState(() {
@@ -2609,7 +3152,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
   Future<void> _resetDemo() async {
     try {
       final controller = Get.find<AdminHomeController>();
-      final futures = controller.trucks.map((t) => _firebaseService.unassignTruck((t['truckNo'] ?? '').toString()));
+      final futures = controller.trucks.map((t) =>
+          _firebaseService.unassignTruck((t['truckNo'] ?? '').toString()));
       await Future.wait(futures);
 
       setState(() {

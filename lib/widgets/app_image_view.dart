@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -31,6 +32,22 @@ class AppImageView extends StatelessWidget {
 
     if (imagePath.isEmpty) {
       imageWidget = _buildPlaceholder();
+    } else if (imagePath.startsWith('data:image/')) {
+      try {
+        final base64String =
+            imagePath.contains(',') ? imagePath.split(',')[1] : imagePath;
+        final bytes = base64Decode(base64String);
+        imageWidget = Image.memory(
+          bytes,
+          width: width,
+          height: height,
+          fit: fit,
+          color: color,
+          errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
+        );
+      } catch (_) {
+        imageWidget = _buildPlaceholder();
+      }
     } else if (imagePath.startsWith('http') || imagePath.startsWith('https')) {
       // Remote Network Image with Caching
       imageWidget = CachedNetworkImage(
