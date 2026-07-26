@@ -134,6 +134,10 @@ class FirebaseService extends GetxService {
       deliveryRejectCount: (data['deliveryRejectCount'] as num?)?.toInt() ?? 0,
       deliveryRejectReason: data['deliveryRejectReason'] ?? '',
       deliveryRejectAudit: data['deliveryRejectAudit'],
+      hasTruckOwnerPass: data['hasTruckOwnerPass'] ?? false,
+      truckOwnerPassId: data['truckOwnerPassId'] ?? '',
+      truckOwnerPassUrl: data['truckOwnerPassUrl'] ?? '',
+      truckOwnerPassData: data['truckOwnerPassData'] as Map<String, dynamic>?,
     );
   }
 
@@ -581,10 +585,16 @@ class FirebaseService extends GetxService {
   /// trip of that driver is suspended). The driver is notified and only now
   /// sees the destination. Returns an error message when it can't be approved
   /// (already handled, or destination not set yet), null on success.
-  Future<String?> approveLoad(String tripId, {String? adminName}) async {
+  Future<String?> approveLoad(
+    String tripId, {
+    String? adminName,
+    String? truckOwnerPassId,
+    String? truckOwnerPassUrl,
+    Map<String, dynamic>? truckOwnerPassData,
+  }) async {
     try {
-      final data =
-          (await _db.collection('trips').doc(tripId).get()).data() ?? {};
+      final docRef = _db.collection('trips').doc(tripId);
+      final data = (await docRef.get()).data() ?? {};
       if (data['status'] != 'LOAD_REQUESTED') {
         return 'Ye request pehle hi handle ho chuki hai.';
       }
@@ -593,6 +603,16 @@ class FirebaseService extends GetxService {
         return 'Pehle destination set karein — uske bina load approve nahi '
             'ho sakta.';
       }
+      await docRef.set({
+        'hasTruckOwnerPass': true,
+        if (truckOwnerPassId != null && truckOwnerPassId.isNotEmpty)
+          'truckOwnerPassId': truckOwnerPassId,
+        if (truckOwnerPassUrl != null && truckOwnerPassUrl.isNotEmpty)
+          'truckOwnerPassUrl': truckOwnerPassUrl,
+        if (truckOwnerPassData != null)
+          'truckOwnerPassData': truckOwnerPassData,
+      }, SetOptions(merge: true));
+
       await updateTripMilestone(
         tripId,
         3,
@@ -608,7 +628,7 @@ class FirebaseService extends GetxService {
         await createNotification(
           toPhone: driverPhone,
           title: 'Trip Activated ✅',
-          body: 'Admin approved your load. Trip $tripId is now ACTIVE — '
+          body: 'Admin approved your load and issued Truck Owner Pass. Trip $tripId is now ACTIVE — '
               'destination: ${data['dropCity'] ?? ''} '
               '${data['dropLocation'] ?? ''}. Drive safely!',
           type: 'trip_activated',
@@ -1858,6 +1878,23 @@ class FirebaseService extends GetxService {
         },
         action: 'unassignTruck',
       );
+
+      // Clean up any active/pending trips for this truck
+      try {
+        final tripsSnap = await _db.collection('trips').get();
+        String clean(String val) => val.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+        final targetClean = clean(truckNo);
+        for (final doc in tripsSnap.docs) {
+          final data = doc.data();
+          final tripTruck = (data['truckNo'] ?? '').toString();
+          final status = (data['status'] ?? '').toString();
+          if (clean(tripTruck) == targetClean && status != 'DELIVERED' && status != 'REJECTED') {
+            await doc.reference.delete();
+          }
+        }
+      } catch (e) {
+        debugPrint('[FirebaseService] unassignTruck trip cleanup error: $e');
+      }
     } on FirebaseException catch (e) {
       debugPrint('[FirebaseService] unassignTruck failed: $e');
       rethrow;

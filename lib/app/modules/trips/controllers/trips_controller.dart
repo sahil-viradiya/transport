@@ -387,6 +387,11 @@ class TripItemModel {
   final String deliveryRejectReason;
   final List<dynamic>? deliveryRejectAudit;
 
+  final bool hasTruckOwnerPass;
+  final String truckOwnerPassId;
+  final String truckOwnerPassUrl;
+  final Map<String, dynamic>? truckOwnerPassData;
+
   TripItemModel({
     required this.id,
     required this.truckNo,
@@ -432,6 +437,10 @@ class TripItemModel {
     this.deliveryRejectCount = 0,
     this.deliveryRejectReason = '',
     this.deliveryRejectAudit,
+    this.hasTruckOwnerPass = false,
+    this.truckOwnerPassId = '',
+    this.truckOwnerPassUrl = '',
+    this.truckOwnerPassData,
   });
 
   TripItemModel copyWith({
@@ -479,6 +488,10 @@ class TripItemModel {
     int? deliveryRejectCount,
     String? deliveryRejectReason,
     List<dynamic>? deliveryRejectAudit,
+    bool? hasTruckOwnerPass,
+    String? truckOwnerPassId,
+    String? truckOwnerPassUrl,
+    Map<String, dynamic>? truckOwnerPassData,
   }) {
     return TripItemModel(
       id: id ?? this.id,
@@ -525,6 +538,10 @@ class TripItemModel {
       deliveryRejectCount: deliveryRejectCount ?? this.deliveryRejectCount,
       deliveryRejectReason: deliveryRejectReason ?? this.deliveryRejectReason,
       deliveryRejectAudit: deliveryRejectAudit ?? this.deliveryRejectAudit,
+      hasTruckOwnerPass: hasTruckOwnerPass ?? this.hasTruckOwnerPass,
+      truckOwnerPassId: truckOwnerPassId ?? this.truckOwnerPassId,
+      truckOwnerPassUrl: truckOwnerPassUrl ?? this.truckOwnerPassUrl,
+      truckOwnerPassData: truckOwnerPassData ?? this.truckOwnerPassData,
     );
   }
 }

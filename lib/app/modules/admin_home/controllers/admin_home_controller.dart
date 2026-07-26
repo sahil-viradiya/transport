@@ -138,8 +138,11 @@ class AdminHomeController extends GetxController {
   // ---------------------------------------------------------------------------
 
   /// All non-admin users (drivers), leave or not.
-  List<Map<String, dynamic>> get allDrivers =>
-      users.where((u) => (u['role'] ?? 'driver') != 'admin').toList();
+  List<Map<String, dynamic>> get allDrivers => users.where((u) {
+        final role = (u['role'] ?? 'driver').toString().toLowerCase();
+        final isAdmin = u['isAdmin'] == true;
+        return !role.contains('admin') && role != 'owner' && !isAdmin;
+      }).toList();
 
   bool isOnLeave(Map<String, dynamic> user) =>
       user['onLeave'] == true || user['availability'] == 'on_leave';

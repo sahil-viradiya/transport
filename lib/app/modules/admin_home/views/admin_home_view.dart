@@ -1147,9 +1147,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
   Widget _buildMockupStatsGrid(bool isDark) {
     final totalTrucks = controller.trucks.length;
     final assignedTrucks = controller.assignedTrucks.length;
-    final totalDrivers = controller.users
-        .where((u) => (u['role'] ?? 'driver') == 'driver')
-        .length;
+    final totalDrivers = controller.allDrivers.length;
     final tripsToday = controller.trips.length;
     final completedCount = controller.completedTripsCount;
 
@@ -3336,9 +3334,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
 
   void _showAssignTruckDialog(
       BuildContext context, Map<String, dynamic> truck) {
-    final drivers = controller.users
-        .where((u) => (u['role'] ?? 'driver') != 'admin')
-        .toList();
+    final drivers = controller.allDrivers;
     if (drivers.isEmpty) {
       AppSnackBar.showWarning(
           title: 'No Drivers', message: 'Pehle koi driver register karein.');
@@ -3763,7 +3759,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
       body: RefreshIndicator(
         onRefresh: controller.loadData,
         child: Obx(() {
-          if (controller.users.isEmpty) {
+          final driversList = controller.allDrivers;
+          if (driversList.isEmpty) {
             return ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               children: [
@@ -3836,9 +3833,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 child: ListView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: controller.users.length,
+                  itemCount: driversList.length,
                   itemBuilder: (context, index) {
-                    final user = controller.users[index];
+                    final user = driversList[index];
                     final isDriver = (user['role'] ?? 'driver') != 'admin';
                     final phone = (user['phone'] ?? '').toString();
                     final name = (user['name'] ?? '').toString();
@@ -4294,7 +4291,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     AppText(
-                        'Showing 1-${controller.users.length} of ${controller.users.length} drivers',
+                        'Showing 1-${driversList.length} of ${driversList.length} drivers',
                         style: AppTextStyle.bodyMedium,
                         color:
                             isDark ? Colors.white60 : const Color(0xFF6B7280)),
@@ -5360,9 +5357,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
             ? editModeTrip!['dropLongitude'].toString()
             : '79.0274');
 
-    final availableDrivers = controller.users
+    final availableDrivers = controller.allDrivers
         .where((u) {
-          if (u['role'] != 'driver') return false;
           // On-leave drivers can't be assigned trips.
           if (controller.isOnLeave(u)) return false;
           final phone = u['phone'] as String?;
@@ -8499,9 +8495,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
       body: RefreshIndicator(
         onRefresh: controller.loadData,
         child: Obx(() {
-          final drivers = controller.users
-              .where((u) => (u['role'] ?? 'driver') == 'driver')
-              .toList();
+          final drivers = controller.allDrivers;
           final tripIds = controller.trips
               .map((t) => (t['id'] ?? '').toString())
               .where((id) => id.isNotEmpty)
@@ -9278,19 +9272,164 @@ class AdminHomeView extends GetView<AdminHomeController> {
   }
 
   Future<void> _approveLoadDirectly(String tripId) async {
-    AppPopup.showLoading(message: 'Approving Load...');
-    try {
-      final err = await Get.find<FirebaseService>().approveLoad(tripId);
-      AppPopup.hideLoading();
-      if (err != null) {
-        Get.snackbar('Alert', err, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.orangeAccent);
-      } else {
-        Get.snackbar('Success', 'Load approved & Trip activated! 🚛', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
-      }
-    } catch (e) {
-      AppPopup.hideLoading();
-      Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent);
-    }
+    _showTruckOwnerPassApprovalDialog(tripId);
+  }
+
+  void _showTruckOwnerPassApprovalDialog(String tripId) {
+    final formKey = GlobalKey<FormState>();
+    final passIdCtrl = TextEditingController(text: 'TOP-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}');
+    final ownerNameCtrl = TextEditingController();
+    final remarksCtrl = TextEditingController();
+    String? passPhotoUrl;
+
+    Get.dialog(
+      StatefulBuilder(
+        builder: (context, setStateDialog) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.assignment_turned_in_rounded, color: Color(0xFF10B981)),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Generate Truck Owner Pass',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 420,
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Driver ne loading proof upload kar diya hai. Ab naya Truck Owner Pass banayein aur upload karein. Iske baad hi driver ko Step 4 customer details dikhenge.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 16),
+
+                      TextFormField(
+                        controller: passIdCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Truck Owner Pass ID *',
+                          prefixIcon: const Icon(Icons.confirmation_number_rounded, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Pass ID enter karein' : null,
+                      ),
+                      const SizedBox(height: 12),
+
+                      TextFormField(
+                        controller: ownerNameCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Truck Owner / Transporter Name',
+                          prefixIcon: const Icon(Icons.business_rounded, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      TextFormField(
+                        controller: remarksCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Pass Remarks / Notes (Optional)',
+                          prefixIcon: const Icon(Icons.notes_rounded, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white10 : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              passPhotoUrl != null ? Icons.check_circle_rounded : Icons.upload_file_rounded,
+                              color: passPhotoUrl != null ? Colors.green : Colors.blue,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                passPhotoUrl != null ? 'Truck Owner Pass Attached ✅' : 'Upload Truck Owner Pass Document',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                setStateDialog(() {
+                                  passPhotoUrl = 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600';
+                                });
+                              },
+                              child: Text(passPhotoUrl != null ? 'Change' : 'Attach'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  if (formKey.currentState!.validate()) {
+                    Get.back();
+                    AppPopup.showLoading(message: 'Generating Pass & Activating Trip...');
+                    try {
+                      final ownerPassData = {
+                        'passId': passIdCtrl.text.trim(),
+                        'ownerName': ownerNameCtrl.text.trim(),
+                        'remarks': remarksCtrl.text.trim(),
+                        'generatedAt': DateTime.now().toString().substring(0, 16),
+                      };
+                      final err = await Get.find<FirebaseService>().approveLoad(
+                        tripId,
+                        truckOwnerPassId: passIdCtrl.text.trim(),
+                        truckOwnerPassUrl: passPhotoUrl ?? '',
+                        truckOwnerPassData: ownerPassData,
+                      );
+                      AppPopup.hideLoading();
+                      if (err != null) {
+                        Get.snackbar('Alert', err, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.orangeAccent);
+                      } else {
+                        Get.snackbar('Success', 'Truck Owner Pass uploaded & Trip activated! 🚛', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
+                      }
+                    } catch (e) {
+                      AppPopup.hideLoading();
+                      Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent);
+                    }
+                  }
+                },
+                icon: const Icon(Icons.check_circle_rounded, size: 16),
+                label: const Text('Save Pass & Approve'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   void _showRejectLoadDialog(BuildContext context, String tripId, bool isDark) {

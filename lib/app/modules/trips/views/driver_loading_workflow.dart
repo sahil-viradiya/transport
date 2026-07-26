@@ -270,8 +270,16 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
                     ),
                   ),
                 ],
-                if ({'ACTIVE NOW', 'DELIVERY_REQUESTED', 'DELIVERED', 'DELIVERY_REJECTED'}.contains(widget.trip.status))
-                  _buildDestinationInfoCard(isDark),
+                if ({'ACTIVE NOW', 'DELIVERY_REQUESTED', 'DELIVERED', 'DELIVERY_REJECTED'}.contains(widget.trip.status)) ...[
+                  if (widget.trip.hasTruckOwnerPass) ...[
+                    _buildTruckOwnerPassCard(isDark),
+                    _buildDestinationInfoCard(isDark),
+                  ] else ...[
+                    _buildAwaitingTruckOwnerPassCard(isDark),
+                  ],
+                ] else if (widget.trip.status == 'LOAD_REQUESTED') ...[
+                  _buildAwaitingTruckOwnerPassCard(isDark),
+                ],
               ],
             ),
           ),
@@ -835,6 +843,89 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
               ],
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTruckOwnerPassCard(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: const Color(0xFF10B981).withValues(alpha: 0.4),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.verified_rounded,
+                color: Color(0xFF10B981),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: AppText(
+                  'Truck Owner Pass (Issued by Admin)',
+                  style: AppTextStyle.labelMedium,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (widget.trip.truckOwnerPassId.isNotEmpty)
+            AppText(
+              'Pass ID: ${widget.trip.truckOwnerPassId}',
+              style: AppTextStyle.bodyMedium,
+              fontWeight: FontWeight.bold,
+            ),
+          if (widget.trip.truckOwnerPassData != null && widget.trip.truckOwnerPassData!['ownerName'] != null)
+            AppText(
+              'Owner/Transporter: ${widget.trip.truckOwnerPassData!['ownerName']}',
+              style: AppTextStyle.bodyMedium,
+              color: isDark ? Colors.white70 : Colors.grey.shade700,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAwaitingTruckOwnerPassCard(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF451A03) : const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? const Color(0xFF78350F) : const Color(0xFFFCD34D),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.hourglass_top_rounded,
+            color: isDark ? const Color(0xFFFDBA74) : const Color(0xFFD97706),
+            size: 18,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: AppText(
+              'Admin is creating & uploading the Truck Owner Pass. Customer & destination details will unlock once pass is uploaded.',
+              style: AppTextStyle.labelMedium,
+              color: isDark ? const Color(0xFFFDBA74) : const Color(0xFF92400E),
+            ),
+          ),
         ],
       ),
     );
