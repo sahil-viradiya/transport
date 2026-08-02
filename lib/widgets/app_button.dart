@@ -105,7 +105,7 @@ class AppButton extends StatelessWidget {
       backgroundColor: buttonColor,
       disabledBackgroundColor: isDark
           ? const Color(0xFF1E293B)
-          : AppColors.secondaryLight.withOpacity(0.5),
+          : AppColors.secondaryLight.withValues(alpha: 0.5),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),

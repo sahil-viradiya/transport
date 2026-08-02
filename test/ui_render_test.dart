@@ -7,6 +7,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:network_image_mock/network_image_mock.dart';
 
 import 'package:transport/app/core/theme/app_theme.dart';
+import 'package:transport/app/core/translations/app_translations.dart';
 import 'package:transport/app/routes/app_pages.dart';
 import 'package:transport/app/data/services/storage_service.dart';
 import 'package:transport/app/data/services/session_service.dart';
@@ -44,6 +45,8 @@ class _OnlineConnectivity extends ConnectivityService {
 
 Widget _app(Widget home, {List<GetPage>? pages}) => GetMaterialApp(
       theme: AppTheme.lightTheme,
+      translations: AppTranslations(),
+      locale: const Locale('en', 'US'),
       home: home,
       getPages: pages,
     );

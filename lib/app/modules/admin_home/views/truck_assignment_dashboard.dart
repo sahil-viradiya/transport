@@ -157,7 +157,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         width: radius * 2,
         height: radius * 2,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
+          color: color.withValues(alpha: 0.15),
           shape: BoxShape.circle,
         ),
         alignment: Alignment.center,
@@ -461,7 +461,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: widget.isDark
-            ? const Color(0xFF1E293B).withOpacity(0.5)
+            ? const Color(0xFF1E293B).withValues(alpha: 0.5)
             : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
@@ -485,14 +485,14 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     final state = truck.status;
     return Container(
       width: 290,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: _getCardBgColor(state),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _getCardBorderColor(state), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(widget.isDark ? 0.2 : 0.04),
+            color: Colors.black.withValues(alpha: widget.isDark ? 0.2 : 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -801,9 +801,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.08),
+              color: color.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: color.withOpacity(0.3), width: 1),
+              border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
             ),
             child: Row(
               children: [
@@ -1157,12 +1157,12 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 widget.isDark ? const Color(0xFF1E293B) : Colors.white,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Row(
+            title: const Row(
               children: [
-                const Icon(Icons.assignment_turned_in_rounded,
+                Icon(Icons.assignment_turned_in_rounded,
                     color: Color(0xFF10B981)),
-                const SizedBox(width: 8),
-                const Expanded(
+                SizedBox(width: 8),
+                Expanded(
                   child: Text(
                     'Generate Supplier Pass',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -1441,7 +1441,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 DropdownButtonFormField<String>(
                   dropdownColor:
                       widget.isDark ? const Color(0xFF1E293B) : Colors.white,
-                  value: selectedReason,
+                  initialValue: selectedReason,
                   items: reasons
                       .map((r) => DropdownMenuItem(
                           value: r,
@@ -1481,7 +1481,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 DropdownButtonFormField<String>(
                   dropdownColor:
                       widget.isDark ? const Color(0xFF1E293B) : Colors.white,
-                  value: selectedPhotoFlag,
+                  initialValue: selectedPhotoFlag,
                   items: const [
                     DropdownMenuItem(
                         value: 'both',
@@ -1763,7 +1763,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                   color: widget.isDark ? Colors.white10 : Colors.amber.shade50,
                   borderRadius: BorderRadius.circular(10),
                   border:
-                      Border.all(color: Colors.amber.shade400.withOpacity(0.5)),
+                      Border.all(color: Colors.amber.shade400.withValues(alpha: 0.5)),
                 ),
                 alignment: Alignment.center,
                 padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -1825,7 +1825,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           decoration: BoxDecoration(
             color: widget.isDark ? Colors.white10 : Colors.amber.shade50,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.amber.shade400.withOpacity(0.5)),
+            border: Border.all(color: Colors.amber.shade400.withValues(alpha: 0.5)),
           ),
           alignment: Alignment.center,
           child: Row(
@@ -1923,11 +1923,11 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           return Container(
             decoration: BoxDecoration(
               color: widget.isDark
-                  ? const Color(0xFF064E3B).withOpacity(0.3)
+                  ? const Color(0xFF064E3B).withValues(alpha: 0.3)
                   : const Color(0xFFECFDF5),
               borderRadius: BorderRadius.circular(8),
               border:
-                  Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
+                  Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
             ),
             alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -2048,17 +2048,17 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
   Color _getCardBgColor(String state) {
     if (state == 'Accepted') {
       return widget.isDark
-          ? const Color(0xFF064E3B).withOpacity(0.15)
+          ? const Color(0xFF064E3B).withValues(alpha: 0.15)
           : const Color(0xFFF0FDF4);
     }
     if (state == 'Problem') {
       return widget.isDark
-          ? const Color(0xFF7F1D1D).withOpacity(0.15)
+          ? const Color(0xFF7F1D1D).withValues(alpha: 0.15)
           : const Color(0xFFFEF2F2);
     }
     if (state == 'Pending Confirmation') {
       return widget.isDark
-          ? const Color(0xFF78350F).withOpacity(0.15)
+          ? const Color(0xFF78350F).withValues(alpha: 0.15)
           : const Color(0xFFFFFBEB);
     }
     return widget.isDark ? const Color(0xFF1E293B) : Colors.white;
@@ -2066,13 +2066,13 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
 
   Color _getCardBorderColor(String state) {
     if (state == 'Accepted') {
-      return const Color(0xFF86EFAC).withOpacity(0.4);
+      return const Color(0xFF86EFAC).withValues(alpha: 0.4);
     } else if (state == 'Assigned') {
-      return const Color(0xFF93C5FD).withOpacity(0.4);
+      return const Color(0xFF93C5FD).withValues(alpha: 0.4);
     } else if (state == 'Problem') {
-      return const Color(0xFFFCA5A5).withOpacity(0.6);
+      return const Color(0xFFFCA5A5).withValues(alpha: 0.6);
     } else if (state == 'Pending Confirmation') {
-      return const Color(0xFFFDE047).withOpacity(0.5);
+      return const Color(0xFFFDE047).withValues(alpha: 0.5);
     }
     return widget.isDark ? Colors.white10 : const Color(0xFFE5EAE7);
   }

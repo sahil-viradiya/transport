@@ -296,7 +296,7 @@ class ExpensesView extends GetView<ExpensesController> {
                       children: [
                         const SizedBox(height: 8),
                         DropdownButtonFormField<String>(
-                          value: titleCtrl.text,
+                          initialValue: titleCtrl.text,
                           decoration: const InputDecoration(
                             labelText: 'Expense Category',
                             border: OutlineInputBorder(),
@@ -326,7 +326,7 @@ class ExpensesView extends GetView<ExpensesController> {
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
-                          value: tripIdCtrl.text.isEmpty
+                          initialValue: tripIdCtrl.text.isEmpty
                               ? null
                               : (Get.isRegistered<TripsController>() &&
                                       Get.find<TripsController>()
@@ -503,7 +503,9 @@ class ExpensesView extends GetView<ExpensesController> {
                                   'longitude': currentLng,
                                   'locationName': locationName,
                                 };
-                                Navigator.of(bottomSheetCtx).pop();
+                                  if (bottomSheetCtx.mounted) {
+                                    Navigator.of(bottomSheetCtx).pop();
+                                  }
                                 await controller.submitExpense(expenseData,
                                     receiptBytes: receiptBytes.value);
                               },

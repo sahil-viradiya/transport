@@ -107,7 +107,7 @@ class AppImageView extends StatelessWidget {
     return Container(
       width: width,
       height: height,
-      color: AppColors.secondaryLight.withOpacity(0.5),
+      color: AppColors.secondaryLight.withValues(alpha: 0.5),
       child: Center(
         child: Icon(
           Icons.image_not_supported_outlined,
@@ -122,7 +122,7 @@ class AppImageView extends StatelessWidget {
     return Container(
       width: width,
       height: height,
-      color: AppColors.secondaryLight.withOpacity(0.5),
+      color: AppColors.secondaryLight.withValues(alpha: 0.5),
       child: const Center(
         child: SizedBox(
           width: 24,

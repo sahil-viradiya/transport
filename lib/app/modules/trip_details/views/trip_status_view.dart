@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../controllers/trip_details_controller.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../core/theme/app_colors.dart';
@@ -126,7 +125,7 @@ class TripStatusView extends GetView<TripDetailsController> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                        color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       )
@@ -153,7 +152,7 @@ class TripStatusView extends GetView<TripDetailsController> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: _statusColor(status).withOpacity(0.12),
+                                color: _statusColor(status).withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: AppText(
@@ -279,7 +278,7 @@ class TripStatusView extends GetView<TripDetailsController> {
                                         shape: BoxShape.circle,
                                         border: Border.all(
                                           color: isNewest 
-                                              ? _statusColor(status).withOpacity(0.3)
+                                              ? _statusColor(status).withValues(alpha: 0.3)
                                               : Colors.transparent,
                                           width: 3,
                                         ),

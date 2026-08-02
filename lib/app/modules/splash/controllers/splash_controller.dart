@@ -1,7 +1,6 @@
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:transport/app/data/services/session_service.dart';
-import 'package:transport/app/data/services/auth_service.dart';
 import 'package:transport/app/routes/app_pages.dart';
 
 class SplashController extends GetxController {

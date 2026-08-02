@@ -401,10 +401,10 @@ class ProfileView extends GetView<ProfileController> {
             ),
             child: Row(
               children: [
-                CircleAvatar(
+                const CircleAvatar(
                   radius: 20,
                   backgroundColor: AppColors.primaryLight,
-                  child: const AppText('SK', style: AppTextStyle.bodyMedium, color: AppColors.primary, fontWeight: FontWeight.bold),
+                  child: AppText('SK', style: AppTextStyle.bodyMedium, color: AppColors.primary, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

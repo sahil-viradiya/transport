@@ -2,13 +2,11 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:transport/app/data/services/auth_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
-import 'package:transport/app/routes/app_pages.dart';
 import 'package:transport/app/data/services/connectivity_service.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/app/data/services/location_service.dart';
@@ -199,7 +197,7 @@ class DashboardController extends GetxController {
       if (accept) {
         await Get.find<FirebaseService>().acceptTruckAssignment(truckNo, _session.phone.value);
         AppPopup.hideLoading();
-        Get.to(() => TruckInspectionFormView());
+        Get.to(() => const TruckInspectionFormView());
       } else {
         await Get.find<FirebaseService>().reportTruckIssue(
           truckNo,

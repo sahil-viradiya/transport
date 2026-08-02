@@ -84,12 +84,12 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
       ),
       child: Stack(
         children: [
-          Positioned(
+          const Positioned(
             right: -60,
             bottom: -40,
             child: Opacity(
               opacity: 0.08,
-              child: const Icon(Icons.shield_outlined, size: 450, color: Colors.white),
+              child: Icon(Icons.shield_outlined, size: 450, color: Colors.white),
             ),
           ),
           Positioned(

@@ -2316,7 +2316,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 selected && Theme.of(Get.context!).brightness != Brightness.dark
                     ? [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         )
@@ -2377,15 +2377,11 @@ class AdminHomeView extends GetView<AdminHomeController> {
     final status = (trip['status'] ?? '').toString();
     final (statusLabel, statusBg, statusFg) =
         _tripStatusStyle(status, trip['isActive'] == true);
-    final vendor = (trip['vendorName'] ?? '').toString();
-    final title =
-        vendor.isNotEmpty ? vendor : (trip['id'] ?? 'Trip').toString();
     final truckNo = (trip['truckNo'] ?? '-').toString();
     final tripId = (trip['id'] ?? '-').toString();
     final loadingPhotoUrl = (trip['loadingPhotoUrl'] ?? '').toString();
     final gatePassPhotoUrl = (trip['gatePassPhotoUrl'] ?? '').toString();
     final podUrl = (trip['podUrl'] ?? '').toString();
-    final loadingPass = (trip['loadingPassId'] ?? '-').toString();
     final passGenTime = (trip['loadingPassGeneratedAt'] ?? '').toString();
     final date = (trip['date'] ?? '').toString();
     final passGenValue = passGenTime.isNotEmpty
@@ -2673,9 +2669,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.08),
+                  color: Colors.red.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withOpacity(0.2)),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
                 ),
                 child: AppText(
                   'Rejected: ${trip['loadRejectReason'] ?? 'None'}',
@@ -2692,9 +2688,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.08),
+                  color: Colors.red.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withOpacity(0.2)),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
                 ),
                 child: AppText(
                   'Rejected: ${trip['deliveryRejectReason'] ?? 'None'}',
@@ -3074,7 +3070,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: (badgeColor ?? Colors.green).withOpacity(0.1),
+                      color: (badgeColor ?? Colors.green).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -3186,13 +3182,13 @@ class AdminHomeView extends GetView<AdminHomeController> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: hasProblem
-              ? Colors.redAccent.withOpacity(0.5)
+              ? Colors.redAccent.withValues(alpha: 0.5)
               : (isDark ? Colors.white10 : Colors.grey.shade200),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -3607,132 +3603,6 @@ class AdminHomeView extends GetView<AdminHomeController> {
   }
 
   // --- TAB 4: ROLES & USERS MANAGEMENT ---
-  Widget _availabilityBadge(Map<String, dynamic> user) {
-    final available = (user['availability'] ?? 'off_duty') == 'available';
-    final color = available ? AppColors.success : AppColors.textSecondary;
-    final address = (user['checkInAddress'] ?? '').toString();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(available ? Icons.circle : Icons.circle_outlined,
-                  size: 9, color: color),
-              const SizedBox(width: 5),
-              AppText(available ? 'Available' : 'Off Duty',
-                  style: AppTextStyle.labelMedium,
-                  color: color,
-                  fontWeight: FontWeight.bold),
-            ],
-          ),
-        ),
-        if (available && address.isNotEmpty) ...[
-          const SizedBox(height: 3),
-          Row(
-            children: [
-              const Icon(Icons.place_rounded, size: 12, color: AppColors.error),
-              const SizedBox(width: 3),
-              Expanded(
-                child: AppText(address,
-                    style: AppTextStyle.labelMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
-              ),
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-
-  /// Small role pill (Driver / Admin) for the drivers list.
-  Widget _roleChip(String role) {
-    final isAdmin = role == 'admin';
-    final color = isAdmin ? const Color(0xFF7E22CE) : AppColors.primary;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: AppText(isAdmin ? 'Admin' : 'Driver',
-          style: AppTextStyle.labelMedium,
-          color: color,
-          fontWeight: FontWeight.bold),
-    );
-  }
-
-  /// Which documents are on file for a driver (photo / driving licence /
-  /// heavy-vehicle licence). Uploaded ones are tappable → open a full-screen
-  /// viewer so the admin can actually see the document.
-  Widget _driverDocsRow(BuildContext context, Map<String, dynamic> user) {
-    String url(String key) => (user[key] ?? '').toString().trim();
-    final name = (user['name'] ?? 'Driver').toString();
-    return Row(
-      children: [
-        const AppText('Documents:',
-            style: AppTextStyle.labelMedium, color: AppColors.textHint),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              _docStatusChip(
-                  context, 'Photo', url('avatarUrl'), '$name — Photo'),
-              _docStatusChip(context, 'Licence', url('drivingLicenceUrl'),
-                  '$name — Driving Licence'),
-              _docStatusChip(context, 'Heavy', url('heavyLicenceUrl'),
-                  '$name — Heavy Vehicle Licence'),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _docStatusChip(
-      BuildContext context, String label, String docUrl, String title) {
-    final present = docUrl.isNotEmpty && docUrl.startsWith('http');
-    final color = present ? AppColors.success : AppColors.textHint;
-    final chip = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-              present
-                  ? Icons.visibility_rounded
-                  : Icons.remove_circle_outline_rounded,
-              size: 13,
-              color: color),
-          const SizedBox(width: 4),
-          AppText(label,
-              style: AppTextStyle.labelMedium,
-              color: color,
-              fontWeight: FontWeight.w600),
-        ],
-      ),
-    );
-    if (!present) return chip;
-    return InkWell(
-      borderRadius: BorderRadius.circular(6),
-      onTap: () => _showImageViewer(context, docUrl, title),
-      child: chip,
-    );
-  }
 
   /// Full-screen image viewer (with proxy + graceful loading/error states).
   void _showImageViewer(BuildContext context, String url, String title) {
@@ -5767,7 +5637,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 DropdownButtonFormField<String>(
-                                  value: selectedTruck,
+                                  initialValue: selectedTruck,
                                   decoration: const InputDecoration(
                                     labelText: 'Assign Truck',
                                     border: OutlineInputBorder(),
@@ -5784,7 +5654,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                 ),
                                 const SizedBox(height: 16),
                                 DropdownButtonFormField<String>(
-                                  value: selectedDriver,
+                                  initialValue: selectedDriver,
                                   decoration: const InputDecoration(
                                     labelText: 'Assign Driver',
                                     border: OutlineInputBorder(),
@@ -5824,7 +5694,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           }),
                           const SizedBox(height: 16),
                           DropdownButtonFormField<String>(
-                            value: selectedTabType,
+                            initialValue: selectedTabType,
                             decoration: const InputDecoration(
                               labelText: 'Tab Category',
                               border: OutlineInputBorder(),
@@ -5927,6 +5797,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                 lastDate: DateTime(2100),
                               );
                               if (selectedDate != null) {
+                                if (!context.mounted) return;
                                 final selectedTime = await showTimePicker(
                                   context: context,
                                   initialTime: TimeOfDay.now(),
@@ -6484,7 +6355,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: vehicleType,
+                initialValue: vehicleType,
                 decoration: const InputDecoration(
                   labelText: 'Vehicle Type',
                   border: OutlineInputBorder(),
@@ -6501,7 +6372,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: status,
+                initialValue: status,
                 decoration: const InputDecoration(
                   labelText: 'Status',
                   border: OutlineInputBorder(),
@@ -7661,10 +7532,12 @@ class AdminHomeView extends GetView<AdminHomeController> {
         .toString()
         .trim();
     if (avatarUrl.isEmpty) {
-      if (driverPhone.isNotEmpty)
+      if (driverPhone.isNotEmpty) {
         avatarUrl = controller.driverAvatarFor(driverPhone);
-      if (avatarUrl.isEmpty && driverName.isNotEmpty)
+      }
+      if (avatarUrl.isEmpty && driverName.isNotEmpty) {
         avatarUrl = controller.driverAvatarFor(driverName);
+      }
     }
 
     return Container(
@@ -8814,7 +8687,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                   color: AppColors.textSecondary),
                               const SizedBox(height: 6),
                               DropdownButtonFormField<String>(
-                                value: controller
+                                initialValue: controller
                                         .selectedExpenseDriver.value.isEmpty
                                     ? null
                                     : controller.selectedExpenseDriver.value,
@@ -8859,7 +8732,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                   color: AppColors.textSecondary),
                               const SizedBox(height: 6),
                               DropdownButtonFormField<String>(
-                                value:
+                                initialValue:
                                     controller.selectedExpenseTrip.value.isEmpty
                                         ? null
                                         : controller.selectedExpenseTrip.value,
@@ -9014,7 +8887,6 @@ class AdminHomeView extends GetView<AdminHomeController> {
                     final exp = filteredExpenses[index];
                     final title = (exp['title'] ?? 'Expense').toString();
                     final amount = (exp['amount'] ?? '').toString();
-                    final desc = (exp['description'] ?? '').toString();
                     final status = (exp['status'] ?? 'Pending').toString();
                     final date = (exp['date'] ?? 'Today').toString();
                     final driverPhone = (exp['driverPhone'] ?? '').toString();
@@ -9788,7 +9660,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 DropdownButtonFormField<String>(
                   dropdownColor:
                       isDark ? const Color(0xFF1E293B) : Colors.white,
-                  value: selectedReason,
+                  initialValue: selectedReason,
                   items: reasons
                       .map((r) => DropdownMenuItem(
                           value: r,
@@ -9828,7 +9700,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 DropdownButtonFormField<String>(
                   dropdownColor:
                       isDark ? const Color(0xFF1E293B) : Colors.white,
-                  value: selectedPhotoFlag,
+                  initialValue: selectedPhotoFlag,
                   items: const [
                     DropdownMenuItem(
                         value: 'both',

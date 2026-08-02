@@ -8,6 +8,7 @@ import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 
 import 'package:transport/app/core/config/app_config.dart';
+import 'package:transport/app/core/utils/app_logger.dart';
 
 class LoginController extends GetxController {
   // Inputs
@@ -24,7 +25,7 @@ class LoginController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    debugPrint('Firebase Auth mode: ${isMockMode.value ? "MOCK" : "LIVE"}');
+    AppLogger.d('Firebase Auth mode: ${isMockMode.value ? "MOCK" : "LIVE"}');
   }
 
   /// Change application language
@@ -83,9 +84,7 @@ class LoginController extends GetxController {
             _signInWithCredential(credential);
           },
           verificationFailed: (FirebaseAuthException e) {
-            debugPrint('------------------------------------------------------------');
-            debugPrint('ERROR: Firebase Phone Auth Failed: [${e.code}] ${e.message}');
-            debugPrint('------------------------------------------------------------');
+            AppLogger.e('Firebase Phone Auth Failed: [${e.code}] ${e.message}', e);
             AppPopup.hideLoading();
             isLoading.value = false;
             AppSnackBar.showError(

@@ -3,15 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:transport/widgets/app_button.dart';
 import 'package:transport/widgets/app_text.dart';
 import 'package:transport/app/core/theme/app_colors.dart';
-import 'package:transport/app/core/utils/time_utils.dart';
 import '../controllers/admin_home_controller.dart';
 import 'package:transport/app/core/utils/image_url.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
-import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/app/core/utils/image_picker_helper.dart';
 
 class AdminTripDetailsView extends GetView<AdminHomeController> {
@@ -449,7 +446,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
         border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -883,11 +880,11 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.checklist_rtl_rounded, color: AppColors.primary, size: 22),
-              const SizedBox(width: 10),
-              const Expanded(
+              Icon(Icons.checklist_rtl_rounded, color: AppColors.primary, size: 22),
+              SizedBox(width: 10),
+              Expanded(
                 child: AppText(
                   'JOURNEY MILESTONES AUDIT',
                   style: AppTextStyle.labelLarge,
@@ -1185,11 +1182,11 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.verified_user_rounded, color: Colors.green, size: 22),
-              const SizedBox(width: 10),
-              const Expanded(
+              Icon(Icons.verified_user_rounded, color: Colors.green, size: 22),
+              SizedBox(width: 10),
+              Expanded(
                 child: AppText(
                   'PROOF OF DELIVERY (POD)',
                   style: AppTextStyle.labelLarge,
@@ -1275,7 +1272,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                       margin: const EdgeInsets.all(12),
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
+                        color: Colors.black.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Row(
@@ -1323,11 +1320,11 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.verified_user_rounded, color: AppColors.primary, size: 22),
-              const SizedBox(width: 10),
-              const Expanded(
+              Icon(Icons.verified_user_rounded, color: AppColors.primary, size: 22),
+              SizedBox(width: 10),
+              Expanded(
                 child: AppText(
                   'VERIFICATION PROOFS',
                   style: AppTextStyle.labelLarge,
@@ -1594,11 +1591,11 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
           return AlertDialog(
             backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Row(
+            title: const Row(
               children: [
-                const Icon(Icons.assignment_turned_in_rounded, color: Color(0xFF10B981)),
-                const SizedBox(width: 8),
-                const Expanded(
+                Icon(Icons.assignment_turned_in_rounded, color: Color(0xFF10B981)),
+                SizedBox(width: 8),
+                Expanded(
                   child: Text(
                     'Generate Truck Owner Pass',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -1824,7 +1821,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    value: selectedReason,
+                    initialValue: selectedReason,
                     items: reasons.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 13)))).toList(),
                     onChanged: (val) {
                       if (val != null) {
@@ -1854,7 +1851,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    value: selectedPhotoFlag,
+                    initialValue: selectedPhotoFlag,
                     items: const [
                       DropdownMenuItem(value: 'both', child: Text('Both Photos', style: TextStyle(fontSize: 13))),
                       DropdownMenuItem(value: 'loading', child: Text('Loading Photo Only', style: TextStyle(fontSize: 13))),
@@ -2274,7 +2271,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
         border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

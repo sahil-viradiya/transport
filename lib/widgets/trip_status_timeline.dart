@@ -203,15 +203,25 @@ class TripStatusTimeline extends StatelessWidget {
       }
 
       String? actual;
-      if (i == 0) actual = ts1;
-      else if (i == 1) actual = acceptTs;
-      else if (i == 2) actual = onWayTs;
-      else if (i == 3) actual = reachedVendorTs;
-      else if (i == 4) actual = loadingStartedTs;
-      else if (i == 5) actual = loadingCompletedTs;
-      else if (i == 6) actual = destinationSetTs;
-      else if (i == 7) actual = onWayDestTs;
-      else if (i == 8) actual = completedTs;
+      if (i == 0) {
+        actual = ts1;
+      } else if (i == 1) {
+        actual = acceptTs;
+      } else if (i == 2) {
+        actual = onWayTs;
+      } else if (i == 3) {
+        actual = reachedVendorTs;
+      } else if (i == 4) {
+        actual = loadingStartedTs;
+      } else if (i == 5) {
+        actual = loadingCompletedTs;
+      } else if (i == 6) {
+        actual = destinationSetTs;
+      } else if (i == 7) {
+        actual = onWayDestTs;
+      } else if (i == 8) {
+        actual = completedTs;
+      }
 
       if (actual != null) {
         times[i] = _formatTimeOnly(actual);

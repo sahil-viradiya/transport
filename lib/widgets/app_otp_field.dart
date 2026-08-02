@@ -53,7 +53,7 @@ class AppOtpField extends StatelessWidget {
 
     final submittedPinTheme = defaultPinTheme.copyWith(
       decoration: defaultPinTheme.decoration!.copyWith(
-        color: isDark ? const Color(0xFF0F172A) : AppColors.primaryLight.withOpacity(0.2),
+        color: isDark ? const Color(0xFF0F172A) : AppColors.primaryLight.withValues(alpha: 0.2),
         border: Border.all(
           color: AppColors.primary,
           width: 1.5,

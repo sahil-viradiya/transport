@@ -116,7 +116,7 @@ class DashboardView extends GetView<DashboardController> {
         margin: const EdgeInsets.only(top: 12),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppColors.primaryLight.withOpacity(0.8),
+          color: AppColors.primaryLight.withValues(alpha: 0.8),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.primary, width: 1.5),
         ),

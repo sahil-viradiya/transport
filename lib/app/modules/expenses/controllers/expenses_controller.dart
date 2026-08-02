@@ -79,10 +79,10 @@ class ExpensesController extends GetxController {
       }
     }
 
-    final format = (double val) {
+    String format(double val) {
       if (val == 0) return '₹0';
       return '₹${val.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}';
-    };
+    }
 
     totalExpenses.value = format(total);
     approvedExpenses.value = format(approved);

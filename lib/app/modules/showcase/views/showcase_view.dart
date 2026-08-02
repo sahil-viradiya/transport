@@ -11,6 +11,7 @@ import '../../../../widgets/dialogs/app_snackbar.dart';
 import '../../../../widgets/dialogs/app_bottom_sheet.dart';
 import '../../../../widgets/dialogs/app_popup.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_logger.dart';
 
 class ShowcaseView extends GetView<ShowcaseController> {
   const ShowcaseView({super.key});
@@ -114,7 +115,7 @@ class ShowcaseView extends GetView<ShowcaseController> {
                     AppSearchBar(
                       controller: controller.searchController,
                       hintText: 'Search for articles, routes...',
-                      onChanged: (val) => print('Search: $val'),
+                      onChanged: (val) => AppLogger.d('Search: $val'),
                     ),
                     const SizedBox(height: 16),
                     AppTextField(

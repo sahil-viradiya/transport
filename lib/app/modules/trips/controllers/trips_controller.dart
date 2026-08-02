@@ -5,7 +5,6 @@ import 'package:get/get.dart';
 import '../../../data/services/firebase_service.dart';
 import '../../../data/services/session_service.dart';
 import '../../../data/services/location_service.dart';
-import 'package:geolocator/geolocator.dart';
 import '../../../../widgets/dialogs/app_popup.dart';
 import '../../../../widgets/dialogs/app_snackbar.dart';
 
@@ -75,7 +74,6 @@ class TripsController extends GetxController {
       case 'LOADING':
       case 'LOAD_REQUESTED':
       case 'LOAD_REJECTED':
-      case 'DELIVERY_REQUESTED':
       case 'DELIVERY_REJECTED':
         return 0; // Active / Ongoing
       case 'PENDING':

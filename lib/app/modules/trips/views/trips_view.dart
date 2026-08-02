@@ -4,9 +4,7 @@ import '../controllers/trips_controller.dart';
 import '../../dashboard/views/dashboard_view.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../../widgets/app_search_bar.dart';
-import '../../../../widgets/trip_status_timeline.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../data/services/session_service.dart';
 import '../../../routes/app_pages.dart';
 import 'driver_loading_workflow.dart';
 
@@ -149,15 +147,6 @@ class TripsView extends GetView<TripsController> {
         return (const Color(0xFFFEE2E2), AppColors.error);
       default:
         return (AppColors.secondaryLight, AppColors.textSecondary);
-    }
-  }
-
-  String _driverName() {
-    try {
-      final name = Get.find<SessionService>().name.value;
-      return name.isEmpty ? '' : name;
-    } catch (_) {
-      return '';
     }
   }
 

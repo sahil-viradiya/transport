@@ -1202,11 +1202,11 @@ class _StepTile extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
                     color: isDark
-                        ? const Color(0xFFF59E0B).withOpacity(0.1)
+                        ? const Color(0xFFF59E0B).withValues(alpha: 0.1)
                         : const Color(0xFFFFFBEB),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                        color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,

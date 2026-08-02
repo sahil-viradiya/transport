@@ -90,7 +90,7 @@ class LoginView extends GetView<LoginController> {
                     color: (isDark
                             ? const Color(0xFF059669)
                             : const Color(0xFF81C784))
-                        .withOpacity(isDark ? 0.08 : 0.2),
+                        .withValues(alpha: isDark ? 0.08 : 0.2),
                   ),
                 ),
               ),
@@ -105,7 +105,7 @@ class LoginView extends GetView<LoginController> {
                     color: (isDark
                             ? const Color(0xFF4F46E5)
                             : const Color(0xFF90CAF9))
-                        .withOpacity(isDark ? 0.06 : 0.15),
+                        .withValues(alpha: isDark ? 0.06 : 0.15),
                   ),
                 ),
               ),
@@ -153,18 +153,21 @@ class LoginView extends GetView<LoginController> {
             color: isDark ? Colors.white10 : Colors.grey.shade200,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.language_rounded,
-                size: 16, color: AppColors.primary),
-            const SizedBox(width: 6),
-            _langChip('English', 'en', currentLocaleCode == 'en', isDark),
-            const SizedBox(width: 4),
-            _langChip('हिंदी', 'hi', currentLocaleCode == 'hi', isDark),
-            const SizedBox(width: 4),
-            _langChip('Español', 'es', currentLocaleCode == 'es', isDark),
-          ],
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.language_rounded,
+                  size: 16, color: AppColors.primary),
+              const SizedBox(width: 6),
+              _langChip('English', 'en', currentLocaleCode == 'en', isDark),
+              const SizedBox(width: 4),
+              _langChip('हिंदी', 'hi', currentLocaleCode == 'hi', isDark),
+              const SizedBox(width: 4),
+              _langChip('Español', 'es', currentLocaleCode == 'es', isDark),
+            ],
+          ),
         ),
       );
     });
@@ -203,14 +206,14 @@ class LoginView extends GetView<LoginController> {
             border: Border.all(
               color:
                   (isDark ? const Color(0xFF34D399) : const Color(0xFF16A34A))
-                      .withOpacity(0.25),
+                      .withValues(alpha: 0.25),
               width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
                 color:
                     (isDark ? const Color(0xFF34D399) : const Color(0xFF16A34A))
-                        .withOpacity(0.12),
+                        .withValues(alpha: 0.12),
                 blurRadius: 20,
                 offset: const Offset(0, 6),
               ),
@@ -260,12 +263,12 @@ class LoginView extends GetView<LoginController> {
       ),
       child: Stack(
         children: [
-          Positioned(
+          const Positioned(
             right: -60,
             bottom: -40,
             child: Opacity(
               opacity: 0.08,
-              child: const Icon(Icons.local_shipping_rounded,
+              child: Icon(Icons.local_shipping_rounded,
                   size: 450, color: Colors.white),
             ),
           ),
@@ -395,7 +398,7 @@ class LoginView extends GetView<LoginController> {
             decoration: BoxDecoration(
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(0.24),
+                  color: AppColors.primary.withValues(alpha: 0.24),
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
@@ -427,10 +430,10 @@ class LoginView extends GetView<LoginController> {
                   border: Border.all(
                     color: isMock
                         ? (isDark
-                            ? const Color(0xFFD97706).withOpacity(0.4)
+                            ? const Color(0xFFD97706).withValues(alpha: 0.4)
                             : const Color(0xFFFCD34D))
                         : (isDark
-                            ? const Color(0xFF10B981).withOpacity(0.4)
+                            ? const Color(0xFF10B981).withValues(alpha: 0.4)
                             : const Color(0xFFA7F3D0)),
                     width: 1.2,
                   ),
@@ -482,12 +485,14 @@ class LoginView extends GetView<LoginController> {
                             '${'tap_to_switch'.tr} ${isMock ? "LIVE" : "MOCK"} ${'mode'.tr}',
                             style: AppTextStyle.labelMedium,
                             fontSize: 11,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             color: isMock
                                 ? (isDark
-                                    ? const Color(0xFFFBBF24).withOpacity(0.7)
+                                    ? const Color(0xFFFBBF24).withValues(alpha: 0.7)
                                     : const Color(0xFFB45309))
                                 : (isDark
-                                    ? const Color(0xFF34D399).withOpacity(0.7)
+                                    ? const Color(0xFF34D399).withValues(alpha: 0.7)
                                     : const Color(0xFF047857)),
                           ),
                         ],
@@ -522,13 +527,20 @@ class LoginView extends GetView<LoginController> {
 
   Widget _buildUtilityRow(bool isDark) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _utility(
-            Icons.headset_mic_rounded, '24/7 Help', AppColors.info, isDark),
-        _utility(
-            Icons.verified_user_rounded, 'Secure', AppColors.success, isDark),
-        _utility(Icons.sos_rounded, 'SOS', AppColors.error, isDark),
+        Expanded(
+          child: _utility(
+              Icons.headset_mic_rounded, '24/7 Help', AppColors.info, isDark),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _utility(
+              Icons.verified_user_rounded, 'Secure', AppColors.success, isDark),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _utility(Icons.sos_rounded, 'SOS', AppColors.error, isDark),
+        ),
       ],
     );
   }
@@ -540,12 +552,12 @@ class LoginView extends GetView<LoginController> {
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.06) : Colors.grey.shade200,
+          color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.grey.shade200,
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -558,7 +570,7 @@ class LoginView extends GetView<LoginController> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
+              color: color.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: color, size: 20),
@@ -570,7 +582,7 @@ class LoginView extends GetView<LoginController> {
             fontWeight: FontWeight.w800,
             fontSize: 11,
             color: isDark
-                ? Colors.white.withOpacity(0.8)
+                ? Colors.white.withValues(alpha: 0.8)
                 : const Color(0xFF334155),
           ),
         ],

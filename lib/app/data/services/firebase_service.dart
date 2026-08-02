@@ -8,6 +8,7 @@ import 'package:transport/app/data/services/session_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:transport/app/core/config/app_config.dart';
+import 'package:transport/app/core/utils/app_logger.dart';
 
 /// Firestore + Storage data layer.
 ///
@@ -1619,14 +1620,12 @@ class FirebaseService extends GetxService {
         },
         action: 'acceptTruckAssignment',
       );
-      print('Truck assigned successfully!');
-    } on FirebaseException catch (e) {
-      print('Update failed: $e');
-      debugPrint('[FirebaseService] acceptTruckAssignment failed: $e');
+      AppLogger.i('Truck assigned successfully!');
+    } on FirebaseException catch (e, st) {
+      AppLogger.e('[FirebaseService] acceptTruckAssignment failed', e, st);
       rethrow;
-    } catch (e) {
-      print('Update failed: $e');
-      debugPrint('[FirebaseService] acceptTruckAssignment failed: $e');
+    } catch (e, st) {
+      AppLogger.e('[FirebaseService] acceptTruckAssignment failed', e, st);
       rethrow;
     }
   }
@@ -1972,9 +1971,9 @@ class FirebaseService extends GetxService {
       final user = FirebaseAuth.instance.currentUser;
       final session = Get.find<SessionService>();
       final isUserAdmin = session.isAdmin;
-      print("Project Id: ${Firebase.app().options.projectId}");
-      print("UID: ${user?.uid}");
-      print("Phone: ${user?.phoneNumber}");
+      AppLogger.d("Project Id: ${Firebase.app().options.projectId}");
+      AppLogger.d("UID: ${user?.uid}");
+      AppLogger.d("Phone: ${user?.phoneNumber}");
       final docSnapshot = await _db.collection('trucks').doc(truckNo).get();
       final existingDoc = docSnapshot.data() ?? {};
 

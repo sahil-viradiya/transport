@@ -10,6 +10,7 @@ import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/app/routes/app_pages.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
+import 'package:transport/app/core/utils/app_logger.dart';
 
 class AdminHomeController extends GetxController {
   final _firebaseService = Get.find<FirebaseService>();
@@ -98,8 +99,7 @@ class AdminHomeController extends GetxController {
     }
     dataError.value = parts.join('  •  ');
 
-    // ignore: avoid_print
-    print('[AdminHome] $what stream error: $e');
+    AppLogger.e('[AdminHome] $what stream error', e);
   }
 
   // Live admin dashboard: trips + expenses + users (driver availability) stay

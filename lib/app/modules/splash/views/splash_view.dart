@@ -21,7 +21,7 @@ class SplashView extends GetView<SplashController> {
         child: Stack(
           children: [
             // Faint highway artwork
-            Positioned(
+            const Positioned(
               top: -30,
               left: -30,
               child: Opacity(
@@ -30,7 +30,7 @@ class SplashView extends GetView<SplashController> {
                     size: 240, color: Colors.white),
               ),
             ),
-            Positioned(
+            const Positioned(
               bottom: -50,
               right: -30,
               child: Opacity(
@@ -77,7 +77,7 @@ class SplashView extends GetView<SplashController> {
                       color: Colors.white.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: AppText('AAPKA SAFAR SAATHI',
+                    child: const AppText('AAPKA SAFAR SAATHI',
                         style: AppTextStyle.labelMedium,
                         color: Colors.white,
                         fontWeight: FontWeight.w700),

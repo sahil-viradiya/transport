@@ -466,10 +466,12 @@ class TripDetailsView extends GetView<TripDetailsController> {
                     Obx(() {
                       // Mock progress value based on current milestone state
                       double progressVal = 0.35;
-                      if (controller.currentMilestone.value == 2)
+                      if (controller.currentMilestone.value == 2) {
                         progressVal = 0.65;
-                      if (controller.currentMilestone.value > 2)
+                      }
+                      if (controller.currentMilestone.value > 2) {
                         progressVal = 1.0;
+                      }
 
                       return LinearProgressIndicator(
                         value: progressVal,
@@ -630,118 +632,6 @@ class TripDetailsView extends GetView<TripDetailsController> {
         ),
       );
     });
-  }
-
-  // Common UI building helpers for Confirm Journey
-  Widget _buildMapOverlayPill(IconData icon, String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: AppColors.primary, size: 14),
-          const SizedBox(width: 4),
-          AppText(text,
-              style: AppTextStyle.labelMedium,
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.bold),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailCard({
-    required bool isDark,
-    required String label,
-    required String title,
-    required String subtitle,
-    required IconData footerIcon,
-    required String footerText,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 6,
-              offset: const Offset(0, 3))
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppText(label,
-              style: AppTextStyle.labelMedium,
-              color: isDark ? Colors.white30 : AppColors.textHint,
-              fontWeight: FontWeight.bold),
-          const SizedBox(height: 6),
-          AppText(title,
-              style: AppTextStyle.bodyLarge,
-              color: isDark ? Colors.white : AppColors.textPrimary,
-              fontWeight: FontWeight.bold),
-          const SizedBox(height: 2),
-          AppText(subtitle, style: AppTextStyle.labelMedium),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(footerIcon, color: AppColors.primary, size: 14),
-              const SizedBox(width: 6),
-              AppText(footerText,
-                  style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildManifestGridItem(String label, String value) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppText(label, style: AppTextStyle.labelMedium),
-          const SizedBox(height: 2),
-          AppText(value,
-              style: AppTextStyle.bodyLarge,
-              fontWeight: FontWeight.bold,
-              color: AppColors.secondaryDark),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChecklistItem(bool isDark, String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: const BoxDecoration(
-                color: Color(0xFFE3FCEF), shape: BoxShape.circle),
-            child: const Icon(Icons.check, color: Color(0xFF006644), size: 12),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-              child: AppText(text,
-                  style: AppTextStyle.bodyMedium,
-                  color: isDark ? Colors.white : AppColors.textPrimary,
-                  fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
   }
 
   // Interactive milestone cards for Active Trip Tracking view

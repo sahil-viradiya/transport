@@ -8,6 +8,7 @@ import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/routes/app_pages.dart';
 import 'package:transport/widgets/app_text.dart';
 import 'package:transport/app/core/theme/app_colors.dart';
+import 'package:transport/app/core/utils/app_logger.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 
 class OtpVerificationController extends GetxController {
@@ -155,7 +156,7 @@ class OtpVerificationController extends GetxController {
             const AppText('Select Role:', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: selectedRole,
+              initialValue: selectedRole,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -270,9 +271,7 @@ class OtpVerificationController extends GetxController {
             }
           },
           verificationFailed: (FirebaseAuthException e) {
-            debugPrint('------------------------------------------------------------');
-            debugPrint('ERROR: Firebase Phone Auth Resend Failed: [${e.code}] ${e.message}');
-            debugPrint('------------------------------------------------------------');
+            AppLogger.e('Firebase Phone Auth Resend Failed: [${e.code}] ${e.message}', e);
             AppPopup.hideLoading();
             isLoading.value = false;
             AppSnackBar.showError(title: 'Resend Failed (${e.code})', message: e.message ?? '');

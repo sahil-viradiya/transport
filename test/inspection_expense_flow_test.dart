@@ -21,36 +21,12 @@ void main() {
     fb = FirebaseService(firestore: db, ownerKeyResolver: () => driver);
   });
 
-  /// The admin dashboard's pending-inspection filter (mirrors
-  /// _buildMockupOperationsHub in admin_home_view.dart).
-  List<Map<String, dynamic>> pendingInspections(
-    List<Map<String, dynamic>> trucks,
-    List<Map<String, dynamic>> trips,
-  ) {
-    return trucks.where((t) {
-      final status = (t['inspectionStatus'] ?? '').toString();
-      final hasDriver = (t['assignedTo'] ?? '').toString().isNotEmpty;
-      if (!hasDriver) return false;
-      if (status == 'inspected_pending_review') return true;
-      if (status != 'pending') return false;
-      final driverPhone = (t['assignedTo'] ?? '').toString();
-      final hasActiveTrip = trips.any((trip) =>
-          (trip['driverPhone'] ?? '').toString() == driverPhone &&
-          trip['status'] != 'DELIVERED' &&
-          trip['status'] != 'CANCELLED');
-      return !hasActiveTrip;
-    }).toList();
-  }
-
   Future<List<Map<String, dynamic>>> trucks() async =>
       (await db.collection('trucks').get()).docs.map((d) {
         final m = d.data();
         m['truckNo'] = d.id;
         return m;
       }).toList();
-
-  Future<List<Map<String, dynamic>>> trips() async =>
-      (await db.collection('trips').get()).docs.map((d) => d.data()).toList();
 
   test('submitted inspection is visible to admin even with an active trip',
       () async {

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:transport/app/core/utils/app_logger.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 
 class ApiProvider {
@@ -21,20 +22,19 @@ class ApiProvider {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          // You can retrieve JWT tokens from SharedPreferences if available
-          // options.headers['Authorization'] = 'Bearer $token';
-          print('--> ${options.method} ${options.path}');
-          print('Headers: ${options.headers}');
-          print('Body: ${options.data}');
+          AppLogger.d('--> ${options.method} ${options.path}');
+          AppLogger.d('Headers: ${options.headers}');
+          AppLogger.d('Body: ${options.data}');
           return handler.next(options);
         },
         onResponse: (response, handler) {
-          print('<-- ${response.statusCode} ${response.requestOptions.path}');
-          print('Response: ${response.data}');
+          AppLogger.d('<-- ${response.statusCode} ${response.requestOptions.path}');
+          AppLogger.d('Response: ${response.data}');
           return handler.next(response);
         },
         onError: (DioException e, handler) {
           final errorMessage = AppErrorHandler.handleError(e);
+          AppLogger.e('API Error (${e.requestOptions.path}): $errorMessage', e);
           AppSnackBar.showError(title: 'API Error', message: errorMessage);
           return handler.next(e);
         },
