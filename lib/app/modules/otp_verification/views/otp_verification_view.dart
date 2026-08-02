@@ -17,7 +17,8 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
 
     if (isWide) {
       return Scaffold(
-        backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        backgroundColor:
+            isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
         body: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -31,7 +32,8 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
               flex: 9,
               child: Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 460),
                     child: _buildOtpCard(context, isDark),
@@ -51,7 +53,8 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: isDark ? Colors.white : AppColors.textPrimary),
           onPressed: controller.changeMobileNumber,
         ),
       ),
@@ -89,7 +92,8 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
             bottom: -40,
             child: Opacity(
               opacity: 0.08,
-              child: Icon(Icons.shield_outlined, size: 450, color: Colors.white),
+              child:
+                  Icon(Icons.shield_outlined, size: 450, color: Colors.white),
             ),
           ),
           Positioned(
@@ -127,14 +131,20 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
                           ),
                         ],
                       ),
-                      child: const Icon(Icons.shield_rounded, color: Color(0xFF059669), size: 26),
+                      child: const Icon(Icons.shield_rounded,
+                          color: Color(0xFF059669), size: 26),
                     ),
                     const SizedBox(width: 14),
-                    const Column(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        AppText('The Highway Authority', style: AppTextStyle.headlineSmall, color: Colors.white, fontWeight: FontWeight.w800),
-                        AppText('Security & Verification Portal', style: AppTextStyle.labelMedium, color: Colors.white70),
+                        AppText('app_title'.tr,
+                            style: AppTextStyle.headlineSmall,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800),
+                        AppText('security_portal'.tr,
+                            style: AppTextStyle.labelMedium,
+                            color: Colors.white70),
                       ],
                     ),
                   ],
@@ -145,24 +155,30 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.2)),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.lock_rounded, color: Color(0xFF34D399), size: 16),
+                          Icon(Icons.lock_rounded,
+                              color: Color(0xFF34D399), size: 16),
                           SizedBox(width: 6),
-                          AppText('Two-Factor Account Authentication', style: AppTextStyle.labelMedium, color: Colors.white, fontWeight: FontWeight.bold),
+                          AppText('two_factor_authentication'.tr,
+                              style: AppTextStyle.labelMedium,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold),
                         ],
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const AppText(
-                      'Protecting Your Fleet Data\nWith Military-Grade Security.',
+                    AppText(
+                      'fleet_security_heading'.tr,
                       style: AppTextStyle.headlineLarge,
                       fontSize: 30,
                       fontWeight: FontWeight.w900,
@@ -170,27 +186,26 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
                     ),
                     const SizedBox(height: 12),
                     AppText(
-                      'Enter the OTP passcode delivered via SMS to access your trip logs, driver assignments, and financial records.',
+                      'otp_security_description'.tr,
                       style: AppTextStyle.bodyLarge,
                       color: Colors.white.withValues(alpha: 0.88),
                     ),
                     const SizedBox(height: 36),
-
                     Row(
                       children: [
                         Expanded(
                           child: _webFeatureCard(
                             Icons.phonelink_ring_rounded,
-                            'Instant SMS Delivery',
-                            'Fast OTP generation',
+                            'instant_sms_delivery'.tr,
+                            'fast_otp_generation'.tr,
                           ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: _webFeatureCard(
                             Icons.verified_user_rounded,
-                            'End-to-End Encryption',
-                            'Secure session keys',
+                            'end_to_end_encryption'.tr,
+                            'secure_session_keys'.tr,
                           ),
                         ),
                       ],
@@ -204,12 +219,17 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.security_rounded, size: 16, color: Color(0xFF34D399)),
+                        const Icon(Icons.security_rounded,
+                            size: 16, color: Color(0xFF34D399)),
                         const SizedBox(width: 6),
-                        AppText('Highway Safety Protocol', style: AppTextStyle.labelMedium, color: Colors.white.withValues(alpha: 0.8)),
+                        AppText('highway_safety_protocol'.tr,
+                            style: AppTextStyle.labelMedium,
+                            color: Colors.white.withValues(alpha: 0.8)),
                       ],
                     ),
-                    AppText('Made in India 🇮🇳  •  v1.0', style: AppTextStyle.labelMedium, color: Colors.white.withValues(alpha: 0.6)),
+                    AppText('made_in_india'.tr,
+                        style: AppTextStyle.labelMedium,
+                        color: Colors.white.withValues(alpha: 0.6)),
                   ],
                 ),
               ],
@@ -233,9 +253,13 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
         children: [
           Icon(icon, color: const Color(0xFF34D399), size: 24),
           const SizedBox(height: 10),
-          AppText(title, style: AppTextStyle.bodyMedium, color: Colors.white, fontWeight: FontWeight.bold),
+          AppText(title,
+              style: AppTextStyle.bodyMedium,
+              color: Colors.white,
+              fontWeight: FontWeight.bold),
           const SizedBox(height: 2),
-          AppText(subtitle, style: AppTextStyle.labelMedium, color: Colors.white70),
+          AppText(subtitle,
+              style: AppTextStyle.labelMedium, color: Colors.white70),
         ],
       ),
     );
@@ -266,10 +290,13 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
               IconButton(
                 onPressed: controller.changeMobileNumber,
                 icon: const Icon(Icons.arrow_back_rounded, size: 20),
-                tooltip: 'Change Phone Number',
+                tooltip: 'change_phone_number'.tr,
               ),
               const SizedBox(width: 8),
-              const AppText('Security Verification', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey),
+              AppText('security_verification'.tr,
+                  style: AppTextStyle.labelMedium,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey),
             ],
           ),
           const SizedBox(height: 16),
@@ -289,7 +316,9 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
             width: 76,
             height: 76,
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : AppColors.primaryLight.withValues(alpha: 0.5),
+              color: isDark
+                  ? const Color(0xFF1E293B)
+                  : AppColors.primaryLight.withValues(alpha: 0.5),
               shape: BoxShape.circle,
             ),
             child: const Center(
@@ -305,9 +334,9 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
         const SizedBox(height: 24),
 
         // Title Header
-        const Center(
+        Center(
           child: AppText(
-            'Verify Your Identity',
+            'verify_identity'.tr,
             style: AppTextStyle.headlineMedium,
             fontWeight: FontWeight.bold,
           ),
@@ -360,14 +389,19 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
                   style: AppTextStyle.bodyMedium,
                 ),
                 TextButton(
-                  onPressed: controller.resendTimer.value > 0 ? null : controller.resendOtp,
-                  style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                  onPressed: controller.resendTimer.value > 0
+                      ? null
+                      : controller.resendOtp,
+                  style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero, minimumSize: Size.zero),
                   child: AppText(
                     controller.resendTimer.value > 0
                         ? 'Resend OTP • 00:${controller.resendTimer.value.toString().padLeft(2, '0')}s'
                         : 'Resend OTP',
                     style: AppTextStyle.labelMedium,
-                    color: controller.resendTimer.value > 0 ? Colors.grey : AppColors.primary,
+                    color: controller.resendTimer.value > 0
+                        ? Colors.grey
+                        : AppColors.primary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -380,7 +414,8 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
         Center(
           child: TextButton.icon(
             onPressed: controller.changeMobileNumber,
-            icon: const Icon(Icons.edit_outlined, size: 16, color: AppColors.primary),
+            icon: const Icon(Icons.edit_outlined,
+                size: 16, color: AppColors.primary),
             label: const AppText(
               'Change Mobile Number',
               style: AppTextStyle.labelMedium,
@@ -415,7 +450,9 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
           child: AppText(
             'The Highway Authority Digital Safety Protocol',
             style: AppTextStyle.labelMedium,
-            color: isDark ? Colors.white24 : AppColors.textHint.withValues(alpha: 0.8),
+            color: isDark
+                ? Colors.white24
+                : AppColors.textHint.withValues(alpha: 0.8),
           ),
         ),
       ],

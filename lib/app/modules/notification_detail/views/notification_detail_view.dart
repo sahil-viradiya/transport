@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import '../controllers/notification_detail_controller.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../../widgets/trip_progress_tracker.dart';
+import '../../../../widgets/feedback_views.dart';
+import '../../../../widgets/app_card.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_url.dart';
 
@@ -19,8 +21,7 @@ class NotificationDetailView extends GetView<NotificationDetailController> {
       ),
       body: Obx(() {
         if (controller.isLoading.value) {
-          return const Center(
-              child: CircularProgressIndicator(color: AppColors.primary));
+          return const AppLoadingView();
         }
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -46,16 +47,7 @@ class NotificationDetailView extends GetView<NotificationDetailController> {
     );
   }
 
-  Widget _card(bool isDark, Widget child) => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1F1B18) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: isDark ? const Color(0xFF332E2A) : AppColors.border),
-        ),
-        child: child,
-      );
+  Widget _card(bool isDark, Widget child) => AppCard(child: child);
 
   Widget _headerCard(bool isDark) {
     final (icon, tint) = _style(controller.type);
@@ -78,7 +70,8 @@ class NotificationDetailView extends GetView<NotificationDetailController> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 AppText(controller.title,
-                    style: AppTextStyle.titleLarge, fontWeight: FontWeight.w700),
+                    style: AppTextStyle.titleLarge,
+                    fontWeight: FontWeight.w700),
                 const SizedBox(height: 4),
                 AppText(controller.body, style: AppTextStyle.bodyMedium),
               ],
@@ -104,7 +97,8 @@ class NotificationDetailView extends GetView<NotificationDetailController> {
                     style: AppTextStyle.bodyLarge, fontWeight: FontWeight.w700),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                       color: AppColors.primaryLight,
                       borderRadius: BorderRadius.circular(6)),

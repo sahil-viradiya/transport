@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../controllers/expense_detail_controller.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../../widgets/app_button.dart';
+import '../../../../widgets/feedback_views.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_url.dart';
 
@@ -19,15 +20,12 @@ class ExpenseDetailView extends GetView<ExpenseDetailController> {
       ),
       body: Obx(() {
         if (controller.isLoading.value) {
-          return const Center(
-              child: CircularProgressIndicator(color: AppColors.primary));
+          return const AppLoadingView();
         }
 
         final e = controller.expense.value;
         if (e == null) {
-          return const Center(
-            child: AppText('Expense not found', style: AppTextStyle.bodyLarge),
-          );
+          return const AppEmptyView(title: 'Expense not found');
         }
 
         final title = (e['title'] ?? 'Expense').toString();
@@ -56,7 +54,9 @@ class ExpenseDetailView extends GetView<ExpenseDetailController> {
                         color: isDark ? const Color(0xFF1F1B18) : Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                            color: isDark ? const Color(0xFF332E2A) : AppColors.border),
+                            color: isDark
+                                ? const Color(0xFF332E2A)
+                                : AppColors.border),
                       ),
                       child: Column(
                         children: [
@@ -104,7 +104,9 @@ class ExpenseDetailView extends GetView<ExpenseDetailController> {
                         color: isDark ? const Color(0xFF1F1B18) : Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                            color: isDark ? const Color(0xFF332E2A) : AppColors.border),
+                            color: isDark
+                                ? const Color(0xFF332E2A)
+                                : AppColors.border),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -119,10 +121,12 @@ class ExpenseDetailView extends GetView<ExpenseDetailController> {
                             const Divider(height: 20),
                           ],
                           if (remarks.isNotEmpty) ...[
-                            _buildInfoRow('Remarks / Description', remarks, isDark),
+                            _buildInfoRow(
+                                'Remarks / Description', remarks, isDark),
                             const Divider(height: 20),
                           ],
-                          _buildInfoRow('Expense ID', controller.expenseId, isDark),
+                          _buildInfoRow(
+                              'Expense ID', controller.expenseId, isDark),
                         ],
                       ),
                     ),
@@ -133,10 +137,13 @@ class ExpenseDetailView extends GetView<ExpenseDetailController> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1F1B18) : Colors.white,
+                          color:
+                              isDark ? const Color(0xFF1F1B18) : Colors.white,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                              color: isDark ? const Color(0xFF332E2A) : AppColors.border),
+                              color: isDark
+                                  ? const Color(0xFF332E2A)
+                                  : AppColors.border),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,7 +158,9 @@ class ExpenseDetailView extends GetView<ExpenseDetailController> {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                    color: isDark ? const Color(0xFF332E2A) : AppColors.border),
+                                    color: isDark
+                                        ? const Color(0xFF332E2A)
+                                        : AppColors.border),
                               ),
                               clipBehavior: Clip.antiAlias,
                               child: Image.network(
@@ -181,7 +190,9 @@ class ExpenseDetailView extends GetView<ExpenseDetailController> {
                   color: isDark ? const Color(0xFF181512) : Colors.white,
                   border: Border(
                     top: BorderSide(
-                        color: isDark ? const Color(0xFF332E2A) : AppColors.border),
+                        color: isDark
+                            ? const Color(0xFF332E2A)
+                            : AppColors.border),
                   ),
                 ),
                 child: SafeArea(
@@ -219,7 +230,8 @@ class ExpenseDetailView extends GetView<ExpenseDetailController> {
         AppText(label.toUpperCase(),
             style: AppTextStyle.labelMedium, color: AppColors.textSecondary),
         const SizedBox(height: 4),
-        AppText(value, style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
+        AppText(value,
+            style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
       ],
     );
   }

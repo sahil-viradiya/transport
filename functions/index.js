@@ -1,13 +1,7 @@
 // Cloud Function: when the app writes a `notifications/{id}` document, push it
 // to the recipient's devices via FCM.
 //
-// The Flutter app already:
-//   - creates notifications in Firestore (in-app bell works with no backend),
-//   - saves each device's FCM token to users/{phone}.fcmTokens.
-// This function turns those in-app notifications into real push notifications.
-//
-// Deploy:  firebase deploy --only functions
-// Requires the Firebase Blaze (pay-as-you-go) plan.
+// Deploy: firebase deploy --only functions
 
 const {onDocumentCreated} = require("firebase-functions/v2/firestore");
 const {initializeApp} = require("firebase-admin/app");
@@ -22,11 +16,17 @@ exports.sendNotificationPush = onDocumentCreated(
       const note = event.data && event.data.data();
       if (!note || !note.toPhone) return;
 
-      // Look up the recipient's registered device tokens.
-      const userSnap = await getFirestore()
-          .collection("users")
-          .doc(note.toPhone)
-          .get();
+      const rawPhone = String(note.toPhone || "").trim();
+      const digitsOnly = rawPhone.replace(/\D/g, "");
+      const phone10 = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+
+      const db = getFirestore();
+      let userSnap = await db.collection("users").doc(rawPhone).get();
+      if (!userSnap.exists && phone10) {
+        userSnap = await db.collection("users").doc(phone10).get();
+      }
+      if (!userSnap.exists) return;
+
       const tokens = ((userSnap.data() || {}).fcmTokens || []).filter(Boolean);
       if (tokens.length === 0) return;
 
@@ -44,8 +44,10 @@ exports.sendNotificationPush = onDocumentCreated(
         android: {
           priority: "high",
           notification: {
-            channelId: "high_importance_channel",
+            channelId: "high_importance_channel_v2",
             sound: "default",
+            priority: "max",
+            visibility: "public",
           },
         },
         apns: {
@@ -57,7 +59,6 @@ exports.sendNotificationPush = onDocumentCreated(
         },
       });
 
-      // Clean up tokens that are no longer valid.
       const stale = [];
       res.responses.forEach((r, i) => {
         if (!r.success) {
@@ -70,6 +71,7 @@ exports.sendNotificationPush = onDocumentCreated(
           }
         }
       });
+
       if (stale.length) {
         const {FieldValue} = require("firebase-admin/firestore");
         await userSnap.ref.update({

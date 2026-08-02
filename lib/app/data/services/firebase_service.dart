@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -6,7 +6,6 @@ import 'package:get/get.dart';
 import 'package:transport/app/modules/trips/controllers/trips_controller.dart';
 import 'package:transport/app/data/services/session_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 import 'package:transport/app/core/config/app_config.dart';
 import 'package:transport/app/core/utils/app_logger.dart';
 
@@ -40,7 +39,32 @@ class FirebaseService extends GetxService {
   FirebaseStorage get _storage => _injectedStorage ?? FirebaseStorage.instance;
 
   Future<FirebaseService> init() async {
+    // Native clients already persist Firestore data by default. The web SDK
+    // defaults to memory-only caching, so enable its disk cache when possible.
+    // A shared browser profile can reject persistence; live reads still work.
+    if (_injectedStorage == null && kIsWeb) {
+      try {
+        _db.settings = const Settings(persistenceEnabled: true);
+      } catch (_) {}
+    }
     return this;
+  }
+
+  /// Commits independent updates in Firestore's maximum-size-safe chunks.
+  /// This preserves each document's payload while replacing N network commits
+  /// with one commit per 500 documents.
+  Future<void> _setInBatches(
+    Iterable<DocumentReference<Map<String, dynamic>>> references,
+    Map<String, dynamic> data,
+  ) async {
+    final refs = references.toList(growable: false);
+    for (var start = 0; start < refs.length; start += 500) {
+      final batch = _db.batch();
+      for (final ref in refs.skip(start).take(500)) {
+        batch.set(ref, data, SetOptions(merge: true));
+      }
+      await batch.commit();
+    }
   }
 
   /// Runs a Firestore write and turns a failure into a readable error instead
@@ -629,7 +653,8 @@ class FirebaseService extends GetxService {
         await createNotification(
           toPhone: driverPhone,
           title: 'Trip Activated ✅',
-          body: 'Admin approved your load and issued Truck Owner Pass. Trip $tripId is now ACTIVE — '
+          body:
+              'Admin approved your load and issued Truck Owner Pass. Trip $tripId is now ACTIVE — '
               'destination: ${data['dropCity'] ?? ''} '
               '${data['dropLocation'] ?? ''}. Drive safely!',
           type: 'trip_activated',
@@ -963,7 +988,7 @@ class FirebaseService extends GetxService {
           ? tripId
           : (refId != null && refId.isNotEmpty)
               ? refId
-              : '${DateTime.now().millisecondsSinceEpoch}';
+              : '${DateTime.now().microsecondsSinceEpoch}_${_db.collection('notifications').doc().id}';
       final docId = '${p}_${type}_$keyId';
 
       await _db.collection('notifications').doc(docId).set({
@@ -1055,9 +1080,8 @@ class FirebaseService extends GetxService {
           .where('toPhone', isEqualTo: p)
           .where('read', isEqualTo: false)
           .get();
-      for (final d in snap.docs) {
-        await d.reference.set({'read': true}, SetOptions(merge: true));
-      }
+      await _setInBatches(
+          snap.docs.map((doc) => doc.reference), {'read': true});
     } catch (_) {}
   }
 
@@ -1083,14 +1107,33 @@ class FirebaseService extends GetxService {
     try {
       final snap =
           await _db.collection('users').where('role', isEqualTo: 'admin').get();
-      for (final d in snap.docs) {
-        await createNotification(
-            toPhone: d.id,
-            title: title,
-            body: body,
-            type: type,
-            tripId: tripId,
-            refId: refId);
+      // All writes are independent but should reach admins together. A batch
+      // avoids one round trip per administrator and queues safely offline.
+      for (var start = 0; start < snap.docs.length; start += 500) {
+        final batch = _db.batch();
+        for (final admin in snap.docs.skip(start).take(500)) {
+          final keyId = (tripId != null && tripId.isNotEmpty)
+              ? tripId
+              : (refId != null && refId.isNotEmpty)
+                  ? refId
+                  : '${DateTime.now().microsecondsSinceEpoch}_${admin.id}';
+          final noteRef =
+              _db.collection('notifications').doc('${admin.id}_${type}_$keyId');
+          batch.set(
+              noteRef,
+              {
+                'toPhone': admin.id,
+                'title': title,
+                'body': body,
+                'type': type,
+                if (tripId != null) 'tripId': tripId,
+                if (refId != null) 'refId': refId,
+                'read': false,
+                'createdAt': FieldValue.serverTimestamp(),
+              },
+              SetOptions(merge: true));
+        }
+        await batch.commit();
       }
     } catch (_) {}
   }
@@ -1881,13 +1924,16 @@ class FirebaseService extends GetxService {
       // Clean up any active/pending trips for this truck
       try {
         final tripsSnap = await _db.collection('trips').get();
-        String clean(String val) => val.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+        String clean(String val) =>
+            val.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
         final targetClean = clean(truckNo);
         for (final doc in tripsSnap.docs) {
           final data = doc.data();
           final tripTruck = (data['truckNo'] ?? '').toString();
           final status = (data['status'] ?? '').toString();
-          if (clean(tripTruck) == targetClean && status != 'DELIVERED' && status != 'REJECTED') {
+          if (clean(tripTruck) == targetClean &&
+              status != 'DELIVERED' &&
+              status != 'REJECTED') {
             await doc.reference.delete();
           }
         }

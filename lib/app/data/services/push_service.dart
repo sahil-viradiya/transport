@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:flutter/widgets.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -9,42 +11,134 @@ import 'web_notify.dart' as web_notify;
 import '../../routes/app_pages.dart';
 import '../../../widgets/dialogs/app_snackbar.dart';
 
-/// Background / terminated messages. Firebase must be re-initialised in this
-/// isolate. The OS auto-displays the `notification` payload, so we only need a
-/// top-level handler to exist.
+/// Top-level background / terminated FCM message handler.
+/// Executed in a separate background isolate when the application is terminated or in background.
+/// Must be annotated with `@pragma('vm:entry-point')` and initialize Firebase.
+///
+/// NOTE: For messages with a `notification` payload, Android/iOS native FCM SDK automatically
+/// displays the heads-up notification banner in background/terminated state. We only trigger
+/// `FlutterLocalNotificationsPlugin.show()` for `data`-only payloads to avoid duplicate notifications.
 @pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {}
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (Firebase.apps.isEmpty) {
+    if (kIsWeb) {
+      await Firebase.initializeApp(
+        options: const FirebaseOptions(
+          apiKey: "AIzaSyCFte8SaEM25uQNis6B7-Ls0T3nE9uN7W0",
+          authDomain: "transport-1faf4.firebaseapp.com",
+          projectId: "transport-1faf4",
+          storageBucket: "transport-1faf4.firebasestorage.app",
+          messagingSenderId: "1048359203148",
+          appId: "1:1048359203148:web:5e3d6694adb35a22765fe9",
+        ),
+      );
+    } else {
+      await Firebase.initializeApp();
+    }
+  }
+
+  // Handle data-only messages in background/terminated state (where FCM native SDK does not auto-display).
+  if (!kIsWeb && message.notification == null && message.data.isNotEmpty) {
+    final FlutterLocalNotificationsPlugin localNotifications =
+        FlutterLocalNotificationsPlugin();
+
+    const channelV2 = AndroidNotificationChannel(
+      'high_importance_channel_v2',
+      'High Importance Notifications',
+      description: 'Trip, expense and driver notifications.',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+      showBadge: true,
+    );
+
+    final androidPlugin = localNotifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    await androidPlugin?.createNotificationChannel(channelV2);
+
+    const initSettings = InitializationSettings(
+      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      iOS: DarwinInitializationSettings(),
+    );
+    await localNotifications.initialize(settings: initSettings);
+
+    final title = message.data['title']?.toString() ??
+        message.data['type']?.toString() ??
+        'Notification';
+    final body = message.data['body']?.toString() ?? '';
+
+    if (title.isNotEmpty || body.isNotEmpty) {
+      await localNotifications.show(
+        id: message.hashCode,
+        title: title,
+        body: body,
+        payload: jsonEncode(message.data),
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            channelV2.id,
+            channelV2.name,
+            channelDescription: channelV2.description,
+            importance: Importance.max,
+            priority: Priority.high,
+            visibility: NotificationVisibility.public,
+            icon: '@mipmap/ic_launcher',
+            ticker: title,
+            category: AndroidNotificationCategory.message,
+            audioAttributesUsage: AudioAttributesUsage.notification,
+            styleInformation: BigTextStyleInformation(body),
+            fullScreenIntent: true,
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+      );
+    }
+  }
+
+  debugPrint('[FCM Background Isolate] Handled background message: ${message.messageId}');
+}
 
 /// Firebase Cloud Messaging — turns every in-app notification into a real push
 /// (foreground + background + terminated) and routes taps to the right screen.
-///
-/// - Foreground: shows a heads-up banner (flutter_local_notifications on
-///   Android, presentation options on iOS) + an in-app snackbar.
-/// - Background / terminated: the OS shows the `notification` payload; tapping it
-///   opens the app and navigates (onMessageOpenedApp / getInitialMessage).
-/// - Saves the device token to `users/{phone}.fcmTokens` for the Cloud Function.
-///
-/// Defensive everywhere: if FCM isn't configured (desktop, or web without a
-/// VAPID key) it degrades to a no-op and the in-app bell still works.
 class PushService extends GetxService {
-  // Web push VAPID key — Firebase Console → Project Settings → Cloud Messaging
-  // → Web Push certificates → Key pair.
   static const String webVapidKey =
       'BKAXZv30eXYX4THvhtZZYNECNa7Qn0ykBga_IyJ1SP6CimbAQmujWD5u2D4Gn3AxFek05ULdpCpPqFQ4wEoSgdA';
 
   final _localNotifications = FlutterLocalNotificationsPlugin();
 
-  final _channel = const AndroidNotificationChannel(
-    'high_importance_channel',
+  final _channelV2 = const AndroidNotificationChannel(
+    'high_importance_channel_v2',
     'High Importance Notifications',
     description: 'Trip, expense and driver notifications.',
     importance: Importance.max,
+    playSound: true,
+    enableVibration: true,
+    showBadge: true,
+  );
+
+  final _channelV1 = const AndroidNotificationChannel(
+    'high_importance_channel',
+    'High Importance Notifications Legacy',
+    description: 'Trip, expense and driver notifications.',
+    importance: Importance.max,
+    playSound: true,
+    enableVibration: true,
+    showBadge: true,
   );
 
   Future<PushService> init() async {
     try {
       final messaging = FirebaseMessaging.instance;
-      await messaging.requestPermission(alert: true, badge: true, sound: true);
+      await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
       await messaging.setForegroundNotificationPresentationOptions(
         alert: true,
         badge: true,
@@ -54,13 +148,17 @@ class PushService extends GetxService {
       if (!kIsWeb) {
         final android = _localNotifications.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
-        await android?.createNotificationChannel(_channel);
-        // Android 13+ needs an explicit runtime notification permission.
+        await android?.createNotificationChannel(_channelV2);
+        await android?.createNotificationChannel(_channelV1);
         await android?.requestNotificationsPermission();
 
         const initSettings = InitializationSettings(
           android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-          iOS: DarwinInitializationSettings(),
+          iOS: DarwinInitializationSettings(
+            requestAlertPermission: true,
+            requestBadgePermission: true,
+            requestSoundPermission: true,
+          ),
         );
         await _localNotifications.initialize(
           settings: initSettings,
@@ -75,9 +173,7 @@ class PushService extends GetxService {
         );
       }
 
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-      // Foreground message → heads-up banner (mobile) + snackbar + browser notification (web).
+      // Foreground message listener
       FirebaseMessaging.onMessage.listen((msg) {
         final n = msg.notification;
         if (n == null) return;
@@ -90,20 +186,23 @@ class PushService extends GetxService {
             payload: jsonEncode(msg.data),
             notificationDetails: NotificationDetails(
               android: AndroidNotificationDetails(
-                _channel.id,
-                _channel.name,
-                channelDescription: _channel.description,
+                _channelV2.id,
+                _channelV2.name,
+                channelDescription: _channelV2.description,
                 importance: Importance.max,
                 priority: Priority.high,
+                visibility: NotificationVisibility.public,
                 icon: '@mipmap/ic_launcher',
+                ticker: n.title,
+                category: AndroidNotificationCategory.message,
+                audioAttributesUsage: AudioAttributesUsage.notification,
+                styleInformation: BigTextStyleInformation(n.body ?? ''),
+                fullScreenIntent: true,
               ),
             ),
           );
         }
 
-        // Show a native browser notification on web (foreground messages are
-        // not auto-displayed by the browser; the service worker only handles
-        // background/terminated state).
         if (kIsWeb) {
           web_notify.showBrowserNotification(
             n.title ?? 'Notification',
@@ -117,14 +216,14 @@ class PushService extends GetxService {
         );
       });
 
-      // Tap on a background notification → open its detail page.
+      // Tap on background notification -> navigate
       FirebaseMessaging.onMessageOpenedApp.listen((m) => _navigate(m.data));
 
-      // Cold start from a terminated notification → navigate once the app is up.
+      // Cold start from terminated notification -> navigate once the app is up
       final initial = await messaging.getInitialMessage();
       if (initial != null && initial.data.isNotEmpty) {
         final data = Map<String, dynamic>.from(initial.data);
-        Future.delayed(const Duration(seconds: 3), () => _navigate(data));
+        Future.delayed(const Duration(seconds: 2), () => _navigate(data));
       }
 
       messaging.onTokenRefresh.listen(_saveToken);
@@ -135,7 +234,7 @@ class PushService extends GetxService {
         ever(session.phone, (_) => registerForUser());
       } catch (_) {}
     } catch (e) {
-      debugPrint('PushService init skipped (FCM not available here): $e');
+      debugPrint('PushService init warning: $e');
     }
     return this;
   }
@@ -147,17 +246,9 @@ class PushService extends GetxService {
     } catch (_) {}
   }
 
-  /// Current browser notification permission on web ('granted' / 'denied' /
-  /// 'default' / 'unsupported'). Always 'granted' on mobile — the OS-level
-  /// heads-up there is handled by flutter_local_notifications, not this API.
   String get webNotificationPermission =>
       kIsWeb ? web_notify.notificationPermission : 'granted';
 
-  /// Explicitly (re)requests notification permission. Call this from a real
-  /// user tap (e.g. an "Enable Notifications" button) — browsers are far more
-  /// reliable about actually showing the prompt when it's tied to a genuine
-  /// gesture rather than the automatic request at app boot, which some
-  /// browsers silently ignore. Returns true if permission ends up granted.
   Future<bool> requestNotificationPermission() async {
     if (kIsWeb) {
       final result = await web_notify.requestNotificationPermission();
@@ -173,18 +264,11 @@ class PushService extends GetxService {
     }
   }
 
-  /// Fires ONLY the native browser notification (web) with no in-app snackbar —
-  /// used when the app already shows its own in-app floating card, so the tab
-  /// still gets a system notification when it isn't focused (no double toast).
   void showWebBrowserNotification(String title, String body) {
     if (kIsWeb) web_notify.showBrowserNotification(title, body);
   }
 
-  /// Show a native browser notification (web) or OS heads-up (mobile/Android).
-  /// Called by [NotificationsController] whenever a new notification arrives on
-  /// the recipient's live Firestore stream.
   Future<void> showLocal(String title, String body, {String? payload}) async {
-    // Web: use the browser Notification API directly.
     if (kIsWeb) {
       web_notify.showBrowserNotification(title, body);
       AppSnackBar.showInfo(
@@ -201,12 +285,18 @@ class PushService extends GetxService {
         payload: payload,
         notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
-            _channel.id,
-            _channel.name,
-            channelDescription: _channel.description,
+            _channelV2.id,
+            _channelV2.name,
+            channelDescription: _channelV2.description,
             importance: Importance.max,
             priority: Priority.high,
+            visibility: NotificationVisibility.public,
             icon: '@mipmap/ic_launcher',
+            ticker: title,
+            category: AndroidNotificationCategory.message,
+            audioAttributesUsage: AudioAttributesUsage.notification,
+            styleInformation: BigTextStyleInformation(body),
+            fullScreenIntent: true,
           ),
           iOS: const DarwinNotificationDetails(),
         ),
@@ -214,7 +304,6 @@ class PushService extends GetxService {
     } catch (_) {}
   }
 
-  /// Associate this device's token with the signed-in user.
   Future<void> registerForUser() async {
     try {
       final phone = Get.find<SessionService>().ownerKey;

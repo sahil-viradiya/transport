@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:transport/app/core/utils/time_utils.dart';
 
@@ -22,6 +23,20 @@ void main() {
       expect(timeAgo(now.subtract(const Duration(days: 1)), now: now), '1 day ago');
       expect(timeAgo(now.subtract(const Duration(days: 2)), now: now), '2 days ago');
     });
+
+    test('handles Firestore Timestamp safely without TypeError', () {
+      final ts = Timestamp.fromDate(now.subtract(const Duration(minutes: 15)));
+      expect(timeAgo(ts, now: now), '15 min ago');
+    });
+
+    test('handles String ISO dates safely', () {
+      final str = now.subtract(const Duration(hours: 2)).toIso8601String();
+      expect(timeAgo(str, now: now), '2 hr ago');
+    });
+
+    test('handles null safely', () {
+      expect(timeAgo(null, now: now), '');
+    });
   });
 
   group('isLocationFresh', () {
@@ -31,6 +46,11 @@ void main() {
 
     test('stale location is not fresh', () {
       expect(isLocationFresh(now.subtract(const Duration(hours: 2)), now: now), false);
+    });
+
+    test('handles Firestore Timestamp safely', () {
+      final ts = Timestamp.fromDate(now.subtract(const Duration(minutes: 5)));
+      expect(isLocationFresh(ts, now: now), true);
     });
   });
 }

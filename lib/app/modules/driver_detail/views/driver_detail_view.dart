@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../controllers/driver_detail_controller.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../../widgets/trip_progress_tracker.dart';
+import '../../../../widgets/feedback_views.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_url.dart';
 import '../../../routes/app_pages.dart';
@@ -20,8 +21,7 @@ class DriverDetailView extends GetView<DriverDetailController> {
       ),
       body: Obx(() {
         if (controller.isLoading.value) {
-          return const Center(
-              child: CircularProgressIndicator(color: AppColors.primary));
+          return const AppLoadingView();
         }
         final u = controller.user.value ?? {};
         final p = controller.profile.value ?? {};
@@ -35,8 +35,12 @@ class DriverDetailView extends GetView<DriverDetailController> {
               const SizedBox(height: 16),
               _vehicleCard(p, trip, isDark),
               const SizedBox(height: 16),
-              if (trip != null) _tripCard(context, trip, isDark) else _noTrip(isDark),
-              if (p['documents'] != null && (p['documents'] as List).isNotEmpty) ...[
+              if (trip != null)
+                _tripCard(context, trip, isDark)
+              else
+                _noTrip(isDark),
+              if (p['documents'] != null &&
+                  (p['documents'] as List).isNotEmpty) ...[
                 const SizedBox(height: 16),
                 _documentsCard(p['documents'] as List, isDark),
               ],
@@ -96,8 +100,8 @@ class DriverDetailView extends GetView<DriverDetailController> {
                     AppText(phone, style: AppTextStyle.bodyMedium),
                     const SizedBox(height: 6),
                     Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: (available
                                 ? AppColors.success
@@ -137,7 +141,8 @@ class DriverDetailView extends GetView<DriverDetailController> {
     );
   }
 
-  Widget _vehicleCard(Map<String, dynamic> p, Map<String, dynamic>? trip, bool isDark) {
+  Widget _vehicleCard(
+      Map<String, dynamic> p, Map<String, dynamic>? trip, bool isDark) {
     var vehicleNo = (p['vehicleNo'] ?? '').toString().trim();
     if (vehicleNo.isEmpty || vehicleNo == 'No vehicle') {
       vehicleNo = (trip?['truckNo'] ?? 'No vehicle').toString();
@@ -168,7 +173,8 @@ class DriverDetailView extends GetView<DriverDetailController> {
     );
   }
 
-  Widget _tripCard(BuildContext context, Map<String, dynamic> trip, bool isDark) {
+  Widget _tripCard(
+      BuildContext context, Map<String, dynamic> trip, bool isDark) {
     return InkWell(
       onTap: () {
         Navigator.of(context, rootNavigator: true).pushNamed(
@@ -194,18 +200,22 @@ class DriverDetailView extends GetView<DriverDetailController> {
                     color: AppColors.textSecondary),
                 const Spacer(),
                 AppText(trip['id']?.toString() ?? '',
-                    style: AppTextStyle.labelMedium, fontWeight: FontWeight.w700),
+                    style: AppTextStyle.labelMedium,
+                    fontWeight: FontWeight.w700),
               ],
             ),
             const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
-                  child: AppText('${trip['pickupCity'] ?? ''} → ${trip['dropCity'] ?? ''}',
-                      style: AppTextStyle.titleLarge, fontWeight: FontWeight.w700),
+                  child: AppText(
+                      '${trip['pickupCity'] ?? ''} → ${trip['dropCity'] ?? ''}',
+                      style: AppTextStyle.titleLarge,
+                      fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+                const Icon(Icons.chevron_right_rounded,
+                    color: AppColors.textSecondary),
               ],
             ),
             const SizedBox(height: 14),
@@ -244,7 +254,8 @@ class DriverDetailView extends GetView<DriverDetailController> {
               IconData iconData = Icons.description_rounded;
               if (title.toLowerCase().contains('license')) {
                 iconData = Icons.badge_rounded;
-              } else if (title.toLowerCase().contains('rc') || title.toLowerCase().contains('registration')) {
+              } else if (title.toLowerCase().contains('rc') ||
+                  title.toLowerCase().contains('registration')) {
                 iconData = Icons.local_shipping_rounded;
               }
 
@@ -263,9 +274,13 @@ class DriverDetailView extends GetView<DriverDetailController> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        AppText(title, style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                        AppText(title,
+                            style: AppTextStyle.bodyMedium,
+                            fontWeight: FontWeight.bold),
                         if (subtitle.isNotEmpty)
-                          AppText(subtitle, style: AppTextStyle.labelMedium, color: AppColors.textSecondary),
+                          AppText(subtitle,
+                              style: AppTextStyle.labelMedium,
+                              color: AppColors.textSecondary),
                       ],
                     ),
                   ),
@@ -273,19 +288,25 @@ class DriverDetailView extends GetView<DriverDetailController> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: (isExpired ? AppColors.error : AppColors.success).withValues(alpha: 0.12),
+                          color:
+                              (isExpired ? AppColors.error : AppColors.success)
+                                  .withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: AppText(status,
                             style: AppTextStyle.labelMedium,
-                            color: isExpired ? AppColors.error : AppColors.success,
+                            color:
+                                isExpired ? AppColors.error : AppColors.success,
                             fontWeight: FontWeight.bold),
                       ),
                       if (expiry.isNotEmpty) ...[
                         const SizedBox(height: 2),
-                        AppText('Expiry: $expiry', style: AppTextStyle.labelMedium, color: AppColors.textSecondary),
+                        AppText('Expiry: $expiry',
+                            style: AppTextStyle.labelMedium,
+                            color: AppColors.textSecondary),
                       ],
                     ],
                   ),
@@ -335,7 +356,8 @@ class DriverDetailView extends GetView<DriverDetailController> {
                 },
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
                   child: Row(
                     children: [
                       Container(

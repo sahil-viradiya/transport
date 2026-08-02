@@ -19,6 +19,7 @@ class DriverDetailController extends GetxController {
   StreamSubscription? _expensesSub;
   bool _inFlight = false;
   bool _queued = false;
+  Timer? _refreshDebounce;
 
   @override
   void onInit() {
@@ -31,8 +32,9 @@ class DriverDetailController extends GetxController {
     // Keep the admin's view of this driver live: their trips, profile
     // (availability / last location) and expense claims all update in place
     // instead of showing a stale snapshot from when the screen was opened.
-    _tripsSub = _fb.watchTripsForOwner(phone).listen((_) => _reload());
-    _profileSub = _fb.watchDriverProfile(phone).listen((_) => _reload());
+    _tripsSub = _fb.watchTripsForOwner(phone).listen((_) => _scheduleReload());
+    _profileSub =
+        _fb.watchDriverProfile(phone).listen((_) => _scheduleReload());
     _expensesSub = _fb.watchExpensesForDriver(phone).listen((list) {
       final sorted = [...list]..sort((a, b) =>
           (b['id'] ?? '').toString().compareTo((a['id'] ?? '').toString()));
@@ -59,11 +61,20 @@ class DriverDetailController extends GetxController {
     }
   }
 
+  /// Firestore sends initial snapshots for each listener together. Coalescing
+  /// them prevents those snapshots (and bursts of related updates) from
+  /// triggering duplicate full-detail reads.
+  void _scheduleReload() {
+    _refreshDebounce?.cancel();
+    _refreshDebounce = Timer(const Duration(milliseconds: 250), _reload);
+  }
+
   @override
   void onClose() {
     _tripsSub?.cancel();
     _profileSub?.cancel();
     _expensesSub?.cancel();
+    _refreshDebounce?.cancel();
     super.onClose();
   }
 
@@ -72,7 +83,8 @@ class DriverDetailController extends GetxController {
     try {
       if (phone.isNotEmpty) {
         user.value = await _fb.getUserData(phone);
-        final prof = Map<String, dynamic>.from(await _fb.getDriverProfile(phone));
+        final prof =
+            Map<String, dynamic>.from(await _fb.getDriverProfile(phone));
         final trips = await _fb.getTripsForOwner(phone);
         final active = trips.firstWhereOrNull((t) => t.isActive);
         if (active != null) {

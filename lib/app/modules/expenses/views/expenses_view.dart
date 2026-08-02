@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../../widgets/app_button.dart';
+import '../../../../widgets/feedback_views.dart';
 import '../../../../widgets/dialogs/app_snackbar.dart';
 import '../../../core/theme/app_colors.dart';
 import '../controllers/expenses_controller.dart';
@@ -20,12 +21,11 @@ class ExpensesView extends GetView<ExpensesController> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      backgroundColor:
+          isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       body: Obx(() {
         if (controller.isLoading.value && controller.expenses.isEmpty) {
-          return const Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
-          );
+          return const AppLoadingView();
         }
 
         return RefreshIndicator(
@@ -41,7 +41,7 @@ class ExpensesView extends GetView<ExpensesController> {
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: isDark 
+                      colors: isDark
                           ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
                           : [AppColors.primary, AppColors.primaryDark],
                       begin: Alignment.topLeft,
@@ -69,8 +69,14 @@ class ExpensesView extends GetView<ExpensesController> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildSummaryStat('Approved', controller.approvedExpenses.value, Colors.greenAccent),
-                          _buildSummaryStat('Pending', controller.pendingExpenses.value, Colors.orangeAccent),
+                          _buildSummaryStat(
+                              'Approved',
+                              controller.approvedExpenses.value,
+                              Colors.greenAccent),
+                          _buildSummaryStat(
+                              'Pending',
+                              controller.pendingExpenses.value,
+                              Colors.orangeAccent),
                         ],
                       ),
                     ],
@@ -99,9 +105,11 @@ class ExpensesView extends GetView<ExpensesController> {
                       child: Center(
                         child: Column(
                           children: [
-                            Icon(Icons.receipt_long_outlined, size: 48, color: AppColors.textHint),
+                            Icon(Icons.receipt_long_outlined,
+                                size: 48, color: AppColors.textHint),
                             SizedBox(height: 8),
-                            AppText('No expense claims recorded yet.', style: AppTextStyle.bodyMedium),
+                            AppText('No expense claims recorded yet.',
+                                style: AppTextStyle.bodyMedium),
                           ],
                         ),
                       ),
@@ -118,7 +126,7 @@ class ExpensesView extends GetView<ExpensesController> {
                       final amt = item['amount'] ?? '₹0';
                       final date = item['date'] ?? '';
                       final status = item['status'] ?? 'Pending';
-                      
+
                       Color iconCol = Colors.orange;
                       IconData iconData = Icons.local_gas_station_rounded;
 
@@ -128,7 +136,8 @@ class ExpensesView extends GetView<ExpensesController> {
                       } else if (title.contains('Food')) {
                         iconCol = Colors.purple;
                         iconData = Icons.hotel_rounded;
-                      } else if (title.contains('Repair') || title.contains('Tyre')) {
+                      } else if (title.contains('Repair') ||
+                          title.contains('Tyre')) {
                         iconCol = Colors.red;
                         iconData = Icons.build_rounded;
                       } else if (title.contains('Other')) {
@@ -137,7 +146,8 @@ class ExpensesView extends GetView<ExpensesController> {
                       }
 
                       return Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 6),
                         child: Card(
                           child: Padding(
                             padding: const EdgeInsets.all(16),
@@ -146,40 +156,57 @@ class ExpensesView extends GetView<ExpensesController> {
                                 Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: isDark ? const Color(0xFF1E293B) : iconCol.withValues(alpha: 0.1),
+                                    color: isDark
+                                        ? const Color(0xFF1E293B)
+                                        : iconCol.withValues(alpha: 0.1),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: Icon(iconData, color: iconCol, size: 24),
+                                  child:
+                                      Icon(iconData, color: iconCol, size: 24),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
                                           Expanded(
-                                            child: AppText(title, style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
+                                            child: AppText(title,
+                                                style: AppTextStyle.bodyLarge,
+                                                fontWeight: FontWeight.bold),
                                           ),
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
-                                              color: status == 'Approved' ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(4),
+                                              color: status == 'Approved'
+                                                  ? Colors.green
+                                                      .withValues(alpha: 0.1)
+                                                  : Colors.orange
+                                                      .withValues(alpha: 0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
                                             ),
                                             child: AppText(
                                               status,
                                               style: AppTextStyle.labelMedium,
-                                              color: status == 'Approved' ? Colors.green : Colors.orange,
+                                              color: status == 'Approved'
+                                                  ? Colors.green
+                                                  : Colors.orange,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
                                         ],
                                       ),
                                       const SizedBox(height: 4),
-                                      AppText(desc, style: AppTextStyle.bodyMedium),
+                                      AppText(desc,
+                                          style: AppTextStyle.bodyMedium),
                                       const SizedBox(height: 4),
-                                      AppText('Trip: ${item['tripId'] ?? "N/A"} • $date', style: AppTextStyle.labelMedium),
+                                      AppText(
+                                          'Trip: ${item['tripId'] ?? "N/A"} • $date',
+                                          style: AppTextStyle.labelMedium),
                                     ],
                                   ),
                                 ),
@@ -188,7 +215,9 @@ class ExpensesView extends GetView<ExpensesController> {
                                   amt,
                                   style: AppTextStyle.bodyLarge,
                                   fontWeight: FontWeight.bold,
-                                  color: isDark ? Colors.white : AppColors.textPrimary,
+                                  color: isDark
+                                      ? Colors.white
+                                      : AppColors.textPrimary,
                                 ),
                               ],
                             ),
@@ -208,7 +237,8 @@ class ExpensesView extends GetView<ExpensesController> {
                   child: AppButton(
                     text: 'File New Expense Claim',
                     icon: Icons.add_circle_outline_rounded,
-                    onPressed: () => _showAddExpenseBottomSheet(context, isDark),
+                    onPressed: () =>
+                        _showAddExpenseBottomSheet(context, isDark),
                   ),
                 ),
               ),
@@ -225,7 +255,10 @@ class ExpensesView extends GetView<ExpensesController> {
       children: [
         AppText(label, style: AppTextStyle.labelMedium, color: Colors.white60),
         const SizedBox(height: 4),
-        AppText(value, style: AppTextStyle.bodyLarge, color: color, fontWeight: FontWeight.bold),
+        AppText(value,
+            style: AppTextStyle.bodyLarge,
+            color: color,
+            fontWeight: FontWeight.bold),
       ],
     );
   }
@@ -235,17 +268,18 @@ class ExpensesView extends GetView<ExpensesController> {
     final titleCtrl = TextEditingController(text: 'Fuel Top-up');
     final amountCtrl = TextEditingController();
     final descCtrl = TextEditingController();
-    
+
     // Get active trip details
     String activeTripId = 'None';
     try {
       final tripsController = Get.find<TripsController>();
-      final active = tripsController.allTrips.firstWhereOrNull((t) => t.isActive);
+      final active =
+          tripsController.allTrips.firstWhereOrNull((t) => t.isActive);
       if (active != null) {
         activeTripId = active.id;
       }
     } catch (_) {}
-    
+
     final tripIdCtrl = TextEditingController(text: activeTripId);
     final receiptBytes = Rx<Uint8List?>(null);
 
@@ -259,271 +293,311 @@ class ExpensesView extends GetView<ExpensesController> {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           clipBehavior: Clip.antiAlias,
           child: Container(
-          padding: EdgeInsets.only(
-            top: 16,
-            left: 20,
-            right: 20,
-            bottom: MediaQuery.of(bottomSheetCtx).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white24 : Colors.black12,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const AppText(
-                'File New Expense Claim',
-                style: AppTextStyle.headlineSmall,
-                fontWeight: FontWeight.bold,
-              ),
-              const Divider(height: 16),
-              Flexible(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  child: Form(
-                    key: formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<String>(
-                          initialValue: titleCtrl.text,
-                          decoration: const InputDecoration(
-                            labelText: 'Expense Category',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.category_rounded),
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 'Fuel Top-up', child: Text('Fuel Top-up')),
-                            DropdownMenuItem(value: 'Toll Tax Payment', child: Text('Toll Tax Payment')),
-                            DropdownMenuItem(value: 'Driver Food & Stay', child: Text('Driver Food & Stay')),
-                            DropdownMenuItem(value: 'Tyre Repair Work', child: Text('Tyre Repair Work')),
-                            DropdownMenuItem(value: 'Other Miscellaneous', child: Text('Other Miscellaneous')),
-                          ],
-                          onChanged: (val) {
-                            if (val != null) titleCtrl.text = val;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: amountCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Amount (₹)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.currency_rupee_rounded),
-                          ),
-                          keyboardType: TextInputType.number,
-                          validator: (v) => v!.isEmpty ? 'Field required' : null,
-                        ),
-                        const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                          initialValue: tripIdCtrl.text.isEmpty
-                              ? null
-                              : (Get.isRegistered<TripsController>() &&
-                                      Get.find<TripsController>()
-                                          .allTrips
-                                          .any((t) => t.id == tripIdCtrl.text)
-                                  ? tripIdCtrl.text
-                                  : null),
-                          decoration: const InputDecoration(
-                            labelText: 'Assigned Trip (Optional)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.tag_rounded),
-                          ),
-                          items: [
-                            const DropdownMenuItem<String>(
-                              value: null,
-                              child: Text('None / Not Associated'),
-                            ),
-                            if (Get.isRegistered<TripsController>())
-                              ...Get.find<TripsController>().allTrips.map((t) {
-                                return DropdownMenuItem<String>(
-                                  value: t.id,
-                                  child: Text(t.id),
-                                );
-                              }),
-                          ],
-                          onChanged: (val) {
-                            tripIdCtrl.text = val ?? '';
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: descCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Description / Remarks',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.description_rounded),
-                          ),
-                          maxLines: 2,
-                          validator: (v) => v!.isEmpty ? 'Field required' : null,
-                        ),
-                        const SizedBox(height: 16),
-                        // Receipt proof — required (photo of bill / receipt).
-                        const AppText('RECEIPT PROOF',
-                            style: AppTextStyle.labelMedium,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textSecondary),
-                        const SizedBox(height: 6),
-                        Obx(() => receiptBytes.value == null
-                            ? OutlinedButton.icon(
-                                onPressed: () async {
-                                  final source = await Get.bottomSheet<ImageSource>(
-                                    Container(
-                                      padding: const EdgeInsets.all(20),
-                                      decoration: BoxDecoration(
-                                        color: Get.isDarkMode ? const Color(0xFF1E293B) : Colors.white,
-                                        borderRadius: const BorderRadius.only(
-                                          topLeft: Radius.circular(16),
-                                          topRight: Radius.circular(16),
-                                        ),
-                                      ),
-                                      child: SafeArea(
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const AppText('Select Image Source', style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
-                                            const SizedBox(height: 16),
-                                            ListTile(
-                                              leading: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
-                                              title: const AppText('Choose from Gallery', style: AppTextStyle.bodyMedium),
-                                              onTap: () => Get.back(result: ImageSource.gallery),
-                                            ),
-                                            ListTile(
-                                              leading: const Icon(Icons.camera_alt_rounded, color: AppColors.primary),
-                                              title: const AppText('Take Photo (Camera)', style: AppTextStyle.bodyMedium),
-                                              onTap: () => Get.back(result: ImageSource.camera),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-
-                                  if (source == null) return;
-
-                                  final x = await ImagePicker().pickImage(
-                                    source: source,
-                                    imageQuality: 70,
-                                  );
-                                  if (x != null) {
-                                    receiptBytes.value = await x.readAsBytes();
-                                  }
-                                },
-                                icon: const Icon(Icons.photo_camera_rounded),
-                                label: const Text('Attach Receipt Photo'),
-                                style: OutlinedButton.styleFrom(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 14),
-                                ),
-                              )
-                            : Row(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: Image.memory(receiptBytes.value!,
-                                        width: 54,
-                                        height: 54,
-                                        fit: BoxFit.cover),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  const Expanded(
-                                    child: AppText('Receipt attached ✓',
-                                        style: AppTextStyle.bodyMedium,
-                                        color: AppColors.success,
-                                        fontWeight: FontWeight.w600),
-                                  ),
-                                  TextButton(
-                                    onPressed: () => receiptBytes.value = null,
-                                    child: const Text('Change'),
-                                  ),
-                                ],
-                              )),
-                        const SizedBox(height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton(
-                              onPressed: () => Navigator.of(bottomSheetCtx).pop(),
-                              child: const AppText('Cancel', style: AppTextStyle.bodyMedium),
-                            ),
-                            const SizedBox(width: 12),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: () async {
-                                if (!formKey.currentState!.validate()) return;
-                                if (receiptBytes.value == null) {
-                                  AppSnackBar.showWarning(
-                                      title: 'Proof Required',
-                                      message:
-                                          'Please attach a receipt photo as proof.');
-                                  return;
-                                }
-                                final phone =
-                                    Get.find<SessionService>().ownerKey;
-
-                                double currentLat =
-                                    LocationService.fallbackLatitude;
-                                double currentLng =
-                                    LocationService.fallbackLongitude;
-                                String locationName = '';
-                                try {
-                                  final locationService =
-                                      Get.find<LocationService>();
-                                  final pos = await locationService
-                                      .getCurrentPosition();
-                                  currentLat = pos.latitude;
-                                  currentLng = pos.longitude;
-                                  locationName = await locationService
-                                      .getAddressFromCoordinates(
-                                          currentLat, currentLng);
-                                } catch (_) {}
-
-                                final expenseData = {
-                                  'tripId': tripIdCtrl.text.trim(),
-                                  'driverPhone': phone,
-                                  'title': titleCtrl.text,
-                                  'description': descCtrl.text.trim(),
-                                  'amount': '₹${amountCtrl.text.trim()}',
-                                  'date': 'Today',
-                                  'latitude': currentLat,
-                                  'longitude': currentLng,
-                                  'locationName': locationName,
-                                };
-                                  if (bottomSheetCtx.mounted) {
-                                    Navigator.of(bottomSheetCtx).pop();
-                                  }
-                                await controller.submitExpense(expenseData,
-                                    receiptBytes: receiptBytes.value);
-                              },
-                              child: const AppText('Submit Claim',
-                                  style: AppTextStyle.bodyMedium, color: Colors.white),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                      ],
+            padding: EdgeInsets.only(
+              top: 16,
+              left: 20,
+              right: 20,
+              bottom: MediaQuery.of(bottomSheetCtx).viewInsets.bottom + 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : Colors.black12,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                const AppText(
+                  'File New Expense Claim',
+                  style: AppTextStyle.headlineSmall,
+                  fontWeight: FontWeight.bold,
+                ),
+                const Divider(height: 16),
+                Flexible(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Form(
+                      key: formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            initialValue: titleCtrl.text,
+                            decoration: const InputDecoration(
+                              labelText: 'Expense Category',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.category_rounded),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                  value: 'Fuel Top-up',
+                                  child: Text('Fuel Top-up')),
+                              DropdownMenuItem(
+                                  value: 'Toll Tax Payment',
+                                  child: Text('Toll Tax Payment')),
+                              DropdownMenuItem(
+                                  value: 'Driver Food & Stay',
+                                  child: Text('Driver Food & Stay')),
+                              DropdownMenuItem(
+                                  value: 'Tyre Repair Work',
+                                  child: Text('Tyre Repair Work')),
+                              DropdownMenuItem(
+                                  value: 'Other Miscellaneous',
+                                  child: Text('Other Miscellaneous')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) titleCtrl.text = val;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: amountCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Amount (₹)',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.currency_rupee_rounded),
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator: (v) =>
+                                v!.isEmpty ? 'Field required' : null,
+                          ),
+                          const SizedBox(height: 16),
+                          DropdownButtonFormField<String>(
+                            initialValue: tripIdCtrl.text.isEmpty
+                                ? null
+                                : (Get.isRegistered<TripsController>() &&
+                                        Get.find<TripsController>()
+                                            .allTrips
+                                            .any((t) => t.id == tripIdCtrl.text)
+                                    ? tripIdCtrl.text
+                                    : null),
+                            decoration: const InputDecoration(
+                              labelText: 'Assigned Trip (Optional)',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.tag_rounded),
+                            ),
+                            items: [
+                              const DropdownMenuItem<String>(
+                                value: null,
+                                child: Text('None / Not Associated'),
+                              ),
+                              if (Get.isRegistered<TripsController>())
+                                ...Get.find<TripsController>()
+                                    .allTrips
+                                    .map((t) {
+                                  return DropdownMenuItem<String>(
+                                    value: t.id,
+                                    child: Text(t.id),
+                                  );
+                                }),
+                            ],
+                            onChanged: (val) {
+                              tripIdCtrl.text = val ?? '';
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: descCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Description / Remarks',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.description_rounded),
+                            ),
+                            maxLines: 2,
+                            validator: (v) =>
+                                v!.isEmpty ? 'Field required' : null,
+                          ),
+                          const SizedBox(height: 16),
+                          // Receipt proof — required (photo of bill / receipt).
+                          const AppText('RECEIPT PROOF',
+                              style: AppTextStyle.labelMedium,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textSecondary),
+                          const SizedBox(height: 6),
+                          Obx(() => receiptBytes.value == null
+                              ? OutlinedButton.icon(
+                                  onPressed: () async {
+                                    final source =
+                                        await Get.bottomSheet<ImageSource>(
+                                      Container(
+                                        padding: const EdgeInsets.all(20),
+                                        decoration: BoxDecoration(
+                                          color: Get.isDarkMode
+                                              ? const Color(0xFF1E293B)
+                                              : Colors.white,
+                                          borderRadius: const BorderRadius.only(
+                                            topLeft: Radius.circular(16),
+                                            topRight: Radius.circular(16),
+                                          ),
+                                        ),
+                                        child: SafeArea(
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const AppText(
+                                                  'Select Image Source',
+                                                  style: AppTextStyle.bodyLarge,
+                                                  fontWeight: FontWeight.bold),
+                                              const SizedBox(height: 16),
+                                              ListTile(
+                                                leading: const Icon(
+                                                    Icons.photo_library_rounded,
+                                                    color: AppColors.primary),
+                                                title: const AppText(
+                                                    'Choose from Gallery',
+                                                    style: AppTextStyle
+                                                        .bodyMedium),
+                                                onTap: () => Get.back(
+                                                    result:
+                                                        ImageSource.gallery),
+                                              ),
+                                              ListTile(
+                                                leading: const Icon(
+                                                    Icons.camera_alt_rounded,
+                                                    color: AppColors.primary),
+                                                title: const AppText(
+                                                    'Take Photo (Camera)',
+                                                    style: AppTextStyle
+                                                        .bodyMedium),
+                                                onTap: () => Get.back(
+                                                    result: ImageSource.camera),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+
+                                    if (source == null) return;
+
+                                    final x = await ImagePicker().pickImage(
+                                      source: source,
+                                      imageQuality: 70,
+                                    );
+                                    if (x != null) {
+                                      receiptBytes.value =
+                                          await x.readAsBytes();
+                                    }
+                                  },
+                                  icon: const Icon(Icons.photo_camera_rounded),
+                                  label: const Text('Attach Receipt Photo'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 14),
+                                  ),
+                                )
+                              : Row(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Image.memory(receiptBytes.value!,
+                                          width: 54,
+                                          height: 54,
+                                          fit: BoxFit.cover),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Expanded(
+                                      child: AppText('Receipt attached ✓',
+                                          style: AppTextStyle.bodyMedium,
+                                          color: AppColors.success,
+                                          fontWeight: FontWeight.w600),
+                                    ),
+                                    TextButton(
+                                      onPressed: () =>
+                                          receiptBytes.value = null,
+                                      child: const Text('Change'),
+                                    ),
+                                  ],
+                                )),
+                          const SizedBox(height: 24),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: () =>
+                                    Navigator.of(bottomSheetCtx).pop(),
+                                child: const AppText('Cancel',
+                                    style: AppTextStyle.bodyMedium),
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 24, vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () async {
+                                  if (!formKey.currentState!.validate()) return;
+                                  if (receiptBytes.value == null) {
+                                    AppSnackBar.showWarning(
+                                        title: 'Proof Required',
+                                        message:
+                                            'Please attach a receipt photo as proof.');
+                                    return;
+                                  }
+                                  final phone =
+                                      Get.find<SessionService>().ownerKey;
+
+                                  double currentLat =
+                                      LocationService.fallbackLatitude;
+                                  double currentLng =
+                                      LocationService.fallbackLongitude;
+                                  String locationName = '';
+                                  try {
+                                    final locationService =
+                                        Get.find<LocationService>();
+                                    final pos = await locationService
+                                        .getCurrentPosition();
+                                    currentLat = pos.latitude;
+                                    currentLng = pos.longitude;
+                                    locationName = await locationService
+                                        .getAddressFromCoordinates(
+                                            currentLat, currentLng);
+                                  } catch (_) {}
+
+                                  final expenseData = {
+                                    'tripId': tripIdCtrl.text.trim(),
+                                    'driverPhone': phone,
+                                    'title': titleCtrl.text,
+                                    'description': descCtrl.text.trim(),
+                                    'amount': '₹${amountCtrl.text.trim()}',
+                                    'date': 'Today',
+                                    'latitude': currentLat,
+                                    'longitude': currentLng,
+                                    'locationName': locationName,
+                                  };
+                                  if (bottomSheetCtx.mounted) {
+                                    Navigator.of(bottomSheetCtx).pop();
+                                  }
+                                  await controller.submitExpense(expenseData,
+                                      receiptBytes: receiptBytes.value);
+                                },
+                                child: const AppText('Submit Claim',
+                                    style: AppTextStyle.bodyMedium,
+                                    color: Colors.white),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      );
+        );
       },
     );
   }

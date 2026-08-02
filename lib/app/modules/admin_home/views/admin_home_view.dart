@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:geocoding/geocoding.dart';
@@ -8,7 +7,6 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:transport/widgets/app_text.dart';
-import 'package:transport/widgets/trip_status_timeline.dart';
 import 'package:transport/widgets/notification_bell.dart';
 import 'package:transport/widgets/animations.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
@@ -23,6 +21,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/app/data/services/session_service.dart';
+import 'package:transport/app/presentation/widgets/desktop_admin_scaffold.dart';
 import 'admin_trip_details_view.dart';
 import 'truck_assignment_dashboard.dart';
 
@@ -69,21 +68,12 @@ class AdminHomeView extends GetView<AdminHomeController> {
     });
 
     if (isWide) {
-      // Web/desktop: dark brand sidebar + top bar (reference dashboard layout).
-      content = Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildSidebar(),
-          Expanded(
-            child: Column(
-              children: [
-                _buildTopBar(context, isDark),
-                const Divider(height: 1),
-                Expanded(child: content),
-              ],
-            ),
-          ),
-        ],
+      // The mobile branch below remains unchanged. On wide screens the same
+      // feature content is composed in the shared desktop presentation shell.
+      content = DesktopAdminScaffold(
+        sidebar: _buildSidebar(),
+        topNavigation: _buildTopBar(context, isDark),
+        child: content,
       );
     }
 
@@ -3070,7 +3060,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: (badgeColor ?? Colors.green).withValues(alpha: 0.1),
+                      color:
+                          (badgeColor ?? Colors.green).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(

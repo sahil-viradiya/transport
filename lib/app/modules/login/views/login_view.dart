@@ -161,11 +161,9 @@ class LoginView extends GetView<LoginController> {
               const Icon(Icons.language_rounded,
                   size: 16, color: AppColors.primary),
               const SizedBox(width: 6),
-              _langChip('English', 'en', currentLocaleCode == 'en', isDark),
+              _langChip('english'.tr, 'en', currentLocaleCode == 'en', isDark),
               const SizedBox(width: 4),
-              _langChip('हिंदी', 'hi', currentLocaleCode == 'hi', isDark),
-              const SizedBox(width: 4),
-              _langChip('Español', 'es', currentLocaleCode == 'es', isDark),
+              _langChip('hindi'.tr, 'hi', currentLocaleCode == 'hi', isDark),
             ],
           ),
         ),
@@ -489,10 +487,12 @@ class LoginView extends GetView<LoginController> {
                             overflow: TextOverflow.ellipsis,
                             color: isMock
                                 ? (isDark
-                                    ? const Color(0xFFFBBF24).withValues(alpha: 0.7)
+                                    ? const Color(0xFFFBBF24)
+                                        .withValues(alpha: 0.7)
                                     : const Color(0xFFB45309))
                                 : (isDark
-                                    ? const Color(0xFF34D399).withValues(alpha: 0.7)
+                                    ? const Color(0xFF34D399)
+                                        .withValues(alpha: 0.7)
                                     : const Color(0xFF047857)),
                           ),
                         ],
@@ -552,7 +552,9 @@ class LoginView extends GetView<LoginController> {
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.grey.shade200,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.grey.shade200,
           width: 1,
         ),
         boxShadow: [

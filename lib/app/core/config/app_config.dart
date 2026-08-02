@@ -3,11 +3,11 @@ import 'package:get/get.dart';
 import '../../data/services/storage_service.dart';
 
 /// Global Application Configuration Manager
-/// 
+///
 /// Controls application-wide execution mode and global localization:
 /// - **LIVE MODE** (`isMockMode = false`): Uses real Firebase Phone Auth (SMS), real Firestore & Storage.
 /// - **MOCK MODE** (`isMockMode = true`): Uses mock OTP (`123456`) and local/mock test fallbacks.
-/// - **LOCALIZATION**: English (`en_US`), Hindi (`hi_IN`), Spanish (`es_ES`).
+/// - **LOCALIZATION**: English (`en_US`) and Hindi (`hi_IN`).
 class AppConfig {
   static const String _mockModeKey = 'app_config_is_mock_mode';
   static const String _languageKey = 'app_config_language_code';
@@ -26,7 +26,7 @@ class AppConfig {
     try {
       if (Get.isRegistered<StorageService>()) {
         final storage = Get.find<StorageService>();
-        
+
         // Mode
         final savedMode = storage.read<bool>(_mockModeKey);
         if (savedMode != null) {
@@ -66,9 +66,6 @@ class AppConfig {
       case 'hi':
       case 'hi_IN':
         return const Locale('hi', 'IN');
-      case 'es':
-      case 'es_ES':
-        return const Locale('es', 'ES');
       default:
         return const Locale('en', 'US');
     }
@@ -98,9 +95,13 @@ class AppConfig {
   static bool get isLive => !isMockMode.value;
 
   static void _logCurrentMode() {
-    debugPrint('================================================================');
-    debugPrint('   [APP CONFIG] CURRENT MODE: ${isMockMode.value ? "MOCK / DEBUG MODE (OTP: 123456)" : "LIVE MODE (Real Firebase SMS & Data)"}');
-    debugPrint('   [APP CONFIG] LOCALE: ${currentLocale.value.languageCode}_${currentLocale.value.countryCode}');
-    debugPrint('================================================================');
+    debugPrint(
+        '================================================================');
+    debugPrint(
+        '   [APP CONFIG] CURRENT MODE: ${isMockMode.value ? "MOCK / DEBUG MODE (OTP: 123456)" : "LIVE MODE (Real Firebase SMS & Data)"}');
+    debugPrint(
+        '   [APP CONFIG] LOCALE: ${currentLocale.value.languageCode}_${currentLocale.value.countryCode}');
+    debugPrint(
+        '================================================================');
   }
 }
