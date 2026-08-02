@@ -88,7 +88,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: 'app_title'.tr,
+      onGenerateTitle: (context) => 'app_title'.tr,
       debugShowCheckedModeBanner: false,
 
       // Internationalization & Localization

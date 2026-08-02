@@ -448,7 +448,7 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
         const SizedBox(height: 4),
         Center(
           child: AppText(
-            'The Highway Authority Digital Safety Protocol',
+            'MoveEasy Digital Safety Protocol',
             style: AppTextStyle.labelMedium,
             color: isDark
                 ? Colors.white24

@@ -54,6 +54,23 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
     return ts;
   }
 
+  String _cleanMilestoneLabel(String? raw) {
+    final text = raw ?? 'Checkpoint';
+    if (text.contains('Vendor ke liye nikla') || text.contains('nikla (on the way)')) {
+      return 'En Route to Vendor (On The Way)';
+    }
+    if (text.contains('Vendor pahuncha') || text.contains('loading shuru')) {
+      return 'Reached Vendor — Loading Started';
+    }
+    if (text.contains('Loaded — awaiting admin approval')) {
+      return 'Cargo Loaded — Awaiting Admin Approval';
+    }
+    if (text.contains('Reached Drop — awaiting delivery approval')) {
+      return 'Reached Destination — Awaiting Delivery Approval';
+    }
+    return text;
+  }
+
   void _openInMaps(String url) async {
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
@@ -146,7 +163,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
             if (hasStartedVendor) {
               logs.add({
                 'milestone': 2,
-                'label': 'Vendor ke liye nikla (on the way)',
+                'label': 'En Route to Vendor (On The Way)',
                 'timestamp': tripDate,
                 'address': pLocation,
                 'latitude': pLat,
@@ -162,7 +179,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
             if (hasStartedLoading) {
               logs.add({
                 'milestone': 3,
-                'label': 'Vendor pahuncha — loading shuru',
+                'label': 'Reached Vendor — Loading Started',
                 'timestamp': tripDate,
                 'address': pLocation,
                 'latitude': pLat,
@@ -177,7 +194,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
             if (hasRequestedLoad) {
               logs.add({
                 'milestone': 4,
-                'label': 'Loaded — awaiting admin approval',
+                'label': 'Cargo Loaded — Awaiting Admin Approval',
                 'timestamp': tripDate,
                 'address': pLocation,
                 'latitude': pLat,
@@ -900,7 +917,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
             itemCount: logs.length,
             itemBuilder: (context, index) {
               final log = logs[index];
-              final label = log['label'] ?? 'Checkpoint';
+              final label = _cleanMilestoneLabel(log['label']?.toString());
               final timestamp = log['timestamp'] ?? '';
               final address = log['address'] ?? '';
               final lat = log['latitude'] ?? 0.0;

@@ -39,7 +39,7 @@ class ProfileView extends GetView<ProfileController> {
           icon: Icon(Icons.menu_rounded, color: isDark ? Colors.white : AppColors.textPrimary),
           onPressed: () {},
         ),
-        title: const AppText('The Highway Authority', style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
+        title: AppText('app_title'.tr, style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
         actions: [
           IconButton(
             icon: const Icon(Icons.hub_rounded, color: AppColors.primary),

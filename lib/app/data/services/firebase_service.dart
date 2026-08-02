@@ -371,7 +371,7 @@ class FirebaseService extends GetxService {
         'milestonesLog': FieldValue.arrayUnion([
           {
             'milestone': 1,
-            'label': 'Vendor ke liye nikla (on the way)',
+            'label': 'En Route to Vendor (On The Way)',
             'timestamp': DateTime.now()
                 .toIso8601String()
                 .split('T')
@@ -421,7 +421,7 @@ class FirebaseService extends GetxService {
         'milestonesLog': FieldValue.arrayUnion([
           {
             'milestone': 2,
-            'label': 'Vendor pahuncha — loading shuru',
+            'label': 'Reached Vendor — Loading Started',
             'timestamp': DateTime.now()
                 .toIso8601String()
                 .split('T')
@@ -579,7 +579,7 @@ class FirebaseService extends GetxService {
         'milestonesLog': FieldValue.arrayUnion([
           {
             'milestone': 3,
-            'label': 'Loaded — awaiting admin approval',
+            'label': 'Cargo Loaded — Awaiting Admin Approval',
             'timestamp': DateTime.now()
                 .toIso8601String()
                 .split('T')
@@ -749,7 +749,7 @@ class FirebaseService extends GetxService {
         'milestonesLog': FieldValue.arrayUnion([
           {
             'milestone': 4,
-            'label': 'Reached Drop — awaiting delivery approval',
+            'label': 'Reached Destination — Awaiting Delivery Approval',
             'timestamp': now,
             'address': location ?? data['dropLocation'] ?? '',
             'latitude': latitude ?? 0.0,

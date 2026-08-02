@@ -7155,7 +7155,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
       if (hasStartedVendor) {
         logs.add({
           'milestone': 2,
-          'label': 'Vendor ke liye nikla (on the way)',
+          'label': 'En Route to Vendor (On The Way)',
           'timestamp': tripDate,
           'address': pLocation,
           'latitude': pLat,
@@ -7176,7 +7176,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
       if (hasStartedLoading) {
         logs.add({
           'milestone': 3,
-          'label': 'Vendor pahuncha — loading shuru',
+          'label': 'Reached Vendor — Loading Started',
           'timestamp': tripDate,
           'address': pLocation,
           'latitude': pLat,
@@ -7195,7 +7195,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
       if (hasRequestedLoad) {
         logs.add({
           'milestone': 4,
-          'label': 'Loaded — awaiting admin approval',
+          'label': 'Cargo Loaded — Awaiting Admin Approval',
           'timestamp': tripDate,
           'address': pLocation,
           'latitude': pLat,
@@ -7668,7 +7668,16 @@ class AdminHomeView extends GetView<AdminHomeController> {
             itemCount: logs.length,
             itemBuilder: (context, index) {
               final log = logs[index];
-              final label = log['label'] ?? 'Checkpoint';
+              final rawLabel = (log['label'] ?? 'Checkpoint').toString();
+              final label = rawLabel.contains('Vendor ke liye nikla') || rawLabel.contains('nikla (on the way)')
+                  ? 'En Route to Vendor (On The Way)'
+                  : (rawLabel.contains('Vendor pahuncha') || rawLabel.contains('loading shuru')
+                      ? 'Reached Vendor — Loading Started'
+                      : (rawLabel.contains('Loaded — awaiting admin approval')
+                          ? 'Cargo Loaded — Awaiting Admin Approval'
+                          : (rawLabel.contains('Reached Drop — awaiting delivery approval')
+                              ? 'Reached Destination — Awaiting Delivery Approval'
+                              : rawLabel)));
               final timestamp = log['timestamp'] ?? '';
               final address = log['address'] ?? '';
               final lat = log['latitude'] ?? 0.0;

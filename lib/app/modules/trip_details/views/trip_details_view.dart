@@ -248,7 +248,7 @@ class TripDetailsView extends GetView<TripDetailsController> {
           icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
           onPressed: () => Get.back(),
         ),
-        title: const AppText('The Highway Authority',
+        title: AppText('app_title'.tr,
             style: AppTextStyle.headlineSmall,
             color: Colors.white,
             fontWeight: FontWeight.bold),

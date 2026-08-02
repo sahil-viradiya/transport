@@ -1,7 +1,7 @@
 const Map<String, String> hiIN = {
-  'app_title': 'द हाईवे अथॉरिटी',
+  'app_title': 'MoveEasy',
   'app_subtitle': 'लॉजिस्टिक्स और फ्लीट संचालन',
-  'app_name': 'भारत ट्रांसपोर्ट',
+  'app_name': 'MoveEasy',
   'language': 'भाषा',
   'english': 'अंग्रेज़ी',
   'hindi': 'हिंदी',

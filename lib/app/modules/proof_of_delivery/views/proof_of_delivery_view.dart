@@ -23,7 +23,7 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
               color: isDark ? Colors.white : AppColors.textPrimary),
           onPressed: () => Get.back(),
         ),
-        title: const AppText('The Highway Authority',
+        title: AppText('app_title'.tr,
             style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
         actions: [
           IconButton(

@@ -1,7 +1,7 @@
 const Map<String, String> enUS = {
-  'app_title': 'The Highway Authority',
+  'app_title': 'MoveEasy',
   'app_subtitle': 'Logistics and Fleet Operations',
-  'app_name': 'Bharat Transport',
+  'app_name': 'MoveEasy',
   'language': 'Language',
   'english': 'English',
   'hindi': 'Hindi',

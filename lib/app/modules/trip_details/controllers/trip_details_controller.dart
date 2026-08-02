@@ -376,11 +376,9 @@ class TripDetailsController extends GetxController {
 
       case 'EN_ROUTE_VENDOR':
         AppPopup.showConfirmation(
-          title: 'VENDOR PAHUNCH GAYE?',
-          description: 'Vendor ko loading pass dikhakar truck ki loading '
-              'shuru ho gayi hai? Admin ko inform kiya jayega (aur wo '
-              'destination set karega).',
-          confirmText: 'Loading Shuru',
+          title: 'ARRIVED AT VENDOR?',
+          description: 'Have you arrived at the vendor location and started loading? Admin will be notified to confirm and set destination.',
+          confirmText: 'Start Loading',
           cancelText: 'Cancel',
           onConfirm: () async {
             AppPopup.showLoading(message: 'Capturing location...');
@@ -395,8 +393,8 @@ class TripDetailsController extends GetxController {
               );
               AppPopup.hideLoading();
               AppSnackBar.showSuccess(
-                title: 'Loading Shuru 📦',
-                message: 'Admin ko bata diya — wo destination set karega.',
+                title: 'Loading Started 📦',
+                message: 'Admin notified to set destination.',
               );
             } catch (e) {
               AppPopup.hideLoading();
