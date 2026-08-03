@@ -54,6 +54,7 @@ class DashboardController extends GetxController {
   // Assigned truck + daily inspection state (live from Firestore)
   final Rxn<Map<String, dynamic>> myTruck = Rxn<Map<String, dynamic>>();
   StreamSubscription? _truckSub;
+  StreamSubscription? _userSub;
   String get myTruckNo => (myTruck.value?['truckNo'] ?? '').toString();
   String get truckInspection {
     final status = (myTruck.value?['inspectionStatus'] ?? '').toString();
@@ -169,9 +170,23 @@ class DashboardController extends GetxController {
 
     // Live: the truck assigned to this driver (morning duty allocation).
     try {
-      _truckSub = Get.find<FirebaseService>()
+      final fb = Get.find<FirebaseService>();
+      _truckSub = fb
           .watchTruckForDriver(_session.ownerKey)
           .listen(myTruck.call);
+
+      _userSub = fb.watchUserData(_session.ownerKey).listen((data) {
+        if (data.isNotEmpty) {
+          driverName.value = data['name'] ?? driverName.value;
+          driverPhone.value = data['phone'] ?? _session.ownerKey;
+          final url = data['avatarUrl'] ?? '';
+          if (url.toString().isNotEmpty) avatarUrl.value = url;
+          final isAvail = (data['availability'] == 'available') ||
+              (data['checkedIn'] == true);
+          dutyStatus.value = isAvail ? 'available' : 'off_duty';
+          checkInAddress.value = data['checkInAddress'] ?? '';
+        }
+      });
     } catch (_) {}
 
     // Listen to allTrips in TripsController to reactively refresh profile statistics
@@ -185,6 +200,7 @@ class DashboardController extends GetxController {
 
   @override
   void onClose() {
+    _userSub?.cancel();
     _truckSub?.cancel();
     super.onClose();
   }
@@ -352,7 +368,9 @@ class DashboardController extends GetxController {
         driverPhone.value = userData['phone'] ?? phone;
         final url = userData['avatarUrl'] ?? '';
         if (url.toString().isNotEmpty) avatarUrl.value = url;
-        dutyStatus.value = userData['availability'] ?? 'off_duty';
+        final isAvail = (userData['availability'] == 'available') ||
+            (userData['checkedIn'] == true);
+        dutyStatus.value = isAvail ? 'available' : 'off_duty';
         checkInAddress.value = userData['checkInAddress'] ?? '';
       }
 
@@ -397,6 +415,24 @@ class DashboardController extends GetxController {
         vehicleModel.value = 'N/A';
       }
     } catch (_) {}
+  }
+
+  /// Ensures the driver is checked in (Go On Duty) before performing any app activity.
+  /// If the driver is Off Duty, displays a forceful dialog requiring check-in.
+  bool ensureCheckedIn() {
+    if (!isOnDuty) {
+      AppPopup.showConfirmation(
+        title: 'Check-In Required 🔴',
+        description:
+            'Aap abhi Off Duty hain. Koi bhi activity perform karne ke liye pehle Check-In (Go On Duty) karna zaroori hai.',
+        confirmText: 'Check In Now 🟢',
+        onConfirm: () {
+          checkIn();
+        },
+      );
+      return false;
+    }
+    return true;
   }
 
   /// Driver goes on duty: capture GPS, mark Available, notify admin.

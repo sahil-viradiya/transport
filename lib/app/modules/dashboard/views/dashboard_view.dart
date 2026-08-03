@@ -432,12 +432,19 @@ class DashboardView extends GetView<DashboardController> {
         childAspectRatio: 1.15,
         children: [
           tile(Icons.local_shipping_rounded, 'My Trips', AppColors.primary,
-              () => home.changeTabIndex(1)),
+              () {
+            if (!controller.ensureCheckedIn()) return;
+            home.changeTabIndex(1);
+          }),
           tile(Icons.fact_check_rounded, 'Inspection', AppColors.info,
-              () => home.changeTabIndex(3),
+              () {
+            if (!controller.ensureCheckedIn()) return;
+            home.changeTabIndex(3);
+          },
               badge: inspectionBadge),
           tile(Icons.workspace_premium_rounded, 'Pass & Royalty',
               const Color(0xFF7E22CE), () {
+            if (!controller.ensureCheckedIn()) return;
             final trip = controller.currentTrip;
             if (trip == null) {
               AppSnackBar.showInfo(
@@ -451,15 +458,22 @@ class DashboardView extends GetView<DashboardController> {
           }),
           tile(Icons.description_rounded, 'Documents', AppColors.tertiaryDark,
               () {
+            if (!controller.ensureCheckedIn()) return;
             home.changeTabIndex(4);
             try {
               Get.find<ProfileController>().selectSubTab(1);
             } catch (_) {}
           }),
           tile(Icons.currency_rupee_rounded, 'Earnings', AppColors.success,
-              () => home.changeTabIndex(2)),
+              () {
+            if (!controller.ensureCheckedIn()) return;
+            home.changeTabIndex(2);
+          }),
           tile(Icons.notifications_rounded, 'Notifications', AppColors.error,
-              () => const NotificationBell().open(context),
+              () {
+            if (!controller.ensureCheckedIn()) return;
+            const NotificationBell().open(context);
+          },
               badge: notifBadge),
         ],
       );

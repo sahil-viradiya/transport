@@ -110,16 +110,38 @@ class SessionService extends GetxService {
     await _storage.remove(_kAvatar);
   }
 
-  /// Normalise a phone string to the `+<countrycode><number>` form used as the
-  /// canonical key. Strips spaces, dashes and parentheses.
+  /// Normalise a phone string to the canonical E.164 (`+91XXXXXXXXXX`) format
+  /// used everywhere in the project. Strips spaces, dashes and formatting.
   static String normalizePhone(String raw) {
-    return raw.replaceAll(RegExp(r'[\s\-()+]'), '').trim();
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return '';
+
+    final digits = trimmed.replaceAll(RegExp(r'[^\d]'), '');
+    if (digits.isEmpty) return '';
+
+    if (digits.length == 10) {
+      return '+91$digits';
+    } else if (digits.length == 12 && digits.startsWith('91')) {
+      return '+$digits';
+    } else if (digits.length == 11 && digits.startsWith('0')) {
+      return '+91${digits.substring(1)}';
+    } else if (trimmed.startsWith('+')) {
+      return '+$digits';
+    }
+    return '+91$digits';
   }
 
   /// Returns all plausible search variants for a given phone number string
-  /// (with +91, without +91, 10-digit base, 12-digit, spaces stripped, etc.)
+  /// (canonical +91, without +, 10-digit base, 12-digit, spaces, etc.)
+  /// used to query legacy documents in Firestore.
   static List<String> getPhoneVariants(String raw) {
     final Set<String> variants = {};
+    final canonical = normalizePhone(raw);
+    if (canonical.isNotEmpty) {
+      variants.add(canonical); // +91XXXXXXXXXX
+      variants.add(canonical.replaceFirst('+', '')); // 91XXXXXXXXXX
+    }
+
     final trimmed = raw.trim();
     if (trimmed.isNotEmpty) {
       variants.add(trimmed);
@@ -133,11 +155,20 @@ class SessionService extends GetxService {
 
     if (digitsOnly.length >= 10) {
       final base10 = digitsOnly.substring(digitsOnly.length - 10);
+      final part1 = base10.substring(0, 5);
+      final part2 = base10.substring(5);
+
       variants.add(base10);
+      variants.add('$part1 $part2');
       variants.add('+91$base10');
       variants.add('+91 $base10');
+      variants.add('+91 $part1 $part2');
+      variants.add('+91-$base10');
       variants.add('91$base10');
+      variants.add('91 $base10');
+      variants.add('91 $part1 $part2');
       variants.add('0$base10');
+      variants.add('0 $part1 $part2');
     }
 
     return variants.toList();

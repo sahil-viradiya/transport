@@ -112,11 +112,34 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
 
           final status = (trip['status'] ?? 'ASSIGNED').toString();
           final isDelivered = status == 'DELIVERED';
-          final driverPhone = trip['driverPhone'] ?? 'N/A';
-          final driverName = controller.users.firstWhereOrNull(
-                (u) => u['phone'] == driverPhone,
-              )?['name'] ??
-              'DEEP';
+          final driverPhone = (trip['driverPhone'] ?? '').toString();
+
+          // Resolve driver name:
+          // 1. Use driverName stored in the trip document (most reliable)
+          // 2. Fall back to phone-normalised lookup in the users list
+          // 3. Fall back to the phone itself — NEVER a hardcoded name
+          final rawDriverName = (trip['driverName'] ?? '').toString().trim();
+          final driverName = rawDriverName.isNotEmpty
+              ? rawDriverName
+              : () {
+                  if (driverPhone.isEmpty) return 'Unknown Driver';
+                  final cleanPhone =
+                      driverPhone.replaceAll(RegExp(r'[^\d]'), '');
+                  final u = controller.users.firstWhereOrNull((u) {
+                    final uPhone = (u['phone'] ?? '')
+                        .toString()
+                        .replaceAll(RegExp(r'[^\d]'), '');
+                    return uPhone.isNotEmpty &&
+                        cleanPhone.isNotEmpty &&
+                        (uPhone == cleanPhone ||
+                            uPhone.endsWith(cleanPhone) ||
+                            cleanPhone.endsWith(uPhone));
+                  });
+                  final name = (u?['name'] ?? u?['driverName'] ?? '')
+                      .toString()
+                      .trim();
+                  return name.isNotEmpty ? name : driverPhone;
+                }();
 
           // Resolve Milestones Log
           final rawLogs = trip['milestonesLog'] as List?;
@@ -1797,51 +1820,6 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 12),
-
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.white10 : const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              adminPhotoUrl != null ? Icons.check_circle_rounded : Icons.add_a_photo_rounded,
-                              color: adminPhotoUrl != null ? Colors.green : Colors.blue,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                adminPhotoUrl != null ? 'Admin Photo Attached ✅' : 'Upload Admin Photo (Optional)',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () async {
-                                final url = await ImagePickerHelper.pickImageAsBase64(context, isDark);
-                                if (url != null) {
-                                  setStateDialog(() {
-                                    adminPhotoUrl = url;
-                                  });
-                                }
-                              },
-                              child: Text(adminPhotoUrl != null ? 'Change' : 'Attach'),
-                            ),
-                            if (adminPhotoUrl != null)
-                              IconButton(
-                                icon: const Icon(Icons.close_rounded, size: 18, color: Colors.red),
-                                onPressed: () {
-                                  setStateDialog(() {
-                                    adminPhotoUrl = null;
-                                  });
-                                },
-                              ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -1862,6 +1840,10 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                         'passId': passIdCtrl.text.trim(),
                         'ownerName': ownerNameCtrl.text.trim(),
                         'remarks': remarksCtrl.text.trim(),
+                        if (passPhotoUrl != null && passPhotoUrl!.isNotEmpty)
+                          'passPhotoUrl': passPhotoUrl,
+                        if (passPhotoUrl != null && passPhotoUrl!.isNotEmpty)
+                          'passDocumentUrl': passPhotoUrl,
                         'generatedAt': DateTime.now().toString().substring(0, 16),
                         if (adminPhotoUrl != null && adminPhotoUrl!.isNotEmpty)
                           'adminPhotoUrl': adminPhotoUrl,

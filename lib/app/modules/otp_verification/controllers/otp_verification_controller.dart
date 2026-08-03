@@ -6,8 +6,7 @@ import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/routes/app_pages.dart';
-import 'package:transport/widgets/app_text.dart';
-import 'package:transport/app/core/theme/app_colors.dart';
+
 import 'package:transport/app/core/utils/app_logger.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 
@@ -104,149 +103,116 @@ class OtpVerificationController extends GetxController {
       final firebaseService = Get.find<FirebaseService>();
       final userData = await firebaseService.getUserData(phone);
 
-      if (userData != null) {
-        // Driver / User already exists in Firestore!
-        final currentUid = FirebaseAuth.instance.currentUser?.uid;
-        final docPhone = (userData['phone'] ?? phone).toString();
-
-        // 1. Link UID if missing or changed
-        final existingUid = userData['uid']?.toString();
-        if (currentUid != null && currentUid.isNotEmpty && (existingUid == null || existingUid.isEmpty || existingUid != currentUid)) {
-          userData['uid'] = currentUid;
-          await firebaseService.linkUserUid(docPhone, currentUid, userData);
-        }
-
-        // 2. Read role, name, avatar
-        final role = (userData['role'] ?? 'driver').toString();
-        final name = (userData['name'] ?? userData['driverName'] ?? 'Driver').toString();
-        final avatarUrl = userData['avatarUrl']?.toString();
-
-        // 3. Create user session
-        await _session.setSession(
-          phone: docPhone,
-          uid: currentUid ?? existingUid,
-          name: name,
-          role: role,
-          avatarUrl: avatarUrl,
+      if (userData == null) {
+        // ── ACCESS DENIED: phone not pre-registered by any Admin ──────────────
+        await _denyAccess(
+          'Account Not Found',
+          'Your account has not been created yet.\nPlease contact your administrator.',
         );
-
-        // 4. Navigate directly to Dashboard (no registration popup!)
-        if (role == 'admin') {
-          Get.offAllNamed(Routes.ADMIN_HOME);
-        } else {
-          Get.offAllNamed(Routes.HOME);
-        }
-        AppSnackBar.showSuccess(
-          title: 'Welcome Back',
-          message: 'Successfully logged in as ${role.toUpperCase()}!',
-        );
-      } else {
-        // User does NOT exist, show role selection signup dialog
-        final normalizedPhone = SessionService.normalizePhone(phone);
-        _showRoleSelectionSignupDialog(normalizedPhone);
+        return;
       }
+
+      // ── Validate driver status ──────────────────────────────────────────────
+      final isDeleted = userData['isDeleted'] == true;
+      if (isDeleted) {
+        await _denyAccess(
+          'Account Unavailable',
+          'This account is no longer available.\nPlease contact your administrator.',
+        );
+        return;
+      }
+
+      final isActive = userData['isActive'] as bool? ?? true; // default active
+      if (!isActive) {
+        await _denyAccess(
+          'Account Deactivated',
+          'Your account has been deactivated.\nPlease contact your administrator.',
+        );
+        return;
+      }
+
+      // ── Existing, active user — proceed ────────────────────────────────────
+      final currentUid = FirebaseAuth.instance.currentUser?.uid;
+
+      // Use the EXACT Firestore document ID as the canonical key.
+      // normalizePhone() strips '+', causing checkIn/checkOut to write to a
+      // different doc than the one the admin panel watches. Using docId ensures
+      // availability updates land on the correct document.
+      final docId = (userData['docId'] as String?)?.isNotEmpty == true
+          ? userData['docId'] as String
+          : SessionService.normalizePhone(
+              (userData['phone'] ?? userData['phoneNumber'] ?? userData['driverPhone'] ?? phone).toString());
+
+      // 1. Link UID if missing or changed
+      final existingUid = userData['uid']?.toString();
+      if (currentUid != null && currentUid.isNotEmpty && (existingUid == null || existingUid.isEmpty || existingUid != currentUid)) {
+        userData['uid'] = currentUid;
+        await firebaseService.linkUserUid(docId, currentUid, userData);
+      }
+
+      // 2. Read role, name, avatar
+      final role = (userData['role'] ?? 'driver').toString().toLowerCase();
+      final name = (userData['name'] ?? userData['driverName'] ?? 'Driver').toString();
+      final avatarUrl = userData['avatarUrl']?.toString();
+
+      // 3. Create user session — phone stored as docId so ownerKey matches Firestore
+      await _session.setSession(
+        phone: docId,
+        uid: currentUid ?? existingUid,
+        name: name,
+        role: role,
+        avatarUrl: avatarUrl,
+      );
+
+      // 4. Navigate directly to Dashboard
+      if (role == 'admin') {
+        Get.offAllNamed(Routes.ADMIN_HOME);
+      } else {
+        Get.offAllNamed(Routes.HOME);
+      }
+      AppSnackBar.showSuccess(
+        title: 'Welcome Back',
+        message: 'Logged in as $name!',
+      );
     } catch (e) {
       AppSnackBar.showError(title: 'Authentication Error', message: e.toString());
     }
   }
 
-  void _showRoleSelectionSignupDialog(String phone) {
-    String selectedRole = 'owner';
-    final nameController = TextEditingController();
+  /// Signs the user out of Firebase Auth and clears the local session,
+  /// then shows a persistent access-denied dialog on the login screen.
+  Future<void> _denyAccess(String title, String message) async {
+    // Sign out Firebase Auth silently so the user can't re-enter on next launch
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {}
+    await _session.clear();
+
+    // Navigate back to login first, then show the error dialog on top
+    Get.offAllNamed(Routes.LOGIN);
+
+    // Small delay so the Login route has time to settle before the dialog opens
+    await Future.delayed(const Duration(milliseconds: 300));
 
     Get.dialog(
       AlertDialog(
-        title: const AppText('Complete Profile', style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
           children: [
-            const AppText('Please enter your details and choose your role to sign up.', style: AppTextStyle.bodyMedium),
-            const SizedBox(height: 16),
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Full Name',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const AppText('Select Role:', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              initialValue: selectedRole,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'owner', child: AppText('Truck Owner', style: AppTextStyle.bodyMedium)),
-                DropdownMenuItem(value: 'admin', child: AppText('Admin / Fleet', style: AppTextStyle.bodyMedium)),
-              ],
-              onChanged: (val) {
-                if (val != null) selectedRole = val;
-              },
-            ),
+            const Icon(Icons.block_rounded, color: Colors.red, size: 22),
+            const SizedBox(width: 8),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ],
         ),
+        content: Text(message, style: const TextStyle(height: 1.5)),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const AppText('Cancel', style: AppTextStyle.bodyMedium),
-          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-            onPressed: () async {
-              final name = nameController.text.trim();
-              if (name.isEmpty) {
-                AppSnackBar.showWarning(title: 'Validation', message: 'Please enter your name.');
-                return;
-              }
-
-              Get.back(); // Close dialog
-              AppPopup.showLoading(message: 'Creating profile...');
-
-              try {
-                final firebaseService = Get.find<FirebaseService>();
-                const avatarUrl = '';
-
-                final userData = {
-                  'name': name,
-                  'phone': phone,
-                  'role': selectedRole,
-                  'avatarUrl': avatarUrl,
-                };
-
-                await firebaseService.saveUser(phone, userData);
-
-                await _session.setSession(
-                  phone: phone,
-                  uid: FirebaseAuth.instance.currentUser?.uid,
-                  name: name,
-                  role: selectedRole,
-                  avatarUrl: avatarUrl,
-                );
-
-                // New truck owner: seed a starter profile + demo trips so their
-                // app isn't empty on first launch (all scoped to their phone).
-                if (selectedRole != 'admin') {
-                  await firebaseService.seedDemoDataForOwner(phone, name: name);
-                }
-
-                AppPopup.hideLoading();
-
-                if (selectedRole == 'admin') {
-                  Get.offAllNamed(Routes.ADMIN_HOME);
-                } else {
-                  Get.offAllNamed(Routes.HOME);
-                }
-                AppSnackBar.showSuccess(title: 'Account Created', message: 'Signed up successfully as ${selectedRole.toUpperCase()}!');
-              } catch (e) {
-                AppPopup.hideLoading();
-                AppSnackBar.showError(title: 'Error', message: e.toString());
-              }
-            },
-            child: const AppText('Submit', style: AppTextStyle.bodyMedium, color: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Get.back(),
+            child: const Text('OK', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

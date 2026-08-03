@@ -58,41 +58,58 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
             ),
             const SizedBox(height: 24),
 
-            // Take Photo (Camera Box Card)
+            // Single Premium Camera Upload Card (Only Camera allowed for Proof of Delivery)
             GestureDetector(
               onTap: controller.takePhoto,
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 28),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryDark,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF059669), Color(0xFF10B981)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primaryDark.withValues(alpha: 0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    )
+                      color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
+                    ),
                   ],
                 ),
-                child: Column(
+                child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
+                        color: Colors.white.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.camera_alt_rounded,
-                          color: Colors.white, size: 28),
+                      child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 28),
                     ),
-                    const SizedBox(height: 12),
-                    const AppText('Take Photo',
-                        style: AppTextStyle.bodyLarge,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold),
-                    const SizedBox(height: 4),
-                    const AppText('Use Camera',
-                        style: AppTextStyle.labelMedium, color: Colors.white70),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AppText(
+                            'Take POD Photo 📸',
+                            style: AppTextStyle.titleLarge,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          SizedBox(height: 4),
+                          AppText(
+                            'Tap to open camera & capture receipt',
+                            style: AppTextStyle.labelMedium,
+                            color: Colors.white70,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 18),
                   ],
                 ),
               ),

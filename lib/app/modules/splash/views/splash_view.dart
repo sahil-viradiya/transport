@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:transport/app/core/theme/app_images.dart';
+import 'package:transport/widgets/app_image_view.dart';
 import '../controllers/splash_controller.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../core/theme/app_colors.dart';
@@ -59,9 +61,8 @@ class SplashView extends GetView<SplashController> {
                         ),
                       ],
                     ),
-                    child: const Center(
-                      child: Icon(Icons.local_shipping_rounded,
-                          color: AppColors.primary, size: 56),
+                    child: const AppImageView(
+                      imagePath: AppImages.appImage,
                     ),
                   ),
                   const SizedBox(height: 28),

@@ -134,12 +134,37 @@ class AdminHomeController extends GetxController {
   // on-duty (non-leave) driver has a truck, no trip can be created.
   // ---------------------------------------------------------------------------
 
-  /// All non-admin users (drivers), leave or not.
-  List<Map<String, dynamic>> get allDrivers => users.where((u) {
-        final role = (u['role'] ?? 'driver').toString().toLowerCase();
-        final isAdmin = u['isAdmin'] == true;
-        return !role.contains('admin') && role != 'owner' && !isAdmin;
-      }).toList();
+  /// All non-admin users (drivers), leave or not, deduplicated by normalized phone number.
+  List<Map<String, dynamic>> get allDrivers {
+    final Map<String, Map<String, dynamic>> uniqueMap = {};
+    for (final u in users) {
+      final role = (u['role'] ?? 'driver').toString().toLowerCase();
+      final isAdmin = u['isAdmin'] == true;
+      if (!role.contains('admin') && role != 'owner' && !isAdmin) {
+        final rawPhone = (u['phone'] ?? u['phoneNumber'] ?? u['driverPhone'] ?? u['docId'] ?? '').toString();
+        final norm = SessionService.normalizePhone(rawPhone);
+        final key = norm.isNotEmpty ? norm : (u['docId'] ?? u['name'] ?? '').toString();
+
+        if (!uniqueMap.containsKey(key)) {
+          uniqueMap[key] = u;
+        } else {
+          // Merge richer fields if duplicate entry has uid or avatarUrl
+          final existing = uniqueMap[key]!;
+          if ((existing['uid'] == null || existing['uid'].toString().isEmpty) &&
+              u['uid'] != null &&
+              u['uid'].toString().isNotEmpty) {
+            existing['uid'] = u['uid'];
+          }
+          if ((existing['avatarUrl'] == null || existing['avatarUrl'].toString().isEmpty) &&
+              u['avatarUrl'] != null &&
+              u['avatarUrl'].toString().isNotEmpty) {
+            existing['avatarUrl'] = u['avatarUrl'];
+          }
+        }
+      }
+    }
+    return uniqueMap.values.toList();
+  }
 
   bool isOnLeave(Map<String, dynamic> user) =>
       user['onLeave'] == true || user['availability'] == 'on_leave';
@@ -552,6 +577,22 @@ class AdminHomeController extends GetxController {
   /// notification to inspect + accept it.
   Future<void> assignTruck(String truckNo, String driverPhone,
       {String? model}) async {
+    final driver = users.firstWhereOrNull((u) {
+      final p = (u['phone'] ?? '').toString();
+      return p == driverPhone ||
+          SessionService.normalizePhone(p) ==
+              SessionService.normalizePhone(driverPhone);
+    });
+
+    if (driver != null && !isDriverCheckedIn(driver)) {
+      AppSnackBar.showError(
+        title: 'Driver Off Duty 🔴',
+        message:
+            'Driver checked in (Available) nahi hai. Only checked-in drivers can be assigned trucks.',
+      );
+      return;
+    }
+
     AppPopup.showLoading(message: 'Assigning truck...');
     try {
       await _firebaseService.assignTruckToDriver(truckNo, driverPhone,
@@ -637,6 +678,13 @@ class AdminHomeController extends GetxController {
     SystemNavigator.pop();
   }
 
+  bool isDriverCheckedIn(Map<String, dynamic> driver) {
+    final availability =
+        (driver['availability'] ?? 'off_duty').toString().toLowerCase();
+    final checkedIn = driver['checkedIn'] == true;
+    return availability == 'available' || checkedIn;
+  }
+
   /// Drivers who are currently on duty (checked-in Available) OR running an
   /// active trip. Used by the "Active Drivers" stat + the Active Drivers screen.
   List<Map<String, dynamic>> get activeDrivers {
@@ -648,9 +696,10 @@ class AdminHomeController extends GetxController {
     return users.where((u) {
       if ((u['role'] ?? 'driver') == 'admin') return false;
       final phone = (u['phone'] ?? '').toString();
-      return u['availability'] == 'available' || activePhones.contains(phone);
+      return isDriverCheckedIn(u) || activePhones.contains(phone);
     }).toList();
   }
+
 
   Map<String, dynamic>? activeTripForDriver(String phone) {
     try {
@@ -770,9 +819,19 @@ class AdminHomeController extends GetxController {
   }
 
   String driverNameFor(String phone) {
-    final u = users.firstWhereOrNull((u) => (u['phone'] ?? '') == phone);
-    final name = (u?['name'] ?? '').toString();
-    return name.isEmpty ? phone : name;
+    if (phone.trim().isEmpty) return '';
+    final cleanPhone = phone.replaceAll(RegExp(r'[^\d]'), '');
+    final u = users.firstWhereOrNull((u) {
+      final uPhone =
+          (u['phone'] ?? '').toString().replaceAll(RegExp(r'[^\d]'), '');
+      return uPhone.isNotEmpty &&
+          cleanPhone.isNotEmpty &&
+          (uPhone == cleanPhone ||
+              uPhone.endsWith(cleanPhone) ||
+              cleanPhone.endsWith(uPhone));
+    });
+    final name = (u?['name'] ?? u?['driverName'] ?? '').toString().trim();
+    return name.isNotEmpty ? name : phone;
   }
 
   String driverAvatarFor(String phoneOrName) {
@@ -881,6 +940,24 @@ class AdminHomeController extends GetxController {
 
   // --- TRIP CRUD ACTIONS ---
   Future<void> createTrip(Map<String, dynamic> tripData) async {
+    final driverPhone = (tripData['driverPhone'] ?? '').toString();
+    if (driverPhone.isNotEmpty) {
+      final driver = users.firstWhereOrNull((u) {
+        final p = (u['phone'] ?? '').toString();
+        return p == driverPhone ||
+            SessionService.normalizePhone(p) ==
+                SessionService.normalizePhone(driverPhone);
+      });
+      if (driver != null && !isDriverCheckedIn(driver)) {
+        AppSnackBar.showError(
+          title: 'Driver Off Duty 🔴',
+          message:
+              'Driver checked in (Available) nahi hai. Only checked-in drivers can be assigned trips.',
+        );
+        return;
+      }
+    }
+
     AppPopup.showLoading(message: 'Assigning Trip...');
     try {
       // Trip id is auto-generated — the admin never types it.
@@ -936,6 +1013,29 @@ class AdminHomeController extends GetxController {
         }
       },
     );
+  }
+
+  /// Shows a typed-confirmation dialog then hard-deletes EVERY trip from Firestore.
+  Future<void> deleteAllTrips() async {
+    final confirmed = await _showTypedConfirmDialog(
+      title: 'Delete ALL Trips?',
+      warning:
+          'This will permanently delete EVERY trip from Firestore.\nThis action CANNOT be undone.',
+      confirmWord: 'DELETE',
+    );
+    if (!confirmed) return;
+
+    AppPopup.showLoading(message: 'Deleting all trips...');
+    try {
+      await _firebaseService.deleteAllTrips();
+      trips.clear();
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(
+          title: 'Done', message: 'All trips permanently deleted.');
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
   }
 
   Future<void> approveTripDelivery(String tripId) async {
@@ -1120,6 +1220,33 @@ class AdminHomeController extends GetxController {
     );
   }
 
+  /// Shows a typed-confirmation dialog then hard-deletes ALL driver profiles
+  /// from both `users` and `drivers` Firestore collections.
+  Future<void> deleteAllDrivers() async {
+    final confirmed = await _showTypedConfirmDialog(
+      title: 'Delete ALL Drivers?',
+      warning:
+          'This will permanently delete EVERY driver profile from Firestore.\nAdmin accounts are preserved. This action CANNOT be undone.',
+      confirmWord: 'DELETE',
+    );
+    if (!confirmed) return;
+
+    AppPopup.showLoading(message: 'Deleting all drivers...');
+    try {
+      await _firebaseService.deleteAllDrivers();
+      users.removeWhere((u) {
+        final role = (u['role'] ?? 'driver').toString().toLowerCase();
+        return role != 'admin';
+      });
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(
+          title: 'Done', message: 'All driver profiles permanently deleted.');
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+    }
+  }
+
   // --- EXPENSE ACTIONS ---
   Future<void> approveExpense(Map<String, dynamic> expenseData) async {
     final id = expenseData['id']?.toString() ?? '';
@@ -1242,4 +1369,86 @@ class AdminHomeController extends GetxController {
   Future<String> uploadAvatar(Uint8List bytes, String phone) async {
     return await _firebaseService.uploadDriverAvatar(bytes, phone);
   }
+}
+
+/// Top-level helper: prompts the user to type [confirmWord] before
+/// a destructive bulk-delete operation. Returns true only when the
+/// exact word (case-insensitive) is typed and the user taps the button.
+Future<bool> _showTypedConfirmDialog({
+  required String title,
+  required String warning,
+  String confirmWord = 'DELETE',
+}) async {
+  final textController = TextEditingController();
+  final result = await Get.dialog<bool>(
+    AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 22),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(title,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, color: Colors.red)),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(warning,
+              style: const TextStyle(height: 1.5, color: Colors.black87)),
+          const SizedBox(height: 16),
+          Text(
+            'Type "$confirmWord" to confirm:',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: textController,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: confirmWord,
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Get.back(result: false),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          onPressed: () {
+            if (textController.text.trim().toUpperCase() ==
+                confirmWord.toUpperCase()) {
+              Get.back(result: true);
+            } else {
+              Get.snackbar(
+                'Wrong Input',
+                'Please type "$confirmWord" exactly to confirm.',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: Colors.red,
+                colorText: Colors.white,
+              );
+            }
+          },
+          child: const Text('Permanently Delete',
+              style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+    barrierDismissible: false,
+  );
+  textController.dispose();
+  return result == true;
 }

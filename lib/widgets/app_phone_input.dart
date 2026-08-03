@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:transport/app/core/theme/app_colors.dart';
 import 'package:transport/widgets/app_text.dart';
@@ -139,11 +140,17 @@ class AppPhoneInput extends StatelessWidget {
             child: TextFormField(
               controller: controller,
               keyboardType: TextInputType.phone,
+              maxLength: 10,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(10),
+              ],
               style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: isDark ? Colors.white : AppColors.textPrimary,
               ),
               decoration: InputDecoration(
+                counterText: '',
                 hintText: 'phone_hint'.tr,
                 hintStyle: TextStyle(
                   color: isDark ? Colors.white38 : AppColors.textHint,

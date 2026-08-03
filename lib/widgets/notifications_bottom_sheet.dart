@@ -42,28 +42,30 @@ class NotificationsBottomSheetContent extends GetView<NotificationsController> {
                     style: AppTextStyle.headlineSmall,
                     fontWeight: FontWeight.bold),
                 const Spacer(),
-                Obx(() => controller.unreadCount > 0
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
+                Obx(() {
+                  if (controller.items.isEmpty) return const SizedBox.shrink();
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (controller.unreadCount > 0)
+                        TextButton(
+                          onPressed: controller.markAllRead,
+                          child: const AppText('Mark read',
+                              style: AppTextStyle.labelMedium,
+                              color: AppColors.primary),
                         ),
-                        child: AppText(
-                          '${controller.unreadCount} new',
-                          style: AppTextStyle.labelMedium,
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    : const SizedBox.shrink()),
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: controller.markAllRead,
-                  child: const AppText('Mark all read',
-                      style: AppTextStyle.labelMedium, color: AppColors.primary),
-                ),
+                      TextButton.icon(
+                        onPressed: controller.deleteAll,
+                        icon: const Icon(Icons.delete_sweep_rounded,
+                            color: Colors.red, size: 18),
+                        label: const AppText('Delete All',
+                            style: AppTextStyle.labelMedium,
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  );
+                }),
               ],
             ),
           ),

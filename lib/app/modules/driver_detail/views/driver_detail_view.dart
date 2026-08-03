@@ -65,7 +65,7 @@ class DriverDetailView extends GetView<DriverDetailController> {
   Widget _profileCard(Map<String, dynamic> u, bool isDark) {
     final name = (u['name'] ?? 'Driver').toString();
     final phone = (u['phone'] ?? controller.phone).toString();
-    final available = u['availability'] == 'available';
+    final available = u['availability'] == 'available' || u['checkedIn'] == true;
     final avatar = (u['avatarUrl'] ?? '').toString();
     final checkInAddr = (u['checkInAddress'] ?? '').toString();
     return Container(

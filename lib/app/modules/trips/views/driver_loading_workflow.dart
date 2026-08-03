@@ -1,12 +1,14 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:transport/app/routes/app_pages.dart';
 import '../controllers/trips_controller.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../core/theme/app_colors.dart';
 import 'package:transport/widgets/app_image_view.dart';
+import 'package:transport/app/core/utils/document_viewer_helper.dart';
+import 'package:transport/app/core/utils/image_picker_helper.dart';
 
 /// A 4-step loading workflow widget shown inside the trip card for active
 /// trips (ASSIGNED → EN_ROUTE_VENDOR → LOADING → LOAD_REQUESTED → ACTIVE NOW).
@@ -77,18 +79,17 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
     }
   }
 
-  Future<Uint8List?> _capturePhotoFromCamera() async {
+  Future<Uint8List?> _pickPhotoOrPdf(BuildContext context, bool isDark) async {
     try {
-      final x = await ImagePicker().pickImage(
-        source: ImageSource.camera,
-        imageQuality: 70,
-        preferredCameraDevice: CameraDevice.rear,
-      );
-      if (x != null) {
-        return await x.readAsBytes();
+      final base64Url = await ImagePickerHelper.pickImageAsBase64(context, isDark, allowPdf: true);
+      if (base64Url != null && base64Url.isNotEmpty) {
+        final parts = base64Url.split(',');
+        if (parts.length == 2) {
+          return base64Decode(parts[1]);
+        }
       }
     } catch (e) {
-      Get.snackbar('Camera Error', e.toString());
+      Get.snackbar('Upload Error', e.toString());
     }
     return null;
   }
@@ -424,7 +425,7 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
               child: InkWell(
                 onTap: needsLoading
                     ? () async {
-                        final bytes = await _capturePhotoFromCamera();
+                        final bytes = await _pickPhotoOrPdf(context, isDark);
                         if (bytes != null) {
                           setState(() {
                             _loadingPhotoBytes = bytes;
@@ -594,7 +595,7 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
               child: InkWell(
                 onTap: needsGatePass
                     ? () async {
-                        final bytes = await _capturePhotoFromCamera();
+                        final bytes = await _pickPhotoOrPdf(context, isDark);
                         if (bytes != null) {
                           setState(() {
                             _gatePassPhotoBytes = bytes;
@@ -883,15 +884,24 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
   }
 
   Widget _buildTruckOwnerPassCard(bool isDark) {
+    final rawUrl = widget.trip.truckOwnerPassUrl.isNotEmpty
+        ? widget.trip.truckOwnerPassUrl
+        : (widget.trip.truckOwnerPassData?['passPhotoUrl'] ??
+            widget.trip.truckOwnerPassData?['passDocumentUrl'] ??
+            widget.trip.truckOwnerPassData?['adminPhotoUrl'] ??
+            widget.trip.truckOwnerPassData?['truckOwnerPassUrl'] ??
+            '');
+    final passDocUrl = rawUrl.toString().trim();
+
     return Container(
       margin: const EdgeInsets.only(top: 8, bottom: 4),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFECFDF5),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF10B981).withValues(alpha: 0.4),
-          width: 1,
+          color: const Color(0xFF10B981).withValues(alpha: 0.5),
+          width: 1.5,
         ),
       ),
       child: Column(
@@ -902,97 +912,160 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
               const Icon(
                 Icons.verified_rounded,
                 color: Color(0xFF10B981),
-                size: 18,
+                size: 20,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: AppText(
                   'Truck Owner Pass (Issued by Admin)',
-                  style: AppTextStyle.labelMedium,
+                  style: AppTextStyle.labelLarge,
                   fontWeight: FontWeight.bold,
                   color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           if (widget.trip.truckOwnerPassId.isNotEmpty)
             AppText(
-              'Pass ID: ${widget.trip.truckOwnerPassId}',
+              'Pass ID: #${widget.trip.truckOwnerPassId}',
               style: AppTextStyle.bodyMedium,
               fontWeight: FontWeight.bold,
             ),
-          if (widget.trip.truckOwnerPassData != null && widget.trip.truckOwnerPassData!['ownerName'] != null)
+          if (widget.trip.truckOwnerPassData != null &&
+              widget.trip.truckOwnerPassData!['ownerName'] != null &&
+              widget.trip.truckOwnerPassData!['ownerName'].toString().isNotEmpty)
             AppText(
               'Owner/Transporter: ${widget.trip.truckOwnerPassData!['ownerName']}',
               style: AppTextStyle.bodyMedium,
               color: isDark ? Colors.white70 : Colors.grey.shade700,
             ),
-          if (widget.trip.truckOwnerPassData != null &&
-              widget.trip.truckOwnerPassData!['adminPhotoUrl'] != null &&
-              widget.trip.truckOwnerPassData!['adminPhotoUrl'].toString().isNotEmpty) ...[
+          if (passDocUrl.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            // Direct Document / Image Preview Box
+            _buildPassDocumentPreview(passDocUrl, isDark),
             const SizedBox(height: 10),
+            // Action Buttons (View In-App & Download)
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                GestureDetector(
-                  onTap: () => _showFullImageDialog(
-                    widget.trip.truckOwnerPassData!['adminPhotoUrl'].toString(),
-                  ),
-                  child: Stack(
-                    children: [
-                      AppImageView(
-                        imagePath: widget.trip.truckOwnerPassData!['adminPhotoUrl'].toString(),
-                        height: 80,
-                        width: 80,
-                        fit: BoxFit.cover,
-                        borderRadius: 8,
-                      ),
-                      Positioned(
-                        right: 4,
-                        bottom: 4,
-                        child: Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Icon(
-                            Icons.fullscreen_rounded,
-                            color: Colors.white,
-                            size: 14,
-                          ),
-                        ),
-                      ),
-                    ],
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => DocumentViewerHelper.showDocument(
+                      context,
+                      passDocUrl,
+                      title: 'Truck Owner Pass Document',
+                    ),
+                    icon: const Icon(Icons.visibility_rounded, size: 16),
+                    label: const Text(
+                      'View In-App',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF10B981),
+                      side: const BorderSide(color: Color(0xFF10B981)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AppText(
-                        'Admin Photo',
-                        style: AppTextStyle.labelMedium,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11,
-                        color: isDark ? Colors.white54 : Colors.grey.shade600,
-                      ),
-                      const SizedBox(height: 4),
-                      AppText(
-                        'Attached by admin during approval',
-                        style: AppTextStyle.bodyMedium,
-                        fontSize: 10,
-                        color: isDark ? Colors.white38 : Colors.grey.shade500,
-                      ),
-                    ],
+                  child: ElevatedButton.icon(
+                    onPressed: () => DocumentViewerHelper.downloadToFolder(
+                      passDocUrl,
+                      'Truck_Owner_Pass_Document',
+                      context: context,
+                    ),
+                    icon: const Icon(Icons.download_rounded, size: 16),
+                    label: const Text(
+                      'Download PDF/Image',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
                   ),
                 ),
               ],
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildPassDocumentPreview(String passDocUrl, bool isDark) {
+    final isPdf = DocumentViewerHelper.isPdf(passDocUrl);
+
+    if (isPdf) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
+        ),
+        child: const Column(
+          children: [
+            Icon(Icons.picture_as_pdf_rounded, color: Colors.redAccent, size: 48),
+            SizedBox(height: 8),
+            AppText(
+              'Truck Owner Pass PDF Attached 📄',
+              style: AppTextStyle.bodyLarge,
+              fontWeight: FontWeight.bold,
+              color: Colors.redAccent,
+            ),
+            SizedBox(height: 4),
+            AppText(
+              'Tap "View In-App" or "Download" below to view details.',
+              style: AppTextStyle.labelMedium,
+              color: Colors.grey,
+            ),
+          ],
+        ),
+      );
+    }
+
+    Widget img;
+    if (passDocUrl.startsWith('data:image') || !passDocUrl.startsWith('http')) {
+      try {
+        var str = passDocUrl.trim();
+        if (str.contains(',')) str = str.split(',').last.trim();
+        str = str.replaceAll(RegExp(r'\s+'), '');
+        while (str.length % 4 != 0) {
+          str += '=';
+        }
+        final bytes = base64Decode(str);
+        img = Image.memory(bytes, fit: BoxFit.contain, height: 180);
+      } catch (_) {
+        img = const Icon(Icons.image_not_supported_rounded, size: 48, color: Colors.grey);
+      }
+    } else {
+      img = Image.network(
+        passDocUrl,
+        fit: BoxFit.contain,
+        height: 180,
+        errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_rounded, size: 48, color: Colors.grey),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      height: 180,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: InteractiveViewer(
+          child: img,
+        ),
       ),
     );
   }

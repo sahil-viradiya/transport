@@ -46,7 +46,7 @@ class ActiveDriversView extends GetView<AdminHomeController> {
   Widget _driverCard(Map<String, dynamic> u, bool isDark) {
     final phone = (u['phone'] ?? '').toString();
     final name = (u['name'] ?? 'Driver').toString();
-    final available = u['availability'] == 'available';
+    final available = u['availability'] == 'available' || u['checkedIn'] == true;
     final trip = controller.activeTripForDriver(phone);
     final onTrip = trip != null;
 

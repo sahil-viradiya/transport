@@ -56,6 +56,19 @@ class ProofOfDeliveryController extends GetxController {
     }
   }
 
+  // Action to pick PDF Document
+  Future<void> fromPdf() async {
+    final pdf = await ImagePickerHelper.pickPdf();
+    if (pdf != null && pdf.bytes.isNotEmpty) {
+      pickedBytes.value = pdf.bytes;
+    } else {
+      AppSnackBar.showInfo(
+        title: 'No Document',
+        message: 'No PDF document selected.',
+      );
+    }
+  }
+
   // Delete/Clear picked photo
   void deletePhoto() {
     pickedBytes.value = null;

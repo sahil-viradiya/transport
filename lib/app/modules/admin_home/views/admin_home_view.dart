@@ -243,9 +243,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                   duration: const Duration(milliseconds: 180),
                   curve: Curves.easeInOut,
                   decoration: BoxDecoration(
-                    color: selected
-                        ? const Color(0xFF059669)
-                        : Colors.transparent,
+                    color:
+                        selected ? const Color(0xFF059669) : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Material(
@@ -2102,6 +2101,29 @@ class AdminHomeView extends GetView<AdminHomeController> {
             ],
           ),
         ),
+        // ── Delete All Trips ─────────────────────────────────────────────
+        Obx(() {
+          if (controller.trips.isEmpty) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: OutlinedButton.icon(
+              onPressed: controller.deleteAllTrips,
+              icon: const Icon(Icons.delete_sweep_rounded,
+                  size: 16, color: Colors.red),
+              label: const Text('Delete All',
+                  style: TextStyle(
+                      color: Colors.red, fontWeight: FontWeight.w600)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.red, width: 1.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          );
+        }),
+        // ── New Trip ─────────────────────────────────────────────────────
         ElevatedButton.icon(
           onPressed: () => _assignTripGuarded(context, isDark),
           icon: const Icon(Icons.add_rounded, size: 18),
@@ -2395,14 +2417,31 @@ class AdminHomeView extends GetView<AdminHomeController> {
         : (date.isNotEmpty ? '$date 08:00 AM' : '-');
     final driverPhone = (trip['driverPhone'] ?? '').toString();
     final driver = controller.driverNameFor(driverPhone);
-    final driverAvatar = controller.driverAvatarFor(driverPhone);
+    // final driverAvatar = controller.driverAvatarFor(trip['driverImage']);
     final material = (trip['materialName'] ?? 'General Cargo').toString();
     final pickupCity = (trip['pickupCity'] ?? '').toString();
     final pickupLocation = (trip['pickupLocation'] ?? '').toString();
     final dropCity = (trip['dropCity'] ?? '').toString();
     final dropLocation =
         (trip['dropLocation'] ?? 'Destination pending').toString();
-
+    final adminCtrl = Get.isRegistered<AdminHomeController>()
+        ? Get.find<AdminHomeController>()
+        : null;
+    String avatarUrl = (trip['driverAvatar'] ??
+            trip['driverPhoto'] ??
+            trip['driverAvatarUrl'] ??
+            trip['driverImage'] ??
+            '')
+        .toString()
+        .trim();
+    if (avatarUrl.isEmpty && adminCtrl != null) {
+      if (driverPhone.isNotEmpty) {
+        avatarUrl = adminCtrl.driverAvatarFor(driverPhone);
+      }
+      if (avatarUrl.isEmpty && driver.isNotEmpty) {
+        avatarUrl = adminCtrl.driverAvatarFor(driver);
+      }
+    }
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -2431,8 +2470,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 backgroundColor: Colors.grey.shade200,
                 child: ClipOval(
                   child: CachedNetworkImage(
-                    imageUrl: corsSafeImageUrl(driverAvatar.isNotEmpty
-                        ? driverAvatar
+                    imageUrl: corsSafeImageUrl(avatarUrl.isNotEmpty
+                        ? avatarUrl
                         : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'),
                     fit: BoxFit.cover,
                     width: 36,
@@ -2447,7 +2486,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AppText(driver.isNotEmpty ? driver : 'Deep',
+                    AppText(driver.isNotEmpty ? driver : '',
                         style: AppTextStyle.bodyLarge,
                         fontWeight: FontWeight.bold,
                         maxLines: 1,
@@ -3357,10 +3396,14 @@ class AdminHomeView extends GetView<AdminHomeController> {
 
   void _showAssignTruckDialog(
       BuildContext context, Map<String, dynamic> truck) {
-    final drivers = controller.allDrivers;
+    final drivers = controller.allDrivers
+        .where((d) => controller.isDriverCheckedIn(d))
+        .toList();
     if (drivers.isEmpty) {
       AppSnackBar.showWarning(
-          title: 'No Drivers', message: 'Pehle koi driver register karein.');
+          title: 'No Checked-In Drivers 🔴',
+          message:
+              'Koi driver abhi Checked-In (Available) nahi hai. Drivers ko app se check-in karne bole.');
       return;
     }
     String selected = (truck['assignedTo'] ?? '').toString();
@@ -3683,6 +3726,30 @@ class AdminHomeView extends GetView<AdminHomeController> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // ── Delete All Drivers action bar ─────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: controller.deleteAllDrivers,
+                      icon: const Icon(Icons.delete_sweep_rounded,
+                          size: 16, color: Colors.red),
+                      label: const Text('Delete All Drivers',
+                          style: TextStyle(
+                              color: Colors.red, fontWeight: FontWeight.w600)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.red, width: 1.5),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               // Mockup Header Columns (only on web/wide screens)
               if (isWide)
                 Padding(
@@ -3754,8 +3821,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
 
                     // Status details
                     final onLeave = controller.isOnLeave(user);
-                    final available =
-                        (user['availability'] ?? 'off_duty') == 'available';
+                    final available = controller.isDriverCheckedIn(user);
 
                     String statusText = 'OFF DUTY';
                     Color statusColor = const Color(0xFF6B7280);
@@ -5383,8 +5449,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
 
     final availableDrivers = controller.allDrivers
         .where((u) {
-          // On-leave drivers can't be assigned trips.
+          // On-leave or off-duty drivers can't be assigned trips.
           if (controller.isOnLeave(u)) return false;
+          if (!controller.isDriverCheckedIn(u)) return false;
           final phone = u['phone'] as String?;
           if (phone == null || phone.isEmpty) return false;
 
@@ -7338,7 +7405,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                   Expanded(
                                     flex: 4,
                                     child: _buildMilestonesTimeline(
-                                        dialogCtx, isDark, logs, trip: liveTrip),
+                                        dialogCtx, isDark, logs,
+                                        trip: liveTrip),
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(
@@ -7358,7 +7426,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                 ],
                               )
                             else ...[
-                              _buildMilestonesTimeline(dialogCtx, isDark, logs, trip: liveTrip),
+                              _buildMilestonesTimeline(dialogCtx, isDark, logs,
+                                  trip: liveTrip),
                               const SizedBox(height: 16),
                               _buildTripExpensesPanel(
                                   dialogCtx, isDark, tripExpenses),
@@ -7485,7 +7554,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           _buildTripMetadataCard(
                               isDark, liveTrip, driverName, driverPhone),
                           const SizedBox(height: 20),
-                          _buildMilestonesTimeline(context, isDark, logs, trip: liveTrip),
+                          _buildMilestonesTimeline(context, isDark, logs,
+                              trip: liveTrip),
                           const SizedBox(height: 20),
                           _buildTripExpensesPanel(
                               context, isDark, tripExpenses),
@@ -7721,22 +7791,25 @@ class AdminHomeView extends GetView<AdminHomeController> {
               String address = rawAddress;
               if (isDummyAddress && trip != null) {
                 if (isDestMilestone) {
-                  address = (trip['dropLocation']?.toString().isNotEmpty == true)
-                      ? trip['dropLocation'].toString()
-                      : ((trip['dropCity']?.toString().isNotEmpty == true)
-                          ? trip['dropCity'].toString()
-                          : 'Destination Terminal');
+                  address =
+                      (trip['dropLocation']?.toString().isNotEmpty == true)
+                          ? trip['dropLocation'].toString()
+                          : ((trip['dropCity']?.toString().isNotEmpty == true)
+                              ? trip['dropCity'].toString()
+                              : 'Destination Terminal');
                 } else {
-                  address = (trip['pickupLocation']?.toString().isNotEmpty == true)
-                      ? trip['pickupLocation'].toString()
-                      : ((trip['pickupCity']?.toString().isNotEmpty == true)
-                          ? trip['pickupCity'].toString()
-                          : 'Pickup Terminal');
+                  address =
+                      (trip['pickupLocation']?.toString().isNotEmpty == true)
+                          ? trip['pickupLocation'].toString()
+                          : ((trip['pickupCity']?.toString().isNotEmpty == true)
+                              ? trip['pickupCity'].toString()
+                              : 'Pickup Terminal');
                 }
               }
 
               final isDummyCoords = (rawLat == 0.0 && rawLng == 0.0) ||
-                  ((rawLat - 18.9482).abs() < 0.001 && (rawLng - 72.9469).abs() < 0.001);
+                  ((rawLat - 18.9482).abs() < 0.001 &&
+                      (rawLng - 72.9469).abs() < 0.001);
 
               double lat = rawLat;
               double lng = rawLng;
@@ -7744,16 +7817,20 @@ class AdminHomeView extends GetView<AdminHomeController> {
               if (isDummyCoords && trip != null) {
                 if (isDestMilestone) {
                   lat = (trip['dropLatitude'] as num?)?.toDouble() ??
-                      (trip['currentLatitude'] as num?)?.toDouble() ?? 0.0;
+                      (trip['currentLatitude'] as num?)?.toDouble() ??
+                      0.0;
                   lng = (trip['dropLongitude'] as num?)?.toDouble() ??
-                      (trip['currentLongitude'] as num?)?.toDouble() ?? 0.0;
+                      (trip['currentLongitude'] as num?)?.toDouble() ??
+                      0.0;
                 } else {
                   lat = (trip['pickupLatitude'] as num?)?.toDouble() ?? 0.0;
                   lng = (trip['pickupLongitude'] as num?)?.toDouble() ?? 0.0;
                 }
               }
 
-              if ((lat == 0.0 && lng == 0.0) || ((lat - 18.9482).abs() < 0.001 && (lng - 72.9469).abs() < 0.001)) {
+              if ((lat == 0.0 && lng == 0.0) ||
+                  ((lat - 18.9482).abs() < 0.001 &&
+                      (lng - 72.9469).abs() < 0.001)) {
                 final cityCoords = _resolveKnownCityCoords(address);
                 if (cityCoords != null) {
                   lat = cityCoords[0];
@@ -7762,7 +7839,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
               }
 
               final hasValidCoords = (lat != 0.0 && lng != 0.0) &&
-                  !((lat - 18.9482).abs() < 0.001 && (lng - 72.9469).abs() < 0.001);
+                  !((lat - 18.9482).abs() < 0.001 &&
+                      (lng - 72.9469).abs() < 0.001);
 
               final isLast = index == logs.length - 1;
               return Stack(
@@ -9612,65 +9690,6 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color:
-                              isDark ? Colors.white10 : const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                              color: isDark
-                                  ? Colors.white24
-                                  : Colors.grey.shade300),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              adminPhotoUrl != null
-                                  ? Icons.check_circle_rounded
-                                  : Icons.add_a_photo_rounded,
-                              color: adminPhotoUrl != null
-                                  ? Colors.green
-                                  : Colors.blue,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                adminPhotoUrl != null
-                                    ? 'Admin Photo Attached ✅'
-                                    : 'Upload Admin Photo (Optional)',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 12),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () async {
-                                final url =
-                                    await ImagePickerHelper.pickImageAsBase64(
-                                        context, isDark);
-                                if (url != null) {
-                                  setStateDialog(() {
-                                    adminPhotoUrl = url;
-                                  });
-                                }
-                              },
-                              child: Text(
-                                  adminPhotoUrl != null ? 'Change' : 'Attach'),
-                            ),
-                            if (adminPhotoUrl != null)
-                              IconButton(
-                                icon: const Icon(Icons.close_rounded,
-                                    size: 18, color: Colors.red),
-                                onPressed: () {
-                                  setStateDialog(() {
-                                    adminPhotoUrl = null;
-                                  });
-                                },
-                              ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -9692,6 +9711,10 @@ class AdminHomeView extends GetView<AdminHomeController> {
                         'passId': passIdCtrl.text.trim(),
                         'ownerName': ownerNameCtrl.text.trim(),
                         'remarks': remarksCtrl.text.trim(),
+                        if (passPhotoUrl != null && passPhotoUrl!.isNotEmpty)
+                          'passPhotoUrl': passPhotoUrl,
+                        if (passPhotoUrl != null && passPhotoUrl!.isNotEmpty)
+                          'passDocumentUrl': passPhotoUrl,
                         'generatedAt':
                             DateTime.now().toString().substring(0, 16),
                         if (adminPhotoUrl != null && adminPhotoUrl!.isNotEmpty)

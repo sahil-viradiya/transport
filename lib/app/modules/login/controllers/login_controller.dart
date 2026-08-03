@@ -52,6 +52,47 @@ class LoginController extends GetxController {
     final digits = phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
     final phone = '${selectedCountryCode.value}$digits';
     isLoading.value = true;
+    AppPopup.showLoading(message: 'Checking account status...');
+
+    // SECURITY GUARD: Check if account exists and was created by Admin
+    final firebaseService = Get.find<FirebaseService>();
+    final userData = await firebaseService.getUserData(phone);
+
+    if (userData == null) {
+      AppPopup.hideLoading();
+      isLoading.value = false;
+      AppSnackBar.showError(
+        title: 'Access Denied 🚫',
+        message:
+            'Your account has not been created yet.\nPlease contact your administrator.',
+      );
+      return;
+    }
+
+    final bool isDeleted = userData['isDeleted'] == true;
+    if (isDeleted) {
+      AppPopup.hideLoading();
+      isLoading.value = false;
+      AppSnackBar.showError(
+        title: 'Access Denied 🚫',
+        message:
+            'This account is no longer available.\nPlease contact your administrator.',
+      );
+      return;
+    }
+
+    final bool isActive = userData['isActive'] as bool? ?? true;
+    if (!isActive) {
+      AppPopup.hideLoading();
+      isLoading.value = false;
+      AppSnackBar.showError(
+        title: 'Account Inactive 🚫',
+        message:
+            'Your account is currently inactive.\nPlease contact your administrator.',
+      );
+      return;
+    }
+
     AppPopup.showLoading(message: 'Requesting OTP...');
 
     if (isMockMode.value) {
@@ -138,8 +179,9 @@ class LoginController extends GetxController {
 
         // Lookup user or driver from Firestore
         final userData = await firebaseService.getUserData(phoneInput);
-        final docPhone = (userData?['phone'] ?? SessionService.normalizePhone(phoneInput)).toString();
-        final role = (userData?['role'] ?? 'driver').toString();
+        final rawPhoneVal = (userData?['phone'] ?? userData?['phoneNumber'] ?? userData?['driverPhone'] ?? phoneInput).toString();
+        final docPhone = SessionService.normalizePhone(rawPhoneVal);
+        final role = (userData?['role'] ?? 'driver').toString().toLowerCase();
         final name = (userData?['name'] ?? userData?['driverName'] ?? 'Driver').toString();
         final avatarUrl = userData?['avatarUrl']?.toString();
 

@@ -7,6 +7,7 @@ import 'trip_status_view.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/session_service.dart';
+import '../../../core/utils/document_viewer_helper.dart';
 
 class TripDetailsView extends GetView<TripDetailsController> {
   const TripDetailsView({super.key});
@@ -126,6 +127,10 @@ class TripDetailsView extends GetView<TripDetailsController> {
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
+
+              // Uploaded Trip Documents Card (Photos & PDFs view & download)
+              _buildTripDocumentsCard(context, isDark, ex),
               const SizedBox(height: 20),
 
               // Actions: Call Admin + Update Status
@@ -230,6 +235,84 @@ class TripDetailsView extends GetView<TripDetailsController> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTripDocumentsCard(
+      BuildContext context, bool isDark, Map<String, dynamic> ex) {
+    final loadingUrl =
+        (ex['loadingPhotoUrl'] ?? ex['loadingPhoto'] ?? '').toString();
+    final gatePassUrl =
+        (ex['gatePassPhotoUrl'] ?? ex['gatePassPhoto'] ?? '').toString();
+    final passData = ex['truckOwnerPassData'] as Map?;
+    final passUrl = (passData?['passPhotoUrl'] ??
+            passData?['passDocumentUrl'] ??
+            passData?['adminPhotoUrl'] ??
+            '')
+        .toString();
+    final podUrl = (ex['podPhotoUrl'] ?? ex['podPhoto'] ?? '').toString();
+
+    final docs = <Map<String, String>>[];
+    if (loadingUrl.isNotEmpty) {
+      docs.add({'title': 'Loading Photo / Document', 'url': loadingUrl});
+    }
+    if (gatePassUrl.isNotEmpty) {
+      docs.add({'title': 'Gate Pass Photo / Document', 'url': gatePassUrl});
+    }
+    if (passUrl.isNotEmpty) {
+      docs.add({'title': 'Truck Owner Pass Document', 'url': passUrl});
+    }
+    if (podUrl.isNotEmpty) {
+      docs.add({'title': 'Proof of Delivery (POD)', 'url': podUrl});
+    }
+
+    if (docs.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? Colors.white10 : AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.folder_shared_rounded,
+                  color: AppColors.primary, size: 20),
+              SizedBox(width: 8),
+              AppText('Trip Documents & Attachments 📄',
+                  style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...docs.map((doc) {
+            final title = doc['title']!;
+            final url = doc['url']!;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: ElevatedButton.icon(
+                onPressed: () => DocumentViewerHelper.showDocument(context, url,
+                    title: title),
+                icon: const Icon(Icons.description_rounded, size: 16),
+                label: AppText(title,
+                    style: AppTextStyle.labelMedium,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 42),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            );
+          }),
         ],
       ),
     );

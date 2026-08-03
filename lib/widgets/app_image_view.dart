@@ -21,7 +21,8 @@ class AppImageView extends StatelessWidget {
     this.width,
     this.height,
     this.fit = BoxFit.cover,
-    this.placeholderImage = 'assets/images/placeholder.png', // Fallback local placeholder
+    this.placeholderImage =
+        'assets/images/placeholder.png', // Fallback local placeholder
     this.borderRadius = 0.0,
     this.color,
   });
@@ -67,7 +68,9 @@ class AppImageView extends StatelessWidget {
           width: width,
           height: height,
           fit: fit,
-          colorFilter: color != null ? ColorFilter.mode(color!, BlendColorFilterMode.srcIn) : null,
+          colorFilter: color != null
+              ? ColorFilter.mode(color!, BlendColorFilterMode.srcIn)
+              : null,
         );
       } else {
         imageWidget = Image.asset(
@@ -136,5 +139,6 @@ class AppImageView extends StatelessWidget {
     );
   }
 }
+
 // Support legacy modes
 typedef BlendColorFilterMode = BlendMode;

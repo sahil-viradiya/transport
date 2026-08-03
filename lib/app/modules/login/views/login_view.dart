@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:transport/app/core/theme/app_images.dart';
+import 'package:transport/widgets/app_image_view.dart';
 import '../controllers/login_controller.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../../widgets/app_button.dart';
@@ -217,11 +219,9 @@ class LoginView extends GetView<LoginController> {
               ),
             ],
           ),
-          child: Center(
-            child: Icon(
-              Icons.local_shipping_rounded,
-              color: isDark ? const Color(0xFF34D399) : const Color(0xFF15803D),
-              size: 36,
+          child: const Center(
+            child: AppImageView(
+              imagePath: AppImages.appImage,
             ),
           ),
         ),
@@ -278,15 +278,11 @@ class LoginView extends GetView<LoginController> {
               children: [
                 Row(
                   children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(Icons.local_shipping_rounded,
-                          color: Color(0xFF059669), size: 26),
+                    const AppImageView(
+                      imagePath: AppImages.appImage,
+                      width: 50,
+                      height: 50,
+                      borderRadius: 14,
                     ),
                     const SizedBox(width: 14),
                     Column(

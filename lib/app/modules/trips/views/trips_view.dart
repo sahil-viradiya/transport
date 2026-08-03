@@ -13,15 +13,20 @@ import 'driver_loading_workflow.dart';
 class TripsView extends GetView<TripsController> {
   const TripsView({super.key});
 
-  static const filterTabs = ['Today', 'All', 'Upcoming', 'Ongoing', 'Completed'];
+  static const filterTabs = [
+    'Today',
+    'All',
+    'Upcoming',
+    'Ongoing',
+    'Completed'
+  ];
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF0F172A) : AppColors.background,
+      backgroundColor: isDark ? const Color(0xFF0F172A) : AppColors.background,
       appBar: AppBar(
         title: const AppText('My Trips',
             style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
@@ -56,14 +61,11 @@ class TripsView extends GetView<TripsController> {
                       decoration: BoxDecoration(
                         color: isSelected
                             ? AppColors.primary
-                            : (isDark
-                                ? const Color(0xFF1E293B)
-                                : Colors.white),
+                            : (isDark ? const Color(0xFF1E293B) : Colors.white),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.border,
+                          color:
+                              isSelected ? AppColors.primary : AppColors.border,
                         ),
                       ),
                       child: Center(
@@ -198,8 +200,7 @@ class TripsView extends GetView<TripsController> {
     );
   }
 
-  Widget _buildTripCard(
-      BuildContext context, TripItemModel trip, bool isDark) {
+  Widget _buildTripCard(BuildContext context, TripItemModel trip, bool isDark) {
     final isPending = trip.status == 'PENDING';
     final (chipBg, chipFg) = _chipColors(trip.status);
 
@@ -275,7 +276,9 @@ class TripsView extends GetView<TripsController> {
           if (_isDestinationVisible(trip.status)) ...[
             _kvRow('Drop City', trip.dropCity),
             _kvRow('Drop Location', trip.dropLocation),
-          ] else if (trip.status != 'PENDING' && trip.status != 'REJECTED' && trip.status != 'DELIVERED') ...[
+          ] else if (trip.status != 'PENDING' &&
+              trip.status != 'REJECTED' &&
+              trip.status != 'DELIVERED') ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               margin: const EdgeInsets.only(bottom: 8),
@@ -289,14 +292,18 @@ class TripsView extends GetView<TripsController> {
                 children: [
                   Icon(Icons.lock_rounded,
                       size: 14,
-                      color: isDark ? Colors.amber.shade200 : Colors.amber.shade700),
+                      color: isDark
+                          ? Colors.amber.shade200
+                          : Colors.amber.shade700),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Destination admin approval ke baad dikhega',
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? Colors.amber.shade200 : Colors.amber.shade800,
+                        color: isDark
+                            ? Colors.amber.shade200
+                            : Colors.amber.shade800,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -309,8 +316,6 @@ class TripsView extends GetView<TripsController> {
           // Loading Workflow stepper for active/ongoing trips
           if (_showLoadingWorkflow(trip.status))
             DriverLoadingWorkflow(trip: trip),
-
-
 
           // View Details
           Align(

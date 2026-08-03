@@ -101,15 +101,31 @@ class NotificationBell extends StatelessWidget {
                                 style: AppTextStyle.headlineSmall,
                                 fontWeight: FontWeight.w700),
                           ),
-                          Obx(() => c.unreadCount > 0
-                              ? TextButton(
-                                  onPressed: c.markAllRead,
-                                  child: const AppText('Mark all read',
-                                      style: AppTextStyle.labelLarge,
-                                      color: AppColors.primary,
+                          Obx(() {
+                            if (c.items.isEmpty) return const SizedBox.shrink();
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (c.unreadCount > 0)
+                                  TextButton(
+                                    onPressed: c.markAllRead,
+                                    child: const AppText('Mark read',
+                                        style: AppTextStyle.labelMedium,
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                TextButton.icon(
+                                  onPressed: c.deleteAll,
+                                  icon: const Icon(Icons.delete_sweep_rounded,
+                                      color: Colors.red, size: 18),
+                                  label: const AppText('Delete All',
+                                      style: AppTextStyle.labelMedium,
+                                      color: Colors.red,
                                       fontWeight: FontWeight.w600),
-                                )
-                              : const SizedBox.shrink()),
+                                ),
+                              ],
+                            );
+                          }),
                         ],
                       ),
                     ),

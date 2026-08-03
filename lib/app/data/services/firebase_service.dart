@@ -986,7 +986,10 @@ class FirebaseService extends GetxService {
     String? tripId,
     String? refId,
   }) async {
-    final p = SessionService.normalizePhone(toPhone);
+    final rawTarget = toPhone.trim();
+    final p = rawTarget.toLowerCase() == 'admin'
+        ? 'admin'
+        : SessionService.normalizePhone(toPhone);
     if (p.isEmpty) return;
     try {
       final keyId = (tripId != null && tripId.isNotEmpty)
@@ -1006,24 +1009,38 @@ class FirebaseService extends GetxService {
         'read': false,
         'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-    } catch (_) {}
+      debugPrint('🔔 [NOTIFICATION CREATED] toPhone: $p, title: "$title"');
+    } catch (e) {
+      debugPrint('🚨 [NOTIFICATION CREATE FAIL] $e');
+    }
   }
 
   /// Live notifications for a user, newest first. Sorted client-side so no
   /// composite index is required.
   Stream<List<Map<String, dynamic>>> watchNotifications(String phone) {
+    final rawP = phone.trim();
     final p = SessionService.normalizePhone(phone);
-    if (p.isEmpty) return Stream.value(const []);
-    return _db
-        .collection('notifications')
-        .where('toPhone', isEqualTo: p)
-        .snapshots()
-        .map((s) {
+    final session = Get.find<SessionService>();
+    final isAdmin = session.isAdmin || rawP == 'admin' || p == 'admin';
+
+    Query<Map<String, dynamic>> query = _db.collection('notifications');
+    if (!isAdmin && p.isNotEmpty) {
+      query = query.where('toPhone', isEqualTo: p);
+    }
+
+    return query.snapshots().map((s) {
       final list = s.docs.map((d) {
         final m = d.data();
         m['id'] = d.id;
         return m;
+      }).where((m) {
+        if (isAdmin) return true;
+        final toP = (m['toPhone'] ?? '').toString().trim();
+        if (toP.isEmpty) return false;
+        final normToP = SessionService.normalizePhone(toP);
+        return toP == rawP || normToP == p || toP == 'admin';
       }).toList();
+
       list.sort((a, b) {
         final da = a['createdAt'] is Timestamp
             ? (a['createdAt'] as Timestamp).toDate()
@@ -1090,6 +1107,40 @@ class FirebaseService extends GetxService {
     } catch (_) {}
   }
 
+  /// Delete a single notification document.
+  Future<void> deleteSingleNotification(String id) async {
+    try {
+      await _db.collection('notifications').doc(id).delete();
+    } catch (_) {}
+  }
+
+  /// Permanently delete all notifications targeted to the given user or admin.
+  Future<void> deleteAllNotifications(String phone) async {
+    final rawP = phone.trim();
+    final p = SessionService.normalizePhone(phone);
+    final session = Get.find<SessionService>();
+    final isAdmin = session.isAdmin || rawP == 'admin' || p == 'admin';
+
+    try {
+      final snap = await _db.collection('notifications').get();
+      for (var i = 0; i < snap.docs.length; i += 400) {
+        final batch = _db.batch();
+        var count = 0;
+        for (final doc in snap.docs.skip(i).take(400)) {
+          final toP = (doc.data()['toPhone'] ?? '').toString().trim();
+          final normToP = SessionService.normalizePhone(toP);
+          if (isAdmin || toP == rawP || normToP == p || toP == 'admin') {
+            batch.delete(doc.reference);
+            count++;
+          }
+        }
+        if (count > 0) {
+          await batch.commit();
+        }
+      }
+    } catch (_) {}
+  }
+
   /// Save this device's FCM token so a Cloud Function can push to the user.
   Future<void> saveFcmToken(String phone, String token) async {
     final p = SessionService.normalizePhone(phone);
@@ -1110,36 +1161,44 @@ class FirebaseService extends GetxService {
     String? refId,
   }) async {
     try {
-      final snap =
-          await _db.collection('users').where('role', isEqualTo: 'admin').get();
-      // All writes are independent but should reach admins together. A batch
-      // avoids one round trip per administrator and queues safely offline.
-      for (var start = 0; start < snap.docs.length; start += 500) {
-        final batch = _db.batch();
-        for (final admin in snap.docs.skip(start).take(500)) {
-          final keyId = (tripId != null && tripId.isNotEmpty)
-              ? tripId
-              : (refId != null && refId.isNotEmpty)
-                  ? refId
-                  : '${DateTime.now().microsecondsSinceEpoch}_${admin.id}';
-          final noteRef =
-              _db.collection('notifications').doc('${admin.id}_${type}_$keyId');
-          batch.set(
-              noteRef,
-              {
-                'toPhone': admin.id,
-                'title': title,
-                'body': body,
-                'type': type,
-                if (tripId != null) 'tripId': tripId,
-                if (refId != null) 'refId': refId,
-                'read': false,
-                'createdAt': FieldValue.serverTimestamp(),
-              },
-              SetOptions(merge: true));
+      final Set<String> targetIds = {'admin'};
+
+      final snap = await _db.collection('users').get();
+      for (final doc in snap.docs) {
+        final r = (doc.data()['role'] ?? '').toString().toLowerCase();
+        if (r == 'admin' || r == 'owner') {
+          targetIds.add(doc.id);
+          final p = doc.data()['phone']?.toString() ?? '';
+          if (p.isNotEmpty) targetIds.add(p);
+          final normP = SessionService.normalizePhone(p);
+          if (normP.isNotEmpty) targetIds.add(normP);
         }
-        await batch.commit();
       }
+
+      final batch = _db.batch();
+      for (final targetId in targetIds) {
+        final keyId = (tripId != null && tripId.isNotEmpty)
+            ? tripId
+            : (refId != null && refId.isNotEmpty)
+                ? refId
+                : '${DateTime.now().microsecondsSinceEpoch}_$targetId';
+        final noteRef =
+            _db.collection('notifications').doc('${targetId}_${type}_$keyId');
+        batch.set(
+            noteRef,
+            {
+              'toPhone': targetId,
+              'title': title,
+              'body': body,
+              'type': type,
+              if (tripId != null) 'tripId': tripId,
+              if (refId != null) 'refId': refId,
+              'read': false,
+              'createdAt': FieldValue.serverTimestamp(),
+            },
+            SetOptions(merge: true));
+      }
+      await batch.commit();
     } catch (_) {}
   }
 
@@ -1157,8 +1216,10 @@ class FirebaseService extends GetxService {
     required String address,
     String? driverName,
   }) async {
-    final p = SessionService.normalizePhone(phone);
+    final p = phone.trim();
     if (p.isEmpty) return;
+    final pNorm = SessionService.normalizePhone(p);
+
     final data = <String, dynamic>{
       'availability': 'available',
       'checkedIn': true,
@@ -1170,6 +1231,12 @@ class FirebaseService extends GetxService {
     try {
       await _db.collection('users').doc(p).set(data, SetOptions(merge: true));
       await _db.collection('drivers').doc(p).set(data, SetOptions(merge: true));
+
+      if (pNorm.isNotEmpty && pNorm != p) {
+        await _db.collection('users').doc(pNorm).set(data, SetOptions(merge: true));
+        await _db.collection('drivers').doc(pNorm).set(data, SetOptions(merge: true));
+      }
+
       await notifyAdmins(
         title: 'Driver On Duty 🟢',
         body: '${driverName ?? p} checked in and is Available'
@@ -1181,8 +1248,10 @@ class FirebaseService extends GetxService {
 
   /// Driver goes off duty: marked Off Duty; admins notified.
   Future<void> checkOut(String phone, {String? driverName}) async {
-    final p = SessionService.normalizePhone(phone);
+    final p = phone.trim();
     if (p.isEmpty) return;
+    final pNorm = SessionService.normalizePhone(p);
+
     final data = <String, dynamic>{
       'availability': 'off_duty',
       'checkedIn': false,
@@ -1191,6 +1260,12 @@ class FirebaseService extends GetxService {
     try {
       await _db.collection('users').doc(p).set(data, SetOptions(merge: true));
       await _db.collection('drivers').doc(p).set(data, SetOptions(merge: true));
+
+      if (pNorm.isNotEmpty && pNorm != p) {
+        await _db.collection('users').doc(pNorm).set(data, SetOptions(merge: true));
+        await _db.collection('drivers').doc(pNorm).set(data, SetOptions(merge: true));
+      }
+
       await notifyAdmins(
         title: 'Driver Off Duty 🔴',
         body: '${driverName ?? p} checked out.',
@@ -1200,18 +1275,60 @@ class FirebaseService extends GetxService {
   }
 
   /// Live user directory for the admin (roles + availability update in place).
+  /// Deduplicates users by normalized phone number to ensure no duplicate cards appear in UI.
   Stream<List<Map<String, dynamic>>> watchAllUsers() {
-    return _db.collection('users').snapshots().map((s) => s.docs.map((d) {
-          final m = d.data();
-          m['phone'] = d.id;
-          return m;
-        }).toList());
+    return _db.collection('users').snapshots().map((s) {
+      final Map<String, Map<String, dynamic>> uniqueMap = {};
+      for (final d in s.docs) {
+        final m = Map<String, dynamic>.from(d.data());
+        m['docId'] = d.id;
+        m['phone'] = (m['phone'] ?? d.id).toString();
+        final rawPhone = (m['phone'] ?? m['phoneNumber'] ?? m['driverPhone'] ?? d.id).toString();
+        final norm = SessionService.normalizePhone(rawPhone);
+        final key = norm.isNotEmpty ? norm : d.id;
+
+        if (!uniqueMap.containsKey(key)) {
+          uniqueMap[key] = m;
+        } else {
+          // Merge richer fields if duplicate document has more data (e.g. uid, avatar)
+          final existing = uniqueMap[key]!;
+          if ((existing['uid'] == null || existing['uid'].toString().isEmpty) &&
+              m['uid'] != null &&
+              m['uid'].toString().isNotEmpty) {
+            existing['uid'] = m['uid'];
+          }
+          if ((existing['avatarUrl'] == null || existing['avatarUrl'].toString().isEmpty) &&
+              m['avatarUrl'] != null &&
+              m['avatarUrl'].toString().isNotEmpty) {
+            existing['avatarUrl'] = m['avatarUrl'];
+          }
+        }
+      }
+      return uniqueMap.values.toList();
+    });
   }
 
   Future<void> deleteTrip(String tripId) async {
     try {
       await _db.collection('trips').doc(tripId).delete();
     } catch (_) {}
+  }
+
+  /// Hard-deletes EVERY document in the `trips` collection.
+  /// Uses batched writes (max 500 per batch) so it handles any collection size.
+  Future<void> deleteAllTrips() async {
+    const batchSize = 400;
+    while (true) {
+      final snap =
+          await _db.collection('trips').limit(batchSize).get();
+      if (snap.docs.isEmpty) break;
+      final batch = _db.batch();
+      for (final doc in snap.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      if (snap.docs.length < batchSize) break;
+    }
   }
 
   /// Update trip milestones & status, appending to the immutable milestone log.
@@ -1486,17 +1603,56 @@ class FirebaseService extends GetxService {
     }
   }
 
+  /// Live stream of a user's document from the users collection
+  Stream<Map<String, dynamic>> watchUserData(String phone) {
+    final rawP = phone.trim();
+    final normalized = SessionService.normalizePhone(phone);
+    final key = rawP.isNotEmpty ? rawP : normalized;
+    if (key.isEmpty) return Stream.value(const <String, dynamic>{});
+
+    return _db.collection('users').doc(key).snapshots().map((doc) {
+      if (!doc.exists || doc.data() == null) return <String, dynamic>{};
+      final data = Map<String, dynamic>.from(doc.data()!);
+      data['docId'] = doc.id;
+      return data;
+    });
+  }
+
   Future<Map<String, dynamic>?> getUserData(String phone) async {
     try {
+      final normalized = SessionService.normalizePhone(phone);
       final variants = SessionService.getPhoneVariants(phone);
+
+      // Helper to process and normalize user/driver doc data
+      Map<String, dynamic> processDoc(DocumentSnapshot<Map<String, dynamic>> doc, {bool isDriverCollection = false}) {
+        final data = Map<String, dynamic>.from(doc.data()!);
+        data['docId'] = doc.id;
+
+        // Preserve existing phone field or fallback to queried normalized phone
+        final existingPhone = (data['phone'] ?? data['phoneNumber'] ?? data['driverPhone'] ?? '').toString();
+        if (existingPhone.isNotEmpty) {
+          data['phone'] = existingPhone;
+        } else if (doc.id.contains(RegExp(r'\d')) && doc.id.length >= 10) {
+          data['phone'] = doc.id;
+        } else {
+          data['phone'] = normalized.isNotEmpty ? normalized : phone;
+        }
+
+        // Default role to driver if missing or empty
+        final roleVal = (data['role'] ?? '').toString().trim();
+        if (roleVal.isEmpty && isDriverCollection) {
+          data['role'] = 'driver';
+        } else if (roleVal.isEmpty) {
+          data['role'] = 'driver';
+        }
+        return data;
+      }
 
       // 1. Direct document lookups by ID in `users` collection
       for (final variant in variants) {
         final doc = await _db.collection('users').doc(variant).get();
         if (doc.exists && doc.data() != null) {
-          final data = Map<String, dynamic>.from(doc.data()!);
-          data['phone'] = doc.id;
-          return data;
+          return processDoc(doc);
         }
       }
 
@@ -1504,17 +1660,13 @@ class FirebaseService extends GetxService {
       for (final variant in variants) {
         final doc = await _db.collection('drivers').doc(variant).get();
         if (doc.exists && doc.data() != null) {
-          final data = Map<String, dynamic>.from(doc.data()!);
-          data['phone'] = doc.id;
-          if (!data.containsKey('role')) {
-            data['role'] = 'driver';
-          }
-          return data;
+          return processDoc(doc, isDriverCollection: true);
         }
       }
 
-      // 3. Query `users` collection by `phone` or `phoneNumber` fields
-      for (final field in ['phone', 'phoneNumber']) {
+      // 3. Query `users` collection using indexed equality queries
+      const phoneFields = ['phoneNumber', 'driverPhone', 'phone'];
+      for (final field in phoneFields) {
         for (final variant in variants) {
           final snap = await _db
               .collection('users')
@@ -1522,16 +1674,13 @@ class FirebaseService extends GetxService {
               .limit(1)
               .get();
           if (snap.docs.isNotEmpty) {
-            final doc = snap.docs.first;
-            final data = Map<String, dynamic>.from(doc.data());
-            data['phone'] = doc.id;
-            return data;
+            return processDoc(snap.docs.first);
           }
         }
       }
 
-      // 4. Query `drivers` collection by `phone` or `phoneNumber` fields
-      for (final field in ['phone', 'phoneNumber']) {
+      // 4. Query `drivers` collection using indexed equality queries
+      for (final field in phoneFields) {
         for (final variant in variants) {
           final snap = await _db
               .collection('drivers')
@@ -1539,46 +1688,7 @@ class FirebaseService extends GetxService {
               .limit(1)
               .get();
           if (snap.docs.isNotEmpty) {
-            final doc = snap.docs.first;
-            final data = Map<String, dynamic>.from(doc.data());
-            data['phone'] = doc.id;
-            if (!data.containsKey('role')) {
-              data['role'] = 'driver';
-            }
-            return data;
-          }
-        }
-      }
-
-      // 5. Fallback scan matching 10-digit suffix across `users` collection
-      final clean = phone.replaceAll(RegExp(r'[^\d]'), '');
-      if (clean.length >= 10) {
-        final base10 = clean.substring(clean.length - 10);
-        final usersSnap = await _db.collection('users').get();
-        for (final doc in usersSnap.docs) {
-          final docIdClean = doc.id.replaceAll(RegExp(r'[^\d]'), '');
-          final fieldPhone = (doc.data()['phone'] ?? doc.data()['phoneNumber'] ?? '').toString().replaceAll(RegExp(r'[^\d]'), '');
-          if ((docIdClean.length >= 10 && docIdClean.substring(docIdClean.length - 10) == base10) ||
-              (fieldPhone.length >= 10 && fieldPhone.substring(fieldPhone.length - 10) == base10)) {
-            final data = Map<String, dynamic>.from(doc.data());
-            data['phone'] = doc.id;
-            return data;
-          }
-        }
-
-        // 6. Fallback scan matching 10-digit suffix across `drivers` collection
-        final driversSnap = await _db.collection('drivers').get();
-        for (final doc in driversSnap.docs) {
-          final docIdClean = doc.id.replaceAll(RegExp(r'[^\d]'), '');
-          final fieldPhone = (doc.data()['phone'] ?? doc.data()['phoneNumber'] ?? '').toString().replaceAll(RegExp(r'[^\d]'), '');
-          if ((docIdClean.length >= 10 && docIdClean.substring(docIdClean.length - 10) == base10) ||
-              (fieldPhone.length >= 10 && fieldPhone.substring(fieldPhone.length - 10) == base10)) {
-            final data = Map<String, dynamic>.from(doc.data());
-            data['phone'] = doc.id;
-            if (!data.containsKey('role')) {
-              data['role'] = 'driver';
-            }
-            return data;
+            return processDoc(snap.docs.first, isDriverCollection: true);
           }
         }
       }
@@ -1590,20 +1700,24 @@ class FirebaseService extends GetxService {
   }
 
   /// Links the Firebase Auth UID to the user/driver record in Firestore
-  /// and syncs the record across `users` and `drivers` collections.
+  /// without creating duplicate documents.
   Future<void> linkUserUid(String phoneKey, String uid, Map<String, dynamic> userData) async {
     try {
+      final targetDocId = (userData['docId'] as String?)?.isNotEmpty == true
+          ? userData['docId'] as String
+          : (phoneKey.isNotEmpty ? phoneKey : SessionService.normalizePhone(phoneKey));
+
       final updates = <String, dynamic>{
-        'uid': uid,
-        'phone': phoneKey,
         ...userData,
+        'uid': uid,
+        'phone': (userData['phone'] ?? phoneKey).toString(),
       };
 
-      await _db.collection('users').doc(phoneKey).set(updates, SetOptions(merge: true));
+      await _db.collection('users').doc(targetDocId).set(updates, SetOptions(merge: true));
 
-      final role = (userData['role'] ?? 'driver').toString();
+      final role = (userData['role'] ?? 'driver').toString().toLowerCase();
       if (role == 'driver' || role == 'owner') {
-        await _db.collection('drivers').doc(phoneKey).set(updates, SetOptions(merge: true));
+        await _db.collection('drivers').doc(targetDocId).set(updates, SetOptions(merge: true));
       }
     } catch (e) {
       debugPrint('[FirebaseService] linkUserUid failed: $e');
@@ -1638,9 +1752,54 @@ class FirebaseService extends GetxService {
             .set({'role': newRole}, SetOptions(merge: true)));
   }
 
-  Future<void> deleteUser(String phone) {
-    return _write('User delete nahi hua',
-        () => _db.collection('users').doc(phone).delete());
+  Future<void> deleteUser(String phone) async {
+    final p = phone.trim();
+    if (p.isEmpty) return;
+    try {
+      await _db.collection('users').doc(p).delete();
+      await _db.collection('drivers').doc(p).delete();
+      final pNorm = SessionService.normalizePhone(p);
+      if (pNorm.isNotEmpty && pNorm != p) {
+        await _db.collection('users').doc(pNorm).delete();
+        await _db.collection('drivers').doc(pNorm).delete();
+      }
+    } catch (_) {}
+  }
+
+
+  /// Hard-deletes ALL driver records from both `users` and `drivers` collections.
+  /// Only removes documents with role == 'driver' (preserves admin accounts).
+  Future<void> deleteAllDrivers() async {
+    const batchSize = 400;
+
+    // 1. Delete from `users` where role is driver (or not admin)
+    while (true) {
+      final snap = await _db
+          .collection('users')
+          .where('role', whereNotIn: ['admin', 'owner'])
+          .limit(batchSize)
+          .get();
+      if (snap.docs.isEmpty) break;
+      final batch = _db.batch();
+      for (final doc in snap.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      if (snap.docs.length < batchSize) break;
+    }
+
+    // 2. Delete everything in `drivers` collection (always driver records)
+    while (true) {
+      final snap =
+          await _db.collection('drivers').limit(batchSize).get();
+      if (snap.docs.isEmpty) break;
+      final batch = _db.batch();
+      for (final doc in snap.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      if (snap.docs.length < batchSize) break;
+    }
   }
 
   // ---------------------------------------------------------------------------

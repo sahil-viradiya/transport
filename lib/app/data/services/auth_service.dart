@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/app/routes/app_pages.dart';
+import 'package:transport/widgets/dialogs/app_snackbar.dart';
 
 /// Centralised Firebase Auth wrapper.
 ///
@@ -11,12 +13,15 @@ import 'package:transport/app/routes/app_pages.dart';
 /// 1. Listen to [authStateChanges] — when the user signs out (or the server
 ///    revokes the session), automatically clear the local [SessionService] and
 ///    redirect to the login screen.
-/// 2. Provide a single [signOut] entry point used by both the driver and admin
+/// 2. Monitor real-time Firestore user document — if an admin deletes or
+///    deactivates a driver account while logged in, automatically trigger logout.
+/// 3. Provide a single [signOut] entry point used by both the driver and admin
 ///    logout flows, so session cleanup is never missed.
-/// 3. Expose [currentUser] and [isAuthenticated] for route guards and UI.
+/// 4. Expose [currentUser] and [isAuthenticated] for route guards and UI.
 class AuthService extends GetxService {
   final Rx<User?> _firebaseUser = Rx<User?>(null);
   StreamSubscription<User?>? _authSub;
+  StreamSubscription<DocumentSnapshot>? _userDocSub;
 
   /// Whether there is a live Firebase Auth session.
   bool get isAuthenticated => _firebaseUser.value != null;
@@ -36,7 +41,56 @@ class AuthService extends GetxService {
       },
     );
 
+    // Watch session phone/docId changes to monitor real-time account deletion
+    try {
+      final session = Get.find<SessionService>();
+      _listenToUserDoc(session.ownerKey);
+      ever(session.phone, (String newPhone) {
+        _listenToUserDoc(newPhone);
+      });
+    } catch (_) {}
+
     return this;
+  }
+
+  void _listenToUserDoc(String ownerKey) {
+    _userDocSub?.cancel();
+    _userDocSub = null;
+
+    final key = ownerKey.trim();
+    if (key.isEmpty) return;
+
+    try {
+      _userDocSub = FirebaseFirestore.instance
+          .collection('users')
+          .doc(key)
+          .snapshots()
+          .listen((snapshot) {
+        final session = Get.find<SessionService>();
+        if (!session.isLoggedIn || session.isAdmin) return;
+
+        final data = snapshot.data();
+        final isDeleted = !snapshot.exists ||
+            data?['isDeleted'] == true ||
+            data?['isActive'] == false ||
+            data?['forceLogout'] == true;
+
+        if (isDeleted) {
+          debugPrint('[AuthService] Driver account deleted/deactivated ($key) — forcing logout.');
+          _userDocSub?.cancel();
+          _userDocSub = null;
+          AppSnackBar.showError(
+            title: 'Account Disabled',
+            message: 'Your account has been deleted or deactivated by administrator.',
+          );
+          signOut();
+        }
+      }, onError: (e) {
+        debugPrint('[AuthService] userDoc stream error: $e');
+      });
+    } catch (e) {
+      debugPrint('[AuthService] error starting userDoc listener: $e');
+    }
   }
 
   void _onAuthStateChanged(User? user) {
@@ -57,6 +111,8 @@ class AuthService extends GetxService {
   /// 2. Clears the local [SessionService] (all persisted keys).
   /// 3. Navigates to the login screen, removing the entire back-stack.
   Future<void> signOut() async {
+    _userDocSub?.cancel();
+    _userDocSub = null;
     try {
       await FirebaseAuth.instance.signOut();
     } catch (e) {
@@ -69,6 +125,8 @@ class AuthService extends GetxService {
   /// Internal: clear local session without navigation (used by the
   /// auth-state listener which handles redirect separately).
   Future<void> _clearAndRedirect() async {
+    _userDocSub?.cancel();
+    _userDocSub = null;
     await _clearSession();
     // Only redirect if we're not already on the login or splash screen.
     final currentRoute = Get.currentRoute;
@@ -85,7 +143,9 @@ class AuthService extends GetxService {
 
   @override
   void onClose() {
+    _userDocSub?.cancel();
     _authSub?.cancel();
     super.onClose();
   }
 }
+

@@ -299,10 +299,32 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         );
       }).toList();
 
+      // Deduplicate by normalized truck number (strips non-alphanumeric chars).
+      // Prevents the same truck appearing twice if it was saved under two
+      // slightly different doc IDs (e.g., "GJ-01-AB-1234" vs "GJ01AB1234").
+      String normTruck(String v) =>
+          v.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+      final Map<String, MockTruck> seenTrucks = {};
+      for (final t in uiTrucks) {
+        final key = normTruck(t.truckNo);
+        if (!seenTrucks.containsKey(key)) {
+          seenTrucks[key] = t;
+        } else {
+          // Prefer the entry that has an assignment or more data
+          final existing = seenTrucks[key]!;
+          if (t.selectedDriver != null && existing.selectedDriver == null) {
+            seenTrucks[key] = t;
+          }
+        }
+      }
+      final dedupedTrucks = seenTrucks.values.toList();
+
+
       final pendingTrucks =
-          uiTrucks.where((t) => t.status == 'Pending Acceptance').toList();
+          dedupedTrucks.where((t) => t.status == 'Pending Acceptance').toList();
       final assignedTrucks =
-          uiTrucks.where((t) => t.status != 'Pending Acceptance').toList();
+          dedupedTrucks.where((t) => t.status != 'Pending Acceptance').toList();
+
 
       final bool hasExpandedAssignedCard = assignedTrucks.any(
           (t) => t.hasActiveTrip || t.hasLoadingPass || t.hasDestinationSetup);

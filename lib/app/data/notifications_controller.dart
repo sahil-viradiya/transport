@@ -8,6 +8,8 @@ import 'services/push_service.dart';
 import '../core/theme/app_colors.dart';
 import '../routes/app_pages.dart';
 import '../../widgets/floating_notification.dart';
+import '../../widgets/dialogs/app_popup.dart';
+import '../../widgets/dialogs/app_snackbar.dart';
 
 /// App-wide live feed of the signed-in user's notifications (driver or admin).
 /// Registered permanently in main() and rebinds whenever the session changes.
@@ -39,7 +41,7 @@ class NotificationsController extends GetxController {
     _sub?.cancel();
     _seenIds.clear();
     _primed = false;
-    final phone = _session.ownerKey;
+    final phone = _session.isAdmin ? 'admin' : _session.ownerKey;
     if (phone.isEmpty) {
       items.clear();
       return;
@@ -142,6 +144,37 @@ class NotificationsController extends GetxController {
   Future<void> markActioned(String id) => _fb.markNotificationActioned(id);
 
   Future<void> markAllRead() => _fb.markAllNotificationsRead(_session.ownerKey);
+
+  Future<void> deleteSingle(String id) async {
+    try {
+      await _fb.deleteSingleNotification(id);
+      items.removeWhere((n) => (n['id'] ?? '').toString() == id);
+    } catch (_) {}
+  }
+
+  Future<void> deleteAll() async {
+    if (items.isEmpty) return;
+    AppPopup.showConfirmation(
+      title: 'Delete All Notifications?',
+      description: 'Are you sure you want to permanently delete all notifications?',
+      confirmText: 'Delete All',
+      onConfirm: () async {
+        AppPopup.showLoading(message: 'Deleting notifications...');
+        try {
+          await _fb.deleteAllNotifications(_session.ownerKey);
+          items.clear();
+          AppPopup.hideLoading();
+          AppSnackBar.showSuccess(
+            title: 'Cleared',
+            message: 'All notifications permanently deleted.',
+          );
+        } catch (e) {
+          AppPopup.hideLoading();
+          AppSnackBar.showError(title: 'Error', message: e.toString());
+        }
+      },
+    );
+  }
 
   @override
   void onClose() {

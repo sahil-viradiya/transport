@@ -8,8 +8,16 @@ service cloud.firestore {
              request.auth.token.phone_number != null;
     }
 
+    function rawPhone() {
+      return request.auth.token.phone_number;
+    }
+
     function phone() {
       return request.auth.token.phone_number.replace('^\\+', '');
+    }
+
+    function normPhone() {
+      return '91' + phone().replace('^91', '');
     }
 
     function checkUserRole(phoneId, expectedRole) {
@@ -19,6 +27,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
+        checkUserRole(rawPhone(), 'admin') ||
+        checkUserRole('+' + normPhone(), 'admin') ||
         checkUserRole(phone(), 'admin') ||
         checkUserRole(phone().replace('^91', ''), 'admin')
       );
@@ -26,22 +36,26 @@ service cloud.firestore {
 
     function isPhoneMatch(dbPhone) {
       return dbPhone != null && (
+        dbPhone == rawPhone() ||
+        dbPhone == '+' + normPhone() ||
         dbPhone.replace('^\\+', '') == phone() ||
         dbPhone.replace('^\\+91', '') == phone().replace('^91', '') ||
         '91' + dbPhone.replace('^\\+', '') == phone() ||
-        dbPhone.replace('^\\+', '') == '91' + phone()
+        dbPhone.replace('^\\+', '') == '91' + phone() ||
+        dbPhone == 'admin'
       );
     }
 
     function ownsIncoming() {
-      return request.resource.data.keys().hasAll(['ownerId']) &&
-             isPhoneMatch(request.resource.data.ownerId);
+      return (request.resource.data.keys().hasAll(['ownerId']) && isPhoneMatch(request.resource.data.ownerId)) ||
+             (request.resource.data.keys().hasAll(['driverPhone']) && isPhoneMatch(request.resource.data.driverPhone));
     }
 
     function ownsExisting() {
-      return resource != null &&
-             resource.data.keys().hasAll(['ownerId']) &&
-             isPhoneMatch(resource.data.ownerId);
+      return resource != null && (
+             (resource.data.keys().hasAll(['ownerId']) && isPhoneMatch(resource.data.ownerId)) ||
+             (resource.data.keys().hasAll(['driverPhone']) && isPhoneMatch(resource.data.driverPhone))
+      );
     }
 
     // =========================
@@ -49,10 +63,7 @@ service cloud.firestore {
     // =========================
     match /users/{phoneId} {
       allow read:
-          if isSignedIn() &&
-          (isPhoneMatch(phoneId) ||
-           resource.data.role == 'admin' ||
-           isAdmin());
+          if true;
 
       allow create, update:
           if isSignedIn() &&
@@ -66,7 +77,10 @@ service cloud.firestore {
     // DRIVERS
     // =========================
     match /drivers/{ownerId} {
-      allow read, write:
+      allow read:
+          if true;
+
+      allow write:
           if isSignedIn() &&
           (isPhoneMatch(ownerId) || isAdmin());
     }
@@ -175,20 +189,21 @@ service cloud.firestore {
     match /notifications/{noteId} {
 
       allow read:
-          if isSignedIn() &&
-          isPhoneMatch(resource.data.toPhone);
+          if isSignedIn() && (
+            isPhoneMatch(resource.data.toPhone) ||
+            resource.data.toPhone == 'admin' ||
+            isAdmin()
+          );
 
       allow create:
-          if isSignedIn() &&
-          request.resource.data.toPhone is string;
+          if isSignedIn();
 
-      allow update:
-          if isSignedIn() &&
-          isPhoneMatch(resource.data.toPhone);
-
-      allow delete:
-          if isSignedIn() &&
-          isPhoneMatch(resource.data.toPhone);
+      allow update, delete:
+          if isSignedIn() && (
+            isPhoneMatch(resource.data.toPhone) ||
+            resource.data.toPhone == 'admin' ||
+            isAdmin()
+          );
     }
 
     // =========================
