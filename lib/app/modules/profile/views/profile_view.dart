@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -20,8 +21,10 @@ class ProfileView extends GetView<ProfileController> {
     if (!kIsWeb && path.isNotEmpty && File(path).existsSync()) {
       return FileImage(File(path));
     }
-    return const NetworkImage(
-        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150');
+    return CachedNetworkImage(
+            imageUrl:
+                'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150')
+        as ImageProvider;
   }
 
   @override
@@ -33,13 +36,16 @@ class ProfileView extends GetView<ProfileController> {
     final driverController = Get.find<DashboardController>();
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF3F7FD),
+      backgroundColor:
+          isDark ? const Color(0xFF0F172A) : const Color(0xFFF3F7FD),
       appBar: AppBar(
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded, color: isDark ? Colors.white : AppColors.textPrimary),
+          icon: Icon(Icons.menu_rounded,
+              color: isDark ? Colors.white : AppColors.textPrimary),
           onPressed: () {},
         ),
-        title: AppText('app_title'.tr, style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
+        title: AppText('app_title'.tr,
+            style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
         actions: [
           IconButton(
             icon: const Icon(Icons.hub_rounded, color: AppColors.primary),
@@ -51,7 +57,7 @@ class ProfileView extends GetView<ProfileController> {
         children: [
           // 1. Sliding Segmented Selector
           _buildSegmentedControl(isDark),
-          
+
           // 2. Tab Content Body
           Expanded(
             child: RefreshIndicator(
@@ -80,7 +86,9 @@ class ProfileView extends GetView<ProfileController> {
       margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : AppColors.primaryLight.withValues(alpha: 0.5),
+        color: isDark
+            ? const Color(0xFF1E293B)
+            : AppColors.primaryLight.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(28),
       ),
       child: Obx(() {
@@ -93,9 +101,8 @@ class ProfileView extends GetView<ProfileController> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: selected == 0
-                        ? AppColors.primary
-                        : Colors.transparent,
+                    color:
+                        selected == 0 ? AppColors.primary : Colors.transparent,
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: selected == 0
                         ? [
@@ -111,7 +118,8 @@ class ProfileView extends GetView<ProfileController> {
                     child: AppText(
                       'Profile Info',
                       style: AppTextStyle.bodyMedium,
-                      fontWeight: selected == 0 ? FontWeight.bold : FontWeight.normal,
+                      fontWeight:
+                          selected == 0 ? FontWeight.bold : FontWeight.normal,
                       color: selected == 0
                           ? Colors.white
                           : (isDark ? Colors.white70 : AppColors.textSecondary),
@@ -126,9 +134,8 @@ class ProfileView extends GetView<ProfileController> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: selected == 1
-                        ? AppColors.primary
-                        : Colors.transparent,
+                    color:
+                        selected == 1 ? AppColors.primary : Colors.transparent,
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: selected == 1
                         ? [
@@ -144,7 +151,8 @@ class ProfileView extends GetView<ProfileController> {
                     child: AppText(
                       'My Documents',
                       style: AppTextStyle.bodyMedium,
-                      fontWeight: selected == 1 ? FontWeight.bold : FontWeight.normal,
+                      fontWeight:
+                          selected == 1 ? FontWeight.bold : FontWeight.normal,
                       color: selected == 1
                           ? Colors.white
                           : (isDark ? Colors.white70 : AppColors.textSecondary),
@@ -160,7 +168,8 @@ class ProfileView extends GetView<ProfileController> {
   }
 
   // TAB 1: Profile Details
-  Widget _buildProfileDetailsTab(DashboardController driverController, bool isDark) {
+  Widget _buildProfileDetailsTab(
+      DashboardController driverController, bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -170,7 +179,11 @@ class ProfileView extends GetView<ProfileController> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
             gradient: const LinearGradient(
-              colors: [AppColors.primaryDark, AppColors.primary, Color(0xFF42526E)],
+              colors: [
+                AppColors.primaryDark,
+                AppColors.primary,
+                Color(0xFF42526E)
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -227,10 +240,11 @@ class ProfileView extends GetView<ProfileController> {
                               shape: BoxShape.circle,
                             ),
                             child: Obx(() => CircleAvatar(
-                              radius: 46,
-                              backgroundImage: _getImageProvider(driverController.avatarUrl.value),
-                              backgroundColor: Colors.grey.shade200,
-                            )),
+                                  radius: 46,
+                                  backgroundImage: _getImageProvider(
+                                      driverController.avatarUrl.value),
+                                  backgroundColor: Colors.grey.shade200,
+                                )),
                           ),
                           Positioned(
                             bottom: 0,
@@ -243,7 +257,10 @@ class ProfileView extends GetView<ProfileController> {
                                   color: AppColors.primary,
                                   shape: BoxShape.circle,
                                   boxShadow: [
-                                    BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))
+                                    BoxShadow(
+                                        color: Colors.black26,
+                                        blurRadius: 4,
+                                        offset: Offset(0, 2))
                                   ],
                                 ),
                                 child: const Icon(
@@ -259,20 +276,21 @@ class ProfileView extends GetView<ProfileController> {
                     ),
                     const SizedBox(height: 12),
                     Obx(() => AppText(
-                      driverController.driverName.value,
-                      style: AppTextStyle.headlineMedium,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    )),
+                          driverController.driverName.value,
+                          style: AppTextStyle.headlineMedium,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        )),
                     const SizedBox(height: 4),
                     Obx(() => AppText(
-                      'ID: ${driverController.vehicleNo.value}',
-                      style: AppTextStyle.bodyMedium,
-                      color: Colors.white70,
-                    )),
+                          'ID: ${driverController.vehicleNo.value}',
+                          style: AppTextStyle.bodyMedium,
+                          color: Colors.white70,
+                        )),
                     const SizedBox(height: 12),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFF0B3),
                         borderRadius: BorderRadius.circular(20),
@@ -280,7 +298,8 @@ class ProfileView extends GetView<ProfileController> {
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.stars_rounded, color: Color(0xFFBF2600), size: 16),
+                          Icon(Icons.stars_rounded,
+                              color: Color(0xFFBF2600), size: 16),
                           SizedBox(width: 6),
                           AppText(
                             'ACTIVE DUTY',
@@ -297,7 +316,7 @@ class ProfileView extends GetView<ProfileController> {
             ],
           ),
         ),
-        
+
         const SizedBox(height: 8),
 
         // 2. License Details Card
@@ -308,18 +327,26 @@ class ProfileView extends GetView<ProfileController> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildDetailItem('LICENSE NUMBER', controller.licenseNo.value, isDark),
+              _buildDetailItem(
+                  'LICENSE NUMBER', controller.licenseNo.value, isDark),
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildDetailItem('CLASS', controller.licenseClass.value, isDark),
+                  _buildDetailItem(
+                      'CLASS', controller.licenseClass.value, isDark),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      const AppText('EXPIRES', style: AppTextStyle.labelMedium, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+                      const AppText('EXPIRES',
+                          style: AppTextStyle.labelMedium,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.bold),
                       const SizedBox(height: 4),
-                      AppText(controller.licenseExpires.value, style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold, color: AppColors.error),
+                      AppText(controller.licenseExpires.value,
+                          style: AppTextStyle.bodyLarge,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.error),
                     ],
                   ),
                 ],
@@ -337,11 +364,14 @@ class ProfileView extends GetView<ProfileController> {
           onActionTap: controller.showEditProfileDialog,
           child: Column(
             children: [
-              Obx(() => _buildHorizontalRow('Driver Phone', driverController.driverPhone.value, isDark)),
+              Obx(() => _buildHorizontalRow(
+                  'Driver Phone', driverController.driverPhone.value, isDark)),
               const Divider(height: 16),
-              Obx(() => _buildHorizontalRow('Vehicle No', driverController.vehicleNo.value, isDark)),
+              Obx(() => _buildHorizontalRow(
+                  'Vehicle No', driverController.vehicleNo.value, isDark)),
               const Divider(height: 16),
-              Obx(() => _buildHorizontalRow('Vehicle Model', driverController.vehicleModel.value, isDark)),
+              Obx(() => _buildHorizontalRow('Vehicle Model',
+                  driverController.vehicleModel.value, isDark)),
             ],
           ),
         ),
@@ -356,29 +386,32 @@ class ProfileView extends GetView<ProfileController> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AppText(
-                      controller.safetyRating.value, 
-                      style: AppTextStyle.headlineMedium, 
-                      color: isDark ? Colors.white : AppColors.textPrimary,
-                      fontWeight: FontWeight.bold
-                    ),
-                    const AppText('Safety Rating', style: AppTextStyle.labelMedium, color: AppColors.textSecondary),
+                    AppText(controller.safetyRating.value,
+                        style: AppTextStyle.headlineMedium,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
+                        fontWeight: FontWeight.bold),
+                    const AppText('Safety Rating',
+                        style: AppTextStyle.labelMedium,
+                        color: AppColors.textSecondary),
                   ],
                 ),
               ),
-              Container(height: 30, width: 1, color: isDark ? Colors.white24 : AppColors.border),
+              Container(
+                  height: 30,
+                  width: 1,
+                  color: isDark ? Colors.white24 : AppColors.border),
               const SizedBox(width: 24),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AppText(
-                      controller.kmDriven.value, 
-                      style: AppTextStyle.headlineMedium, 
-                      color: isDark ? Colors.white : AppColors.textPrimary,
-                      fontWeight: FontWeight.bold
-                    ),
-                    const AppText('KM Driven', style: AppTextStyle.labelMedium, color: AppColors.textSecondary),
+                    AppText(controller.kmDriven.value,
+                        style: AppTextStyle.headlineMedium,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
+                        fontWeight: FontWeight.bold),
+                    const AppText('KM Driven',
+                        style: AppTextStyle.labelMedium,
+                        color: AppColors.textSecondary),
                   ],
                 ),
               ),
@@ -404,30 +437,32 @@ class ProfileView extends GetView<ProfileController> {
                 const CircleAvatar(
                   radius: 20,
                   backgroundColor: AppColors.primaryLight,
-                  child: AppText('SK', style: AppTextStyle.bodyMedium, color: AppColors.primary, fontWeight: FontWeight.bold),
+                  child: AppText('SK',
+                      style: AppTextStyle.bodyMedium,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Obx(() => AppText(controller.emergencyContactName.value,
+                          style: AppTextStyle.bodyMedium,
+                          fontWeight: FontWeight.bold)),
                       Obx(() => AppText(
-                        controller.emergencyContactName.value,
-                        style: AppTextStyle.bodyMedium,
-                        fontWeight: FontWeight.bold
-                      )),
-                      Obx(() => AppText(
-                        '${controller.emergencyRelation.value} • ${controller.emergencyPhone.value}',
-                        style: AppTextStyle.labelMedium,
-                        color: AppColors.textSecondary
-                      )),
+                          '${controller.emergencyRelation.value} • ${controller.emergencyPhone.value}',
+                          style: AppTextStyle.labelMedium,
+                          color: AppColors.textSecondary)),
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.phone_rounded, color: AppColors.primary),
+                  icon:
+                      const Icon(Icons.phone_rounded, color: AppColors.primary),
                   style: IconButton.styleFrom(
-                    backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    backgroundColor:
+                        isDark ? const Color(0xFF1E293B) : Colors.white,
                     shape: const CircleBorder(),
                   ),
                   onPressed: () {},
@@ -444,11 +479,14 @@ class ProfileView extends GetView<ProfileController> {
           icon: Icons.business_outlined,
           child: Column(
             children: [
-              _buildHorizontalRow('Employer', controller.employer.value, isDark),
+              _buildHorizontalRow(
+                  'Employer', controller.employer.value, isDark),
               const Divider(height: 20),
-              _buildHorizontalRow('Fleet Hub', controller.fleetHub.value, isDark),
+              _buildHorizontalRow(
+                  'Fleet Hub', controller.fleetHub.value, isDark),
               const Divider(height: 20),
-              _buildHorizontalRow('App Version', controller.appVersion.value, isDark),
+              _buildHorizontalRow(
+                  'App Version', controller.appVersion.value, isDark),
             ],
           ),
         ),
@@ -460,18 +498,22 @@ class ProfileView extends GetView<ProfileController> {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: OutlinedButton.icon(
             icon: const Icon(Icons.logout_rounded, color: AppColors.error),
-            label: const AppText('Logout', style: AppTextStyle.bodyLarge, color: AppColors.error, fontWeight: FontWeight.bold),
+            label: const AppText('Logout',
+                style: AppTextStyle.bodyLarge,
+                color: AppColors.error,
+                fontWeight: FontWeight.bold),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: AppColors.error),
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
             ),
             onPressed: driverController.logout,
           ),
         ),
 
         const SizedBox(height: 24),
-        
+
         // Footer Powered text
         const Center(
           child: AppText(
@@ -511,7 +553,9 @@ class ProfileView extends GetView<ProfileController> {
           // Reactive document card list
           Obx(() {
             return Column(
-              children: controller.documents.map((doc) => _buildDocumentCard(doc, isDark)).toList(),
+              children: controller.documents
+                  .map((doc) => _buildDocumentCard(doc, isDark))
+                  .toList(),
             );
           }),
 
@@ -543,7 +587,8 @@ class ProfileView extends GetView<ProfileController> {
                   bottom: -10,
                   child: Opacity(
                     opacity: 0.15,
-                    child: Icon(Icons.folder_copy_rounded, size: 80, color: Colors.white.withValues(alpha: 0.8)),
+                    child: Icon(Icons.folder_copy_rounded,
+                        size: 80, color: Colors.white.withValues(alpha: 0.8)),
                   ),
                 ),
                 Column(
@@ -566,8 +611,10 @@ class ProfileView extends GetView<ProfileController> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                         elevation: 0,
                       ),
                       onPressed: controller.showAddNewDocumentDialog,
@@ -606,8 +653,10 @@ class ProfileView extends GetView<ProfileController> {
 
     // Adapt layout names & badges to match reference precisely
     final displayStatus = doc.status == 'Expired' ? 'Expired' : doc.status;
-    final displayStatusBg = doc.status == 'Expired' ? const Color(0xFFFFEBE6) : statusBgColor;
-    final displayStatusText = doc.status == 'Expired' ? AppColors.error : statusTextColor;
+    final displayStatusBg =
+        doc.status == 'Expired' ? const Color(0xFFFFEBE6) : statusBgColor;
+    final displayStatusText =
+        doc.status == 'Expired' ? AppColors.error : statusTextColor;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -632,51 +681,58 @@ class ProfileView extends GetView<ProfileController> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: doc.status == 'Expired' 
-                      ? const Color(0xFFFFEBE6) 
-                      : (isDark ? const Color(0xFF0F172A) : AppColors.primaryLight),
+                  color: doc.status == 'Expired'
+                      ? const Color(0xFFFFEBE6)
+                      : (isDark
+                          ? const Color(0xFF0F172A)
+                          : AppColors.primaryLight),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  doc.icon, 
-                  color: doc.status == 'Expired' ? AppColors.error : AppColors.primary, 
-                  size: 24
-                ),
+                child: Icon(doc.icon,
+                    color: doc.status == 'Expired'
+                        ? AppColors.error
+                        : AppColors.primary,
+                    size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AppText(doc.title, style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
-                    AppText(doc.subtitle, style: AppTextStyle.labelMedium, color: AppColors.textSecondary),
+                    AppText(doc.title,
+                        style: AppTextStyle.bodyLarge,
+                        fontWeight: FontWeight.bold),
+                    AppText(doc.subtitle,
+                        style: AppTextStyle.labelMedium,
+                        color: AppColors.textSecondary),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: displayStatusBg,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: AppText(
-                  displayStatus, 
-                  style: AppTextStyle.labelMedium, 
-                  color: displayStatusText, 
-                  fontWeight: FontWeight.bold
-                ),
+                child: AppText(displayStatus,
+                    style: AppTextStyle.labelMedium,
+                    color: displayStatusText,
+                    fontWeight: FontWeight.bold),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Expiry Info Middle Box
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: doc.status == 'Expired' 
-                  ? const Color(0xFFFFEBE6).withValues(alpha: 0.3) 
-                  : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF3F7FD)),
+              color: doc.status == 'Expired'
+                  ? const Color(0xFFFFEBE6).withValues(alpha: 0.3)
+                  : (isDark
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFF3F7FD)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -685,35 +741,42 @@ class ProfileView extends GetView<ProfileController> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const AppText('EXPIRY DATE', style: AppTextStyle.labelMedium, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+                    const AppText('EXPIRY DATE',
+                        style: AppTextStyle.labelMedium,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.bold),
                     const SizedBox(height: 4),
-                    AppText(
-                      doc.expiryDate, 
-                      style: AppTextStyle.bodyMedium, 
-                      fontWeight: FontWeight.bold,
-                      color: doc.status == 'Expired' ? AppColors.error : AppColors.textPrimary
-                    ),
+                    AppText(doc.expiryDate,
+                        style: AppTextStyle.bodyMedium,
+                        fontWeight: FontWeight.bold,
+                        color: doc.status == 'Expired'
+                            ? AppColors.error
+                            : AppColors.textPrimary),
                   ],
                 ),
                 Row(
                   children: [
                     if (doc.status == 'Expired') ...[
-                      const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 20),
+                      const Icon(Icons.warning_amber_rounded,
+                          color: AppColors.error, size: 20),
                       const SizedBox(width: 8),
                     ],
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const AppText('STATUS', style: AppTextStyle.labelMedium, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+                        const AppText('STATUS',
+                            style: AppTextStyle.labelMedium,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.bold),
                         const SizedBox(height: 4),
-                        AppText(
-                          doc.statusMsg, 
-                          style: AppTextStyle.bodyMedium, 
-                          fontWeight: FontWeight.bold,
-                          color: doc.status == 'Expired' 
-                              ? AppColors.error 
-                              : (doc.status == 'Valid' ? AppColors.primary : AppColors.success)
-                        ),
+                        AppText(doc.statusMsg,
+                            style: AppTextStyle.bodyMedium,
+                            fontWeight: FontWeight.bold,
+                            color: doc.status == 'Expired'
+                                ? AppColors.error
+                                : (doc.status == 'Valid'
+                                    ? AppColors.primary
+                                    : AppColors.success)),
                       ],
                     ),
                   ],
@@ -722,7 +785,7 @@ class ProfileView extends GetView<ProfileController> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Bottom Row: Action buttons
           Row(
             children: [
@@ -731,12 +794,17 @@ class ProfileView extends GetView<ProfileController> {
                     ? SizedBox(
                         height: 40,
                         child: ElevatedButton.icon(
-                          icon: const Icon(Icons.sync_rounded, color: Colors.white, size: 18),
-                          label: const AppText('Renew Now', style: AppTextStyle.labelLarge, color: Colors.white, fontWeight: FontWeight.bold),
+                          icon: const Icon(Icons.sync_rounded,
+                              color: Colors.white, size: 18),
+                          label: const AppText('Renew Now',
+                              style: AppTextStyle.labelLarge,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.error,
                             elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                           ),
                           onPressed: () => controller.renewDocument(doc.title),
@@ -746,13 +814,24 @@ class ProfileView extends GetView<ProfileController> {
                         ? SizedBox(
                             height: 40,
                             child: ElevatedButton.icon(
-                              icon: Icon(Icons.badge_outlined, color: isDark ? Colors.white : AppColors.primary, size: 18),
-                              label: AppText('Digital ID', style: AppTextStyle.labelLarge, color: isDark ? Colors.white : AppColors.primary, fontWeight: FontWeight.bold),
+                              icon: Icon(Icons.badge_outlined,
+                                  color:
+                                      isDark ? Colors.white : AppColors.primary,
+                                  size: 18),
+                              label: AppText('Digital ID',
+                                  style: AppTextStyle.labelLarge,
+                                  color:
+                                      isDark ? Colors.white : AppColors.primary,
+                                  fontWeight: FontWeight.bold),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: isDark ? const Color(0xFF334155) : AppColors.primaryLight,
+                                backgroundColor: isDark
+                                    ? const Color(0xFF334155)
+                                    : AppColors.primaryLight,
                                 elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8)),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
                               ),
                               onPressed: controller.downloadDigitalId,
                             ),
@@ -761,7 +840,8 @@ class ProfileView extends GetView<ProfileController> {
                             text: 'Preview',
                             icon: Icons.visibility_outlined,
                             height: 40,
-                            onPressed: () => controller.previewDocument(doc.title),
+                            onPressed: () =>
+                                controller.previewDocument(doc.title),
                           ),
               ),
               const SizedBox(width: 12),
@@ -772,14 +852,18 @@ class ProfileView extends GetView<ProfileController> {
                   width: 40,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-                    color: isDark ? const Color(0xFF334155).withValues(alpha: 0.2) : AppColors.primaryLight.withValues(alpha: 0.2),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.3)),
+                    color: isDark
+                        ? const Color(0xFF334155).withValues(alpha: 0.2)
+                        : AppColors.primaryLight.withValues(alpha: 0.2),
                   ),
                   child: Icon(
-                    doc.status == 'Expired' ? Icons.edit_outlined : Icons.share_outlined, 
-                    color: AppColors.primary, 
-                    size: 18
-                  ),
+                      doc.status == 'Expired'
+                          ? Icons.edit_outlined
+                          : Icons.share_outlined,
+                      color: AppColors.primary,
+                      size: 18),
                 ),
               ),
             ],
@@ -822,13 +906,19 @@ class ProfileView extends GetView<ProfileController> {
                 children: [
                   Icon(icon, color: AppColors.textSecondary, size: 20),
                   const SizedBox(width: 8),
-                  AppText(title, style: AppTextStyle.bodyLarge, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+                  AppText(title,
+                      style: AppTextStyle.bodyLarge,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.bold),
                 ],
               ),
               if (actionText != null && onActionTap != null)
                 GestureDetector(
                   onTap: onActionTap,
-                  child: AppText(actionText, style: AppTextStyle.labelMedium, color: AppColors.primary, fontWeight: FontWeight.bold),
+                  child: AppText(actionText,
+                      style: AppTextStyle.labelMedium,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold),
                 ),
             ],
           ),
@@ -844,9 +934,15 @@ class ProfileView extends GetView<ProfileController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AppText(label, style: AppTextStyle.labelMedium, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+        AppText(label,
+            style: AppTextStyle.labelMedium,
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.bold),
         const SizedBox(height: 4),
-        AppText(value, style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.textPrimary),
+        AppText(value,
+            style: AppTextStyle.bodyLarge,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : AppColors.textPrimary),
       ],
     );
   }
@@ -856,8 +952,12 @@ class ProfileView extends GetView<ProfileController> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        AppText(label, style: AppTextStyle.bodyMedium, color: AppColors.textSecondary),
-        AppText(value, style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.textPrimary),
+        AppText(label,
+            style: AppTextStyle.bodyMedium, color: AppColors.textSecondary),
+        AppText(value,
+            style: AppTextStyle.bodyMedium,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : AppColors.textPrimary),
       ],
     );
   }

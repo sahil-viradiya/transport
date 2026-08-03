@@ -2911,8 +2911,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
           child: GestureDetector(
             onTap: () => controller.goToTripPage(i),
             child: Container(
-              width: 34,
-              height: 34,
+              // width: 34,
+              // height: 34,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: selected ? AppColors.primary : Colors.transparent,
@@ -3279,29 +3279,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              const Icon(Icons.battery_charging_full_rounded,
-                  size: 14, color: Colors.grey),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: isEnRoute ? 0.75 : 0.35,
-                    backgroundColor: Colors.grey.shade100,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      isEnRoute
-                          ? const Color(0xFF10B981)
-                          : const Color(0xFF3B82F6),
-                    ),
-                    minHeight: 6,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          // const SizedBox(height: 14),
           if (hasProblem) ...[
             const SizedBox(height: 14),
             Container(
@@ -3330,7 +3308,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
               ),
             ),
           ],
-          const Spacer(),
+          // const Spacer(),
           const Divider(height: 20),
           Row(
             children: [
@@ -3577,7 +3555,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                     crossAxisCount: crossAxisCount,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
-                    mainAxisExtent: 280,
+                    mainAxisExtent: 215,
                   ),
                   itemCount: controller.trucks.length,
                   itemBuilder: (context, idx) {
@@ -7669,13 +7647,16 @@ class AdminHomeView extends GetView<AdminHomeController> {
             itemBuilder: (context, index) {
               final log = logs[index];
               final rawLabel = (log['label'] ?? 'Checkpoint').toString();
-              final label = rawLabel.contains('Vendor ke liye nikla') || rawLabel.contains('nikla (on the way)')
+              final label = rawLabel.contains('Vendor ke liye nikla') ||
+                      rawLabel.contains('nikla (on the way)')
                   ? 'En Route to Vendor (On The Way)'
-                  : (rawLabel.contains('Vendor pahuncha') || rawLabel.contains('loading shuru')
+                  : (rawLabel.contains('Vendor pahuncha') ||
+                          rawLabel.contains('loading shuru')
                       ? 'Reached Vendor — Loading Started'
                       : (rawLabel.contains('Loaded — awaiting admin approval')
                           ? 'Cargo Loaded — Awaiting Admin Approval'
-                          : (rawLabel.contains('Reached Drop — awaiting delivery approval')
+                          : (rawLabel.contains(
+                                  'Reached Drop — awaiting delivery approval')
                               ? 'Reached Destination — Awaiting Delivery Approval'
                               : rawLabel)));
               final timestamp = log['timestamp'] ?? '';
