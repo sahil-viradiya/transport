@@ -115,4 +115,31 @@ class SessionService extends GetxService {
   static String normalizePhone(String raw) {
     return raw.replaceAll(RegExp(r'[\s\-()+]'), '').trim();
   }
+
+  /// Returns all plausible search variants for a given phone number string
+  /// (with +91, without +91, 10-digit base, 12-digit, spaces stripped, etc.)
+  static List<String> getPhoneVariants(String raw) {
+    final Set<String> variants = {};
+    final trimmed = raw.trim();
+    if (trimmed.isNotEmpty) {
+      variants.add(trimmed);
+      variants.add(trimmed.replaceAll(' ', ''));
+    }
+
+    final digitsOnly = raw.replaceAll(RegExp(r'[^\d]'), '');
+    if (digitsOnly.isNotEmpty) {
+      variants.add(digitsOnly);
+    }
+
+    if (digitsOnly.length >= 10) {
+      final base10 = digitsOnly.substring(digitsOnly.length - 10);
+      variants.add(base10);
+      variants.add('+91$base10');
+      variants.add('+91 $base10');
+      variants.add('91$base10');
+      variants.add('0$base10');
+    }
+
+    return variants.toList();
+  }
 }

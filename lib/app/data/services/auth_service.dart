@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:transport/app/data/services/session_service.dart';
-import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/app/routes/app_pages.dart';
 
 /// Centralised Firebase Auth wrapper.

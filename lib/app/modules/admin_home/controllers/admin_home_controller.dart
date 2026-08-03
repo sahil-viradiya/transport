@@ -2,10 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:transport/app/data/services/auth_service.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
-import 'package:transport/app/data/services/storage_service.dart';
 import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/app/routes/app_pages.dart';
 import 'package:transport/widgets/dialogs/app_snackbar.dart';
@@ -14,7 +12,6 @@ import 'package:transport/app/core/utils/app_logger.dart';
 
 class AdminHomeController extends GetxController {
   final _firebaseService = Get.find<FirebaseService>();
-  final _storage = Get.find<StorageService>();
 
   final RxInt currentTabIndex = 0.obs;
   final RxBool isLoading = false.obs;
@@ -319,9 +316,9 @@ class AdminHomeController extends GetxController {
     final createdAt = t['createdAt'];
     if (createdAt != null) {
       final s = createdAt.toString();
-      if (s.contains('${now.year}') &&
-          s.contains('${now.month.toString().padLeft(2, '0')}') &&
-          s.contains('${now.day.toString().padLeft(2, '0')}')) {
+      if (s.contains(now.year.toString()) &&
+          s.contains(now.month.toString().padLeft(2, '0')) &&
+          s.contains(now.day.toString().padLeft(2, '0'))) {
         return true;
       }
     }

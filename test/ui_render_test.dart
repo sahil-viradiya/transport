@@ -109,7 +109,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(tester.takeException(), isNull);
-    expect(find.text('The Highway Authority'), findsOneWidget);
+    expect(find.text('journey_partner'.tr), findsOneWidget);
 
     // Drain the 3s splash timer so no pending timer fails the test.
     await tester.pump(const Duration(seconds: 4));

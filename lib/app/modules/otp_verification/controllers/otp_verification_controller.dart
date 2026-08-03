@@ -100,32 +100,50 @@ class OtpVerificationController extends GetxController {
   }
 
   Future<void> _handleUserLoginOrSignup(String phone) async {
-    // Normalize phone: '+91 9999999999' becomes '+919999999999'
-    phone = SessionService.normalizePhone(phone);
     try {
       final firebaseService = Get.find<FirebaseService>();
       final userData = await firebaseService.getUserData(phone);
 
       if (userData != null) {
-        // User exists, log them in immediately
-        final role = userData['role'] ?? 'owner';
+        // Driver / User already exists in Firestore!
+        final currentUid = FirebaseAuth.instance.currentUser?.uid;
+        final docPhone = (userData['phone'] ?? phone).toString();
+
+        // 1. Link UID if missing or changed
+        final existingUid = userData['uid']?.toString();
+        if (currentUid != null && currentUid.isNotEmpty && (existingUid == null || existingUid.isEmpty || existingUid != currentUid)) {
+          userData['uid'] = currentUid;
+          await firebaseService.linkUserUid(docPhone, currentUid, userData);
+        }
+
+        // 2. Read role, name, avatar
+        final role = (userData['role'] ?? 'driver').toString();
+        final name = (userData['name'] ?? userData['driverName'] ?? 'Driver').toString();
+        final avatarUrl = userData['avatarUrl']?.toString();
+
+        // 3. Create user session
         await _session.setSession(
-          phone: phone,
-          uid: FirebaseAuth.instance.currentUser?.uid,
-          name: userData['name'],
+          phone: docPhone,
+          uid: currentUid ?? existingUid,
+          name: name,
           role: role,
-          avatarUrl: userData['avatarUrl'],
+          avatarUrl: avatarUrl,
         );
 
+        // 4. Navigate directly to Dashboard (no registration popup!)
         if (role == 'admin') {
           Get.offAllNamed(Routes.ADMIN_HOME);
         } else {
           Get.offAllNamed(Routes.HOME);
         }
-        AppSnackBar.showSuccess(title: 'Welcome Back', message: 'Successfully logged in as ${role.toUpperCase()}!');
+        AppSnackBar.showSuccess(
+          title: 'Welcome Back',
+          message: 'Successfully logged in as ${role.toUpperCase()}!',
+        );
       } else {
-        // User does not exist, show role selection signup dialog
-        _showRoleSelectionSignupDialog(phone);
+        // User does NOT exist, show role selection signup dialog
+        final normalizedPhone = SessionService.normalizePhone(phone);
+        _showRoleSelectionSignupDialog(normalizedPhone);
       }
     } catch (e) {
       AppSnackBar.showError(title: 'Authentication Error', message: e.toString());

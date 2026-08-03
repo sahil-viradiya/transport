@@ -125,9 +125,9 @@ class LocationService extends GetxService {
   /// Handles platform exceptions cleanly with mock fallbacks.
   Future<String> getAddressFromCoordinates(double lat, double lng) async {
     try {
-      // If mock coords, directly return mock address
+      // If mock coords, return clean location description
       if (lat == fallbackLatitude && lng == fallbackLongitude) {
-        return "JNPT Port Terminal, Navi Mumbai, Maharashtra";
+        return "Terminal Hub Location";
       }
 
       final placemarks = await placemarkFromCoordinates(lat, lng).timeout(
@@ -165,7 +165,7 @@ class LocationService extends GetxService {
     } catch (_) {
       // Fallback address mapping based on coordinate ranges (to look smart and dynamic)
       if ((lat - fallbackLatitude).abs() < 0.1 && (lng - fallbackLongitude).abs() < 0.1) {
-        return "JNPT Port Terminal, Navi Mumbai, Maharashtra";
+        return "Terminal Hub Location";
       }
       
       // Indore hub coordinates fallback
@@ -199,7 +199,7 @@ class LocationService extends GetxService {
     if (hours > 0) {
       return "${hours}h ${minutes}m";
     } else {
-      return "${minutes} mins";
+      return "$minutes mins";
     }
   }
 }

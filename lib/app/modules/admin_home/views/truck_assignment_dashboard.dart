@@ -386,14 +386,15 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                       physics: const BouncingScrollPhysics(),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: pendingTrucks.map((truck) {
+                        children: List.generate(pendingTrucks.length, (idx) {
+                          final truck = pendingTrucks[idx];
                           return Padding(
-                            key: ValueKey(truck.id),
+                            key: ValueKey('unassigned_${truck.id}_$idx'),
                             padding:
                                 const EdgeInsets.only(right: 16, bottom: 8),
                             child: _buildInteractiveCard(truck),
                           );
-                        }).toList(),
+                        }),
                       ),
                     ),
             ),
@@ -433,14 +434,15 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                       physics: const BouncingScrollPhysics(),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: assignedTrucks.map((truck) {
+                        children: List.generate(assignedTrucks.length, (idx) {
+                          final truck = assignedTrucks[idx];
                           return Padding(
-                            key: ValueKey(truck.id),
+                            key: ValueKey('assigned_${truck.id}_$idx'),
                             padding:
                                 const EdgeInsets.only(right: 16, bottom: 8),
                             child: _buildInteractiveCard(truck),
                           );
-                        }).toList(),
+                        }),
                       ),
                     ),
             ),

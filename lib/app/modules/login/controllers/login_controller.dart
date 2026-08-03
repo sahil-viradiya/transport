@@ -132,21 +132,31 @@ class LoginController extends GetxController {
       final user = userCredential.user;
       
       if (user != null) {
-        final phone = SessionService.normalizePhone(
-            user.phoneNumber ?? phoneController.text.trim());
+        final phoneInput = user.phoneNumber ?? phoneController.text.trim();
         final session = Get.find<SessionService>();
         final firebaseService = Get.find<FirebaseService>();
 
-        // Lookup user role from Firestore
-        final userData = await firebaseService.getUserData(phone);
-        final role = userData?['role'] ?? 'owner';
+        // Lookup user or driver from Firestore
+        final userData = await firebaseService.getUserData(phoneInput);
+        final docPhone = (userData?['phone'] ?? SessionService.normalizePhone(phoneInput)).toString();
+        final role = (userData?['role'] ?? 'driver').toString();
+        final name = (userData?['name'] ?? userData?['driverName'] ?? 'Driver').toString();
+        final avatarUrl = userData?['avatarUrl']?.toString();
+
+        if (userData != null) {
+          final existingUid = userData['uid']?.toString();
+          if (existingUid == null || existingUid.isEmpty || existingUid != user.uid) {
+            userData['uid'] = user.uid;
+            await firebaseService.linkUserUid(docPhone, user.uid, userData);
+          }
+        }
 
         await session.setSession(
-          phone: phone,
+          phone: docPhone,
           uid: user.uid,
-          name: userData?['name'],
+          name: name,
           role: role,
-          avatarUrl: userData?['avatarUrl'],
+          avatarUrl: avatarUrl,
         );
 
         if (role == 'admin') {

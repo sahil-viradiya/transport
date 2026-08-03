@@ -166,9 +166,9 @@ class OtpVerificationView extends GetView<OtpVerificationController> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.lock_rounded,
+                          const Icon(Icons.lock_rounded,
                               color: Color(0xFF34D399), size: 16),
-                          SizedBox(width: 6),
+                          const SizedBox(width: 6),
                           AppText('two_factor_authentication'.tr,
                               style: AppTextStyle.labelMedium,
                               color: Colors.white,

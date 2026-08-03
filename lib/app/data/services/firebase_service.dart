@@ -751,9 +751,15 @@ class FirebaseService extends GetxService {
             'milestone': 4,
             'label': 'Reached Destination — Awaiting Delivery Approval',
             'timestamp': now,
-            'address': location ?? data['dropLocation'] ?? '',
-            'latitude': latitude ?? 0.0,
-            'longitude': longitude ?? 0.0,
+            'address': (location != null && location.isNotEmpty)
+                ? location
+                : ((data['dropLocation']?.toString().isNotEmpty == true)
+                    ? data['dropLocation'].toString()
+                    : ((data['dropCity']?.toString().isNotEmpty == true)
+                        ? data['dropCity'].toString()
+                        : 'Destination Terminal')),
+            'latitude': latitude ?? (data['dropLatitude'] as num?)?.toDouble() ?? 0.0,
+            'longitude': longitude ?? (data['dropLongitude'] as num?)?.toDouble() ?? 0.0,
           }
         ]),
       }, SetOptions(merge: true));
@@ -783,10 +789,9 @@ class FirebaseService extends GetxService {
         tripId,
         4,
         status: 'DELIVERED',
-        locationName:
-            (data['currentAddress'] ?? data['dropLocation'] ?? '').toString(),
-        latitude: (data['currentLatitude'] as num?)?.toDouble(),
-        longitude: (data['currentLongitude'] as num?)?.toDouble(),
+        locationName: (data['currentAddress'] ?? data['dropLocation'] ?? data['dropCity'] ?? 'Destination Terminal').toString(),
+        latitude: (data['currentLatitude'] ?? data['dropLatitude'] as num?)?.toDouble(),
+        longitude: (data['currentLongitude'] ?? data['dropLongitude'] as num?)?.toDouble(),
       );
       final driverPhone =
           (data['driverPhone'] ?? data['ownerId'])?.toString() ?? '';
@@ -1483,25 +1488,145 @@ class FirebaseService extends GetxService {
 
   Future<Map<String, dynamic>?> getUserData(String phone) async {
     try {
-      final doc = await _db.collection('users').doc(phone).get();
-      if (doc.exists) {
-        final data = doc.data();
-        if (data != null) data['phone'] = doc.id;
-        return data;
+      final variants = SessionService.getPhoneVariants(phone);
+
+      // 1. Direct document lookups by ID in `users` collection
+      for (final variant in variants) {
+        final doc = await _db.collection('users').doc(variant).get();
+        if (doc.exists && doc.data() != null) {
+          final data = Map<String, dynamic>.from(doc.data()!);
+          data['phone'] = doc.id;
+          return data;
+        }
       }
+
+      // 2. Direct document lookups by ID in `drivers` collection
+      for (final variant in variants) {
+        final doc = await _db.collection('drivers').doc(variant).get();
+        if (doc.exists && doc.data() != null) {
+          final data = Map<String, dynamic>.from(doc.data()!);
+          data['phone'] = doc.id;
+          if (!data.containsKey('role')) {
+            data['role'] = 'driver';
+          }
+          return data;
+        }
+      }
+
+      // 3. Query `users` collection by `phone` or `phoneNumber` fields
+      for (final field in ['phone', 'phoneNumber']) {
+        for (final variant in variants) {
+          final snap = await _db
+              .collection('users')
+              .where(field, isEqualTo: variant)
+              .limit(1)
+              .get();
+          if (snap.docs.isNotEmpty) {
+            final doc = snap.docs.first;
+            final data = Map<String, dynamic>.from(doc.data());
+            data['phone'] = doc.id;
+            return data;
+          }
+        }
+      }
+
+      // 4. Query `drivers` collection by `phone` or `phoneNumber` fields
+      for (final field in ['phone', 'phoneNumber']) {
+        for (final variant in variants) {
+          final snap = await _db
+              .collection('drivers')
+              .where(field, isEqualTo: variant)
+              .limit(1)
+              .get();
+          if (snap.docs.isNotEmpty) {
+            final doc = snap.docs.first;
+            final data = Map<String, dynamic>.from(doc.data());
+            data['phone'] = doc.id;
+            if (!data.containsKey('role')) {
+              data['role'] = 'driver';
+            }
+            return data;
+          }
+        }
+      }
+
+      // 5. Fallback scan matching 10-digit suffix across `users` collection
+      final clean = phone.replaceAll(RegExp(r'[^\d]'), '');
+      if (clean.length >= 10) {
+        final base10 = clean.substring(clean.length - 10);
+        final usersSnap = await _db.collection('users').get();
+        for (final doc in usersSnap.docs) {
+          final docIdClean = doc.id.replaceAll(RegExp(r'[^\d]'), '');
+          final fieldPhone = (doc.data()['phone'] ?? doc.data()['phoneNumber'] ?? '').toString().replaceAll(RegExp(r'[^\d]'), '');
+          if ((docIdClean.length >= 10 && docIdClean.substring(docIdClean.length - 10) == base10) ||
+              (fieldPhone.length >= 10 && fieldPhone.substring(fieldPhone.length - 10) == base10)) {
+            final data = Map<String, dynamic>.from(doc.data());
+            data['phone'] = doc.id;
+            return data;
+          }
+        }
+
+        // 6. Fallback scan matching 10-digit suffix across `drivers` collection
+        final driversSnap = await _db.collection('drivers').get();
+        for (final doc in driversSnap.docs) {
+          final docIdClean = doc.id.replaceAll(RegExp(r'[^\d]'), '');
+          final fieldPhone = (doc.data()['phone'] ?? doc.data()['phoneNumber'] ?? '').toString().replaceAll(RegExp(r'[^\d]'), '');
+          if ((docIdClean.length >= 10 && docIdClean.substring(docIdClean.length - 10) == base10) ||
+              (fieldPhone.length >= 10 && fieldPhone.substring(fieldPhone.length - 10) == base10)) {
+            final data = Map<String, dynamic>.from(doc.data());
+            data['phone'] = doc.id;
+            if (!data.containsKey('role')) {
+              data['role'] = 'driver';
+            }
+            return data;
+          }
+        }
+      }
+
       return null;
     } catch (_) {
       return null;
     }
   }
 
+  /// Links the Firebase Auth UID to the user/driver record in Firestore
+  /// and syncs the record across `users` and `drivers` collections.
+  Future<void> linkUserUid(String phoneKey, String uid, Map<String, dynamic> userData) async {
+    try {
+      final updates = <String, dynamic>{
+        'uid': uid,
+        'phone': phoneKey,
+        ...userData,
+      };
+
+      await _db.collection('users').doc(phoneKey).set(updates, SetOptions(merge: true));
+
+      final role = (userData['role'] ?? 'driver').toString();
+      if (role == 'driver' || role == 'owner') {
+        await _db.collection('drivers').doc(phoneKey).set(updates, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint('[FirebaseService] linkUserUid failed: $e');
+    }
+  }
+
   Future<void> saveUser(String phone, Map<String, dynamic> userData) {
     return _write(
         'User save nahi hua',
-        () => _db
-            .collection('users')
-            .doc(phone)
-            .set(userData, SetOptions(merge: true)));
+        () async {
+          await _db
+              .collection('users')
+              .doc(phone)
+              .set(userData, SetOptions(merge: true));
+
+          final role = (userData['role'] ?? 'driver').toString();
+          if (role == 'driver' || role == 'owner') {
+            await _db
+                .collection('drivers')
+                .doc(phone)
+                .set(userData, SetOptions(merge: true));
+          }
+        });
   }
 
   Future<void> updateUserRole(String phone, String newRole) {

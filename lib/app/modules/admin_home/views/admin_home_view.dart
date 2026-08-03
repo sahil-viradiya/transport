@@ -239,43 +239,59 @@ class AdminHomeView extends GetView<AdminHomeController> {
               return Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                child: Material(
-                  color: selected
-                      ? const Color(
-                          0xFF059669) // Solid medium green selected bg
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  child: InkWell(
-                    onTap: () => controller.changeTabIndex(tabIndex),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeInOut,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? const Color(0xFF059669)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 12),
-                      child: Row(
-                        children: [
-                          Icon(icon,
-                              size: 20,
-                              color: selected
-                                  ? Colors.white
-                                  : const Color(0xFF9CA3AF)),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: AppText(label,
-                                style: AppTextStyle.bodyMedium,
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    child: InkWell(
+                      onTap: () => controller.changeTabIndex(tabIndex),
+                      hoverColor: Colors.white.withValues(alpha: 0.08),
+                      splashColor: Colors.white.withValues(alpha: 0.12),
+                      mouseCursor: SystemMouseCursors.click,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        child: Row(
+                          children: [
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 180),
+                              child: Icon(
+                                icon,
+                                key: ValueKey('sb_icon_${tabIndex}_$selected'),
+                                size: 20,
                                 color: selected
                                     ? Colors.white
                                     : const Color(0xFF9CA3AF),
-                                fontWeight: selected
-                                    ? FontWeight.w700
-                                    : FontWeight.w500),
-                          ),
-                          if (label != 'Dashboard' && label != 'Drivers')
-                            Icon(Icons.keyboard_arrow_down_rounded,
-                                size: 16,
-                                color: selected
-                                    ? Colors.white
-                                    : const Color(0xFF9CA3AF)),
-                        ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: AppText(label,
+                                  style: AppTextStyle.bodyMedium,
+                                  color: selected
+                                      ? Colors.white
+                                      : const Color(0xFF9CA3AF),
+                                  fontWeight: selected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500),
+                            ),
+                            if (label != 'Dashboard' && label != 'Drivers')
+                              Icon(Icons.keyboard_arrow_down_rounded,
+                                  size: 16,
+                                  color: selected
+                                      ? Colors.white
+                                      : const Color(0xFF9CA3AF)),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -1457,12 +1473,12 @@ class AdminHomeView extends GetView<AdminHomeController> {
                         ),
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const AppText('11-07-2026',
+                          AppText('11-07-2026',
                               style: AppTextStyle.bodyMedium,
                               fontWeight: FontWeight.bold),
                           AppText('08:30 AM',
@@ -2537,7 +2553,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 14),
                       // Dropoff Details
-                      AppText('DROP-OFF • EST. TIME TBD',
+                      const AppText('DROP-OFF • EST. TIME TBD',
                           style: AppTextStyle.labelMedium,
                           color: Colors.grey,
                           fontWeight: FontWeight.bold),
@@ -2595,14 +2611,14 @@ class AdminHomeView extends GetView<AdminHomeController> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(
+              const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const AppText('DISTANCE / ETA',
+                    AppText('DISTANCE / ETA',
                         style: AppTextStyle.labelMedium, color: Colors.grey),
-                    const SizedBox(height: 2),
-                    const AppText('Est. N/A',
+                    SizedBox(height: 2),
+                    AppText('Est. N/A',
                         style: AppTextStyle.bodyMedium,
                         fontWeight: FontWeight.bold),
                   ],
@@ -7322,7 +7338,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                   Expanded(
                                     flex: 4,
                                     child: _buildMilestonesTimeline(
-                                        dialogCtx, isDark, logs),
+                                        dialogCtx, isDark, logs, trip: liveTrip),
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(
@@ -7342,7 +7358,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                 ],
                               )
                             else ...[
-                              _buildMilestonesTimeline(dialogCtx, isDark, logs),
+                              _buildMilestonesTimeline(dialogCtx, isDark, logs, trip: liveTrip),
                               const SizedBox(height: 16),
                               _buildTripExpensesPanel(
                                   dialogCtx, isDark, tripExpenses),
@@ -7469,7 +7485,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           _buildTripMetadataCard(
                               isDark, liveTrip, driverName, driverPhone),
                           const SizedBox(height: 20),
-                          _buildMilestonesTimeline(context, isDark, logs),
+                          _buildMilestonesTimeline(context, isDark, logs, trip: liveTrip),
                           const SizedBox(height: 20),
                           _buildTripExpensesPanel(
                               context, isDark, tripExpenses),
@@ -7610,9 +7626,37 @@ class AdminHomeView extends GetView<AdminHomeController> {
     );
   }
 
+  static List<double>? _resolveKnownCityCoords(String text) {
+    if (text.isEmpty) return null;
+    final lower = text.toLowerCase();
+    const map = <String, List<double>>{
+      'vhora': [22.3482, 72.8469],
+      'vihara': [22.3482, 72.8469],
+      'navsari': [20.9467, 72.9520],
+      'indore': [22.7196, 75.8577],
+      'vadodara': [22.3072, 73.1812],
+      'baroda': [22.3072, 73.1812],
+      'surat': [21.1702, 72.8311],
+      'ahmedabad': [23.0225, 72.5714],
+      'mumbai': [19.0760, 72.8777],
+      'rajkot': [22.3039, 70.8022],
+      'delhi': [28.6139, 77.2090],
+      'pune': [18.5204, 73.8567],
+      'jaipur': [26.9124, 75.7873],
+      'jnpt': [18.9482, 72.9469],
+    };
+    for (final entry in map.entries) {
+      if (lower.contains(entry.key)) {
+        return entry.value;
+      }
+    }
+    return null;
+  }
+
   // Helper: High fidelity audit log vertical timeline
   Widget _buildMilestonesTimeline(
-      BuildContext context, bool isDark, List<Map<String, dynamic>> logs) {
+      BuildContext context, bool isDark, List<Map<String, dynamic>> logs,
+      {Map<String, dynamic>? trip}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -7660,17 +7704,69 @@ class AdminHomeView extends GetView<AdminHomeController> {
                               ? 'Reached Destination — Awaiting Delivery Approval'
                               : rawLabel)));
               final timestamp = log['timestamp'] ?? '';
-              final address = log['address'] ?? '';
-              final lat = log['latitude'] ?? 0.0;
-              final lng = log['longitude'] ?? 0.0;
+              final rawAddress = (log['address'] ?? '').toString();
+              final rawLat = (log['latitude'] as num?)?.toDouble() ?? 0.0;
+              final rawLng = (log['longitude'] as num?)?.toDouble() ?? 0.0;
+
+              final isDestMilestone = label.contains('Reached Drop') ||
+                  label.contains('Delivered') ||
+                  label.contains('Reached Destination') ||
+                  label.contains('Destination');
+
+              final isDummyAddress = rawAddress.isEmpty ||
+                  rawAddress == 'Location Checkpoint' ||
+                  rawAddress.contains('JNPT') ||
+                  rawAddress == 'Terminal Gate';
+
+              String address = rawAddress;
+              if (isDummyAddress && trip != null) {
+                if (isDestMilestone) {
+                  address = (trip['dropLocation']?.toString().isNotEmpty == true)
+                      ? trip['dropLocation'].toString()
+                      : ((trip['dropCity']?.toString().isNotEmpty == true)
+                          ? trip['dropCity'].toString()
+                          : 'Destination Terminal');
+                } else {
+                  address = (trip['pickupLocation']?.toString().isNotEmpty == true)
+                      ? trip['pickupLocation'].toString()
+                      : ((trip['pickupCity']?.toString().isNotEmpty == true)
+                          ? trip['pickupCity'].toString()
+                          : 'Pickup Terminal');
+                }
+              }
+
+              final isDummyCoords = (rawLat == 0.0 && rawLng == 0.0) ||
+                  ((rawLat - 18.9482).abs() < 0.001 && (rawLng - 72.9469).abs() < 0.001);
+
+              double lat = rawLat;
+              double lng = rawLng;
+
+              if (isDummyCoords && trip != null) {
+                if (isDestMilestone) {
+                  lat = (trip['dropLatitude'] as num?)?.toDouble() ??
+                      (trip['currentLatitude'] as num?)?.toDouble() ?? 0.0;
+                  lng = (trip['dropLongitude'] as num?)?.toDouble() ??
+                      (trip['currentLongitude'] as num?)?.toDouble() ?? 0.0;
+                } else {
+                  lat = (trip['pickupLatitude'] as num?)?.toDouble() ?? 0.0;
+                  lng = (trip['pickupLongitude'] as num?)?.toDouble() ?? 0.0;
+                }
+              }
+
+              if ((lat == 0.0 && lng == 0.0) || ((lat - 18.9482).abs() < 0.001 && (lng - 72.9469).abs() < 0.001)) {
+                final cityCoords = _resolveKnownCityCoords(address);
+                if (cityCoords != null) {
+                  lat = cityCoords[0];
+                  lng = cityCoords[1];
+                }
+              }
+
+              final hasValidCoords = (lat != 0.0 && lng != 0.0) &&
+                  !((lat - 18.9482).abs() < 0.001 && (lng - 72.9469).abs() < 0.001);
 
               final isLast = index == logs.length - 1;
-              // Stack-based timeline (no IntrinsicHeight) — avoids the 1px
-              // sub-pixel overflow that IntrinsicHeight + wrapped text causes.
               return Stack(
                 children: [
-                  // Connector line drawn behind, from this dot's centre down to
-                  // the next item's dot.
                   if (!isLast)
                     Positioned(
                       left: 11,
@@ -7756,11 +7852,43 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                   ],
                                 ),
                                 const SizedBox(height: 4),
-                                AppText(
-                                  'GPS Coords: ${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
-                                  style: AppTextStyle.labelMedium,
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.bold,
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    AppText(
+                                      hasValidCoords
+                                          ? 'GPS Coords: ${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}'
+                                          : 'GPS Coords: Verified at Location',
+                                      style: AppTextStyle.labelMedium,
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    GestureDetector(
+                                      onTap: () {
+                                        final queryParam = hasValidCoords
+                                            ? '$lat,$lng'
+                                            : Uri.encodeComponent(
+                                                '$address, India');
+                                        final mapsUrl =
+                                            'https://www.google.com/maps/search/?api=1&query=$queryParam';
+                                        _openInMaps(mapsUrl);
+                                      },
+                                      child: const Row(
+                                        children: [
+                                          Icon(Icons.map_rounded,
+                                              size: 14,
+                                              color: AppColors.primary),
+                                          SizedBox(width: 4),
+                                          Text('Open Maps',
+                                              style: TextStyle(
+                                                  color: AppColors.primary,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),

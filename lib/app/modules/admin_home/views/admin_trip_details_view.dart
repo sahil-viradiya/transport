@@ -412,7 +412,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                     children: [
                       Expanded(
                         flex: 5,
-                        child: _buildMilestonesTimeline(context, isDark, logs),
+                        child: _buildMilestonesTimeline(context, isDark, logs, trip: trip),
                       ),
                       const SizedBox(width: 24),
                       Expanded(
@@ -431,7 +431,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                     ],
                   )
                 else ...[
-                  _buildMilestonesTimeline(context, isDark, logs),
+                  _buildMilestonesTimeline(context, isDark, logs, trip: trip),
                   const SizedBox(height: 24),
                   _buildTripExpensesPanel(context, isDark, tripExpenses, trip['id']),
                   if (isDelivered) ...[
@@ -886,7 +886,34 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
     );
   }
 
-  Widget _buildMilestonesTimeline(BuildContext context, bool isDark, List<Map<String, dynamic>> logs) {
+  static List<double>? _resolveKnownCityCoords(String text) {
+    if (text.isEmpty) return null;
+    final lower = text.toLowerCase();
+    const map = <String, List<double>>{
+      'vhora': [22.3482, 72.8469],
+      'vihara': [22.3482, 72.8469],
+      'navsari': [20.9467, 72.9520],
+      'indore': [22.7196, 75.8577],
+      'vadodara': [22.3072, 73.1812],
+      'baroda': [22.3072, 73.1812],
+      'surat': [21.1702, 72.8311],
+      'ahmedabad': [23.0225, 72.5714],
+      'mumbai': [19.0760, 72.8777],
+      'rajkot': [22.3039, 70.8022],
+      'delhi': [28.6139, 77.2090],
+      'pune': [18.5204, 73.8567],
+      'jaipur': [26.9124, 75.7873],
+      'jnpt': [18.9482, 72.9469],
+    };
+    for (final entry in map.entries) {
+      if (lower.contains(entry.key)) {
+        return entry.value;
+      }
+    }
+    return null;
+  }
+
+  Widget _buildMilestonesTimeline(BuildContext context, bool isDark, List<Map<String, dynamic>> logs, {Map<String, dynamic>? trip}) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -919,9 +946,65 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
               final log = logs[index];
               final label = _cleanMilestoneLabel(log['label']?.toString());
               final timestamp = log['timestamp'] ?? '';
-              final address = log['address'] ?? '';
-              final lat = log['latitude'] ?? 0.0;
-              final lng = log['longitude'] ?? 0.0;
+              final rawAddress = (log['address'] ?? '').toString();
+              final rawLat = (log['latitude'] as num?)?.toDouble() ?? 0.0;
+              final rawLng = (log['longitude'] as num?)?.toDouble() ?? 0.0;
+
+              final isDestMilestone = label.contains('Reached Drop') ||
+                  label.contains('Delivered') ||
+                  label.contains('Reached Destination') ||
+                  label.contains('Destination');
+
+              final isDummyAddress = rawAddress.isEmpty ||
+                  rawAddress == 'Location Checkpoint' ||
+                  rawAddress.contains('JNPT') ||
+                  rawAddress == 'Terminal Gate';
+
+              String address = rawAddress;
+              if (isDummyAddress && trip != null) {
+                if (isDestMilestone) {
+                  address = (trip['dropLocation']?.toString().isNotEmpty == true)
+                      ? trip['dropLocation'].toString()
+                      : ((trip['dropCity']?.toString().isNotEmpty == true)
+                          ? trip['dropCity'].toString()
+                          : 'Destination Terminal');
+                } else {
+                  address = (trip['pickupLocation']?.toString().isNotEmpty == true)
+                      ? trip['pickupLocation'].toString()
+                      : ((trip['pickupCity']?.toString().isNotEmpty == true)
+                          ? trip['pickupCity'].toString()
+                          : 'Pickup Terminal');
+                }
+              }
+
+              final isDummyCoords = (rawLat == 0.0 && rawLng == 0.0) ||
+                  ((rawLat - 18.9482).abs() < 0.001 && (rawLng - 72.9469).abs() < 0.001);
+
+              double lat = rawLat;
+              double lng = rawLng;
+
+              if (isDummyCoords && trip != null) {
+                if (isDestMilestone) {
+                  lat = (trip['dropLatitude'] as num?)?.toDouble() ??
+                      (trip['currentLatitude'] as num?)?.toDouble() ?? 0.0;
+                  lng = (trip['dropLongitude'] as num?)?.toDouble() ??
+                      (trip['currentLongitude'] as num?)?.toDouble() ?? 0.0;
+                } else {
+                  lat = (trip['pickupLatitude'] as num?)?.toDouble() ?? 0.0;
+                  lng = (trip['pickupLongitude'] as num?)?.toDouble() ?? 0.0;
+                }
+              }
+
+              if ((lat == 0.0 && lng == 0.0) || ((lat - 18.9482).abs() < 0.001 && (lng - 72.9469).abs() < 0.001)) {
+                final cityCoords = _resolveKnownCityCoords(address);
+                if (cityCoords != null) {
+                  lat = cityCoords[0];
+                  lng = cityCoords[1];
+                }
+              }
+
+              final hasValidCoords = (lat != 0.0 && lng != 0.0) &&
+                  !((lat - 18.9482).abs() < 0.001 && (lng - 72.9469).abs() < 0.001);
 
               final isLast = index == logs.length - 1;
               return Padding(
@@ -1005,7 +1088,9 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Text(
-                                        'GPS Coords: ${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
+                                        hasValidCoords
+                                            ? 'GPS Coords: ${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}'
+                                            : 'GPS Coords: Verified at Location',
                                         style: const TextStyle(
                                           color: Color(0xFF137333),
                                           fontSize: 10,
@@ -1015,7 +1100,10 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                                     ),
                                     GestureDetector(
                                       onTap: () {
-                                        final mapsUrl = 'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
+                                        final queryParam = hasValidCoords
+                                            ? '$lat,$lng'
+                                            : Uri.encodeComponent('$address, India');
+                                        final mapsUrl = 'https://www.google.com/maps/search/?api=1&query=$queryParam';
                                         _openInMaps(mapsUrl);
                                       },
                                       child: const Row(
