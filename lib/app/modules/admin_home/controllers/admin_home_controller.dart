@@ -682,7 +682,9 @@ class AdminHomeController extends GetxController {
     final availability =
         (driver['availability'] ?? 'off_duty').toString().toLowerCase();
     final checkedIn = driver['checkedIn'] == true;
-    return availability == 'available' || checkedIn;
+    final isClockedIn = driver['isClockedIn'] == true;
+    final dutyStatus = (driver['dutyStatus'] ?? '').toString().toUpperCase();
+    return availability == 'available' || checkedIn || isClockedIn || dutyStatus == 'ON_DUTY';
   }
 
   /// Drivers who are currently on duty (checked-in Available) OR running an

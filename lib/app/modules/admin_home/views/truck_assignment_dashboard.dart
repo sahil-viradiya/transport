@@ -3065,9 +3065,12 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
       }
     });
 
-    // 2. Filter driver list to exclude already assigned drivers (only driver role)
+    // 2. Filter driver list to ONLY include Clocked-In (Available) drivers who are NOT on leave and NOT already assigned
     final availableDrivers = controller.allDrivers
-        .where((u) => !assignedPhones.contains(u['phone']))
+        .where((u) =>
+            controller.isDriverCheckedIn(u) &&
+            !controller.isOnLeave(u) &&
+            !assignedPhones.contains(u['phone']))
         .map(_driverFromMap)
         .toList();
 
@@ -3086,7 +3089,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 style: AppTextStyle.titleLarge, fontWeight: FontWeight.bold),
             const SizedBox(height: 12),
             const AppText(
-              'Only showing available drivers. Already assigned drivers are hidden.',
+              'Only showing Clocked-In (Available) drivers. Off-Duty & assigned drivers are hidden.',
               style: AppTextStyle.labelMedium,
               color: Colors.grey,
             ),

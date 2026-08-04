@@ -8,6 +8,7 @@ import 'package:transport/app/data/services/session_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:transport/app/core/config/app_config.dart';
 import 'package:transport/app/core/utils/app_logger.dart';
+import 'package:transport/app/core/errors/validation_exception.dart';
 
 /// Firestore + Storage data layer.
 ///
@@ -225,6 +226,21 @@ class FirebaseService extends GetxService {
   }
 
   Future<void> saveTrip(String tripId, Map<String, dynamic> tripData) async {
+    // Input Validations
+    final pickup = (tripData['pickupCity'] ?? tripData['pickupLocation'] ?? '').toString().trim().toLowerCase();
+    final drop = (tripData['dropCity'] ?? tripData['dropLocation'] ?? '').toString().trim().toLowerCase();
+    if (pickup.isNotEmpty && drop.isNotEmpty && pickup == drop) {
+      throw ValidationException('Pickup and Drop locations cannot be identical ($pickup)!');
+    }
+
+    final freightRaw = tripData['freightAmount'];
+    if (freightRaw != null) {
+      final amt = double.tryParse(freightRaw.toString()) ?? 0;
+      if (amt < 0) {
+        throw ValidationException('Freight amount cannot be negative!');
+      }
+    }
+
     try {
       // A trip belongs to the driver it is assigned to, so its `ownerId` (what
       // the driver's owner-scoped query matches on) must be the driver's phone.
@@ -330,10 +346,41 @@ class FirebaseService extends GetxService {
   /// the driver to accept or reject.
   Future<void> assignTripToDriver(
       String tripId, Map<String, dynamic> tripData) async {
+    final driverPhone = SessionService.normalizePhone(
+        tripData['driverPhone']?.toString() ?? '');
+
+    if (driverPhone.isNotEmpty) {
+      // 1. Driver leave/deactivated status validation
+      final driverSnap = await _db.collection('users').doc(driverPhone).get();
+      if (driverSnap.exists) {
+        final dData = driverSnap.data() ?? {};
+        if (dData['onLeave'] == true || dData['status'] == 'deactivated') {
+          throw ValidationException(
+              'Cannot assign trip. Driver $driverPhone is currently on leave or deactivated!');
+        }
+      }
+
+      // 2. Single driver per trip validation (prevent duplicate trip assignment)
+      final existingTripDoc = await _db.collection('trips').doc(tripId).get();
+      if (existingTripDoc.exists) {
+        final existingData = existingTripDoc.data() ?? {};
+        final existingDriver = (existingData['driverPhone'] ?? '').toString();
+        final status = (existingData['status'] ?? '').toString();
+
+        if (existingDriver.isNotEmpty &&
+            existingDriver != driverPhone &&
+            status != 'DELIVERED' &&
+            status != 'CANCELLED' &&
+            status != 'REJECTED') {
+          throw ValidationException(
+              'Trip #$tripId is already assigned to driver $existingDriver (Status: $status). Multiple driver assignments are not allowed!');
+        }
+      }
+    }
+
     tripData['status'] = 'PENDING';
     tripData['confirmedByDriver'] = false;
     await saveTrip(tripId, tripData);
-    final driverPhone = tripData['driverPhone']?.toString() ?? '';
     if (driverPhone.isNotEmpty) {
       await createNotification(
         toPhone: driverPhone,
@@ -888,6 +935,11 @@ class FirebaseService extends GetxService {
     Map<String, dynamic> expenseData, {
     String? driverName,
   }) async {
+    final amount = double.tryParse((expenseData['amount'] ?? '').toString()) ?? 0;
+    if (amount <= 0) {
+      throw ValidationException('Expense amount must be greater than zero!');
+    }
+
     try {
       final id =
           expenseData['id'] ?? 'EXP-${DateTime.now().millisecondsSinceEpoch}';
@@ -1532,8 +1584,13 @@ class FirebaseService extends GetxService {
     String? key,
   }) async {
     try {
+      final id = (key == null || key.isEmpty) ? ownerKey : key;
+      final normId = SessionService.normalizePhone(id);
+
       final data = <String, dynamic>{
         'isClockedIn': isClockedIn,
+        'checkedIn': isClockedIn,
+        'availability': isClockedIn ? 'available' : 'off_duty',
         'dutyStatus': isClockedIn ? 'ON_DUTY' : 'OFF_DUTY',
         'lastDutyChange': FieldValue.serverTimestamp(),
       };
@@ -1544,7 +1601,13 @@ class FirebaseService extends GetxService {
       } else {
         if (clockOutTime != null) data['lastClockOutTime'] = clockOutTime.toIso8601String();
       }
-      await _ownerDoc(key).set(data, SetOptions(merge: true));
+
+      await _ownerDoc(id).set(data, SetOptions(merge: true));
+      await _db.collection('users').doc(id).set(data, SetOptions(merge: true));
+      if (normId.isNotEmpty && normId != id) {
+        await _db.collection('users').doc(normId).set(data, SetOptions(merge: true));
+        await _db.collection('drivers').doc(normId).set(data, SetOptions(merge: true));
+      }
     } catch (_) {}
   }
 
@@ -1878,10 +1941,42 @@ class FirebaseService extends GetxService {
   Future<void> assignTruckToDriver(String truckNo, String driverPhone,
       {String? model}) async {
     final p = SessionService.normalizePhone(driverPhone);
-    if (truckNo.isEmpty || p.isEmpty) return;
+    if (truckNo.isEmpty || p.isEmpty) {
+      throw ValidationException('Truck number and driver phone are required!');
+    }
+
+    // 1. Driver leave/deactivated & Clock-In status validation
+    final driverSnap = await _db.collection('users').doc(p).get();
+    if (driverSnap.exists) {
+      final dData = driverSnap.data() ?? {};
+      if (dData['onLeave'] == true || dData['status'] == 'deactivated') {
+        throw ValidationException(
+            'Cannot assign truck. Driver $p is currently on leave or deactivated!');
+      }
+      final availability = (dData['availability'] ?? 'off_duty').toString().toLowerCase();
+      final checkedIn = dData['checkedIn'] == true;
+      final isClockedIn = dData['isClockedIn'] == true;
+      final dutyStatus = (dData['dutyStatus'] ?? '').toString().toUpperCase();
+      final isAvailable = availability == 'available' || checkedIn || isClockedIn || dutyStatus == 'ON_DUTY';
+
+      if (!isAvailable) {
+        throw ValidationException(
+            'Driver $p is Off Duty / Not Clocked In! Trucks can ONLY be assigned to Clocked In (Available) drivers.');
+      }
+    }
+
+    // 2. Single driver per truck validation (prevent assigning same truck to multiple drivers)
+    final truckSnap = await _db.collection('trucks').doc(truckNo).get();
+    if (truckSnap.exists) {
+      final currentAssigned = (truckSnap.data()?['assignedTo'] ?? '').toString();
+      if (currentAssigned.isNotEmpty && currentAssigned != p) {
+        throw ValidationException(
+            'Truck "$truckNo" is already assigned to driver $currentAssigned. Please unassign it first!');
+      }
+    }
+
     try {
-      // Rule: same truck same time 2 driver ko assign nahi ho sakte, and a driver can only have one truck assigned at a time.
-      // 1. Unassign this driver from any other trucks
+      // 3. Unassign this driver from any other trucks
       final existingQuery = await _db
           .collection('trucks')
           .where('assignedTo', isEqualTo: p)
@@ -2394,15 +2489,73 @@ class FirebaseService extends GetxService {
     );
   }
 
-  Future<void> saveTruck(String truckId, Map<String, dynamic> truckData) {
+  /// Save or update a truck document with duplicate truck number validation.
+  Future<void> saveTruck(String truckId, Map<String, dynamic> truckData) async {
+    final cleanTruckId = truckId.trim();
+    if (cleanTruckId.isEmpty) {
+      throw ValidationException('Truck number cannot be empty!');
+    }
+
+    final canonTruck = cleanTruckId.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+
+    // 1. Duplicate Truck Number Validation (case-insensitive & space/hyphen agnostic)
+    final existingTrucks = await _db.collection('trucks').get();
+    for (final doc in existingTrucks.docs) {
+      if (doc.id != cleanTruckId) {
+        final existingCanon = doc.id.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+        final existingTruckNo = (doc.data()['truckNo'] ?? '').toString().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+        if (canonTruck == existingCanon || canonTruck == existingTruckNo) {
+          throw ValidationException(
+              "Truck number '$cleanTruckId' already exists in the fleet! Duplicate trucks are not allowed.");
+        }
+      }
+    }
+
     truckData.putIfAbsent('ownerId', () => ownerKey);
-    return _setTruckDoc(truckId, truckData,
+    await _setTruckDoc(cleanTruckId, truckData,
         options: SetOptions(merge: true), action: 'saveTruck');
   }
 
-  Future<void> deleteTruck(String truckId) {
-    return _write('Truck delete nahi hua',
-        () => _db.collection('trucks').doc(truckId).delete());
+  /// Permanently delete a truck and all its doc variants from the database.
+  Future<void> deleteTruck(String truckId) async {
+    final cleanTruck = truckId.trim();
+    if (cleanTruck.isEmpty) return;
+
+    final String Function(String) clean =
+        (val) => val.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    final targetClean = clean(cleanTruck);
+
+    // 1. Unassign truck first to clean up active driver bindings
+    try {
+      await unassignTruck(cleanTruck);
+    } catch (_) {}
+
+    // 2. Find and delete all matching truck docs from `trucks` collection
+    try {
+      final snap = await _db.collection('trucks').get();
+      bool foundAny = false;
+
+      for (final doc in snap.docs) {
+        final docId = doc.id;
+        final docTruckNo = (doc.data()['truckNo'] ?? '').toString();
+
+        if (docId == cleanTruck ||
+            docId.endsWith(cleanTruck) ||
+            clean(docId) == targetClean ||
+            clean(docTruckNo) == targetClean) {
+          await doc.reference.delete();
+          foundAny = true;
+        }
+      }
+
+      // 3. Fallback direct deletion if docId was exact
+      if (!foundAny) {
+        await _db.collection('trucks').doc(cleanTruck).delete();
+      }
+    } catch (e) {
+      debugPrint('[FirebaseService] deleteTruck error: $e');
+      rethrow;
+    }
   }
 
   // ---------------------------------------------------------------------------

@@ -172,7 +172,7 @@ class ProofOfDeliveryController extends GetxController {
   }
 
   @override
-void onClose() {
+  void onClose() {
     remarksController.dispose();
     super.onClose();
   }
