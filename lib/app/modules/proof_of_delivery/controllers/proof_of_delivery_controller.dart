@@ -17,7 +17,7 @@ class ProofOfDeliveryController extends GetxController {
   final RxBool isUploading = false.obs;
   final RxDouble uploadProgress = 0.0.obs;
 
-  final RxString tripId = 'IND-99281'.obs;
+  final RxString tripId = ''.obs;
 
   @override
   void onInit() {
@@ -172,7 +172,7 @@ class ProofOfDeliveryController extends GetxController {
   }
 
   @override
-  void onClose() {
+void onClose() {
     remarksController.dispose();
     super.onClose();
   }

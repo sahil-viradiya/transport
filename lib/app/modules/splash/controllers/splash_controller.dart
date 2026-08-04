@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:transport/app/data/services/session_service.dart';
+import 'package:transport/app/data/services/clock_in_service.dart';
 import 'package:transport/app/routes/app_pages.dart';
 
 class SplashController extends GetxController {
@@ -50,11 +51,12 @@ class SplashController extends GetxController {
     }
 
     if (hasLocalSession && hasFirebaseUser) {
-      // Fully authenticated — route based on role.
+      // Fully authenticated — route based on role & driver shift state.
       if (_session.isAdmin) {
         Get.offAllNamed(Routes.ADMIN_HOME);
       } else {
-        Get.offAllNamed(Routes.HOME);
+        final clockInService = Get.find<ClockInService>();
+        Get.offAllNamed(clockInService.getInitialRoute());
       }
     } else {
       // Either no local session or Firebase Auth disagrees — clear any stale

@@ -10,6 +10,8 @@ import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/data/services/connectivity_service.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/app/data/services/location_service.dart';
+import 'package:transport/app/data/services/clock_in_service.dart';
+import 'package:transport/app/routes/app_pages.dart';
 import '../../trips/controllers/trips_controller.dart';
 import '../../inspection/views/inspection_view.dart';
 
@@ -472,19 +474,23 @@ class DashboardController extends GetxController {
   /// Driver goes off duty.
   void checkOut() {
     AppPopup.showConfirmation(
-      title: 'Check Out?',
-      description: 'Aap Off Duty ho jayenge aur admin ko pata chal jayega.',
-      confirmText: 'Check Out',
+      title: 'Clock Out / End Shift?',
+      description: 'Are you sure you want to clock out? You will need to clock in again to resume driver activities.',
+      confirmText: 'Clock Out',
       onConfirm: () async {
         isCheckingDuty.value = true;
-        AppPopup.showLoading(message: 'Checking out...');
+        AppPopup.showLoading(message: 'Clocking out...');
         try {
           final fb = Get.find<FirebaseService>();
           await fb.checkOut(_session.ownerKey, driverName: driverName.value);
+          if (Get.isRegistered<ClockInService>()) {
+            await Get.find<ClockInService>().clockOut();
+          }
           dutyStatus.value = 'off_duty';
           AppPopup.hideLoading();
           AppSnackBar.showInfo(
               title: 'Checked Out', message: 'You are now Off Duty.');
+          Get.offAllNamed(Routes.CLOCK_IN);
         } catch (e) {
           AppPopup.hideLoading();
           AppSnackBar.showError(title: 'Error', message: e.toString());

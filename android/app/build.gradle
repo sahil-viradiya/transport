@@ -7,24 +7,19 @@ plugins {
 
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file('local.properties')
+
 if (localPropertiesFile.exists()) {
     localPropertiesFile.withReader('UTF-8') { reader ->
         localProperties.load(reader)
     }
 }
 
-def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
-if (flutterVersionCode == null) {
-    flutterVersionCode = '1'
-}
-
-def flutterVersionName = localProperties.getProperty('flutter.versionName')
-if (flutterVersionName == null) {
-    flutterVersionName = '1.0'
-}
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode') ?: '1'
+def flutterVersionName = localProperties.getProperty('flutter.versionName') ?: '1.0'
 
 android {
     namespace "com.example.transport"
+
     compileSdk flutter.compileSdkVersion
     ndkVersion flutter.ndkVersion
 
@@ -43,31 +38,35 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId "com.example.transport"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
+
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion flutter.targetSdkVersion
+
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+
+        multiDexEnabled true
     }
 
     buildTypes {
-        release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+
+        debug {
             signingConfig signingConfigs.debug
         }
-    }
 
-    packagingOptions {
-        doNotStrip "**/*.so"
-    }
+        release {
 
-    aaptOptions {
-        cruncherEnabled = false
-        noCompress ''
+            // Change to release signing before Play Store upload
+            signingConfig signingConfigs.debug
+
+            minifyEnabled true
+            shrinkResources true
+
+            proguardFiles getDefaultProguardFile(
+                    'proguard-android-optimize.txt'),
+                    'proguard-rules.pro'
+        }
     }
 }
 
@@ -76,9 +75,15 @@ flutter {
 }
 
 dependencies {
+
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+
     implementation 'com.google.android.gms:play-services-base:18.7.2'
+
     implementation platform('com.google.firebase:firebase-bom:34.0.0')
+
     implementation 'com.google.firebase:firebase-appcheck-playintegrity'
-    implementation 'com.google.firebase:firebase-appcheck-debug'
+
+    // Debug only
+    debugImplementation 'com.google.firebase:firebase-appcheck-debug'
 }

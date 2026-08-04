@@ -17,6 +17,9 @@ abstract class Routes {
   static const ACTIVE_DRIVERS = _Paths.ACTIVE_DRIVERS;
   static const DRIVER_DETAIL = _Paths.DRIVER_DETAIL;
   static const EXPENSE_DETAIL = _Paths.EXPENSE_DETAIL;
+  static const NOTIFICATION_PERMISSION = _Paths.NOTIFICATION_PERMISSION;
+  static const LOCATION_PERMISSION = _Paths.LOCATION_PERMISSION;
+  static const CLOCK_IN = _Paths.CLOCK_IN;
 }
 
 abstract class _Paths {
@@ -34,4 +37,7 @@ abstract class _Paths {
   static const ACTIVE_DRIVERS = '/active-drivers';
   static const DRIVER_DETAIL = '/driver-detail';
   static const EXPENSE_DETAIL = '/expense-detail';
+  static const NOTIFICATION_PERMISSION = '/notification-permission';
+  static const LOCATION_PERMISSION = '/location-permission';
+  static const CLOCK_IN = '/clock-in';
 }

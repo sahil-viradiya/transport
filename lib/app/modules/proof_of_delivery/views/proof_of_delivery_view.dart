@@ -190,7 +190,7 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
                             ],
                           ),
                           AppText(
-                              '${(controller.uploadProgress.value * 100).toInt()}%',
+                        '${(controller.uploadProgress.value * 100).toInt()}%',
                               style: AppTextStyle.labelMedium,
                               fontWeight: FontWeight.bold),
                         ],
@@ -208,7 +208,6 @@ class ProofOfDeliveryView extends GetView<ProofOfDeliveryController> {
                   ),
                 );
               }
-
               return AppButton(
                 text: 'Submit Proof',
                 icon: Icons.cloud_upload_rounded,

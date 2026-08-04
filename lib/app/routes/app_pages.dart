@@ -26,7 +26,14 @@ import '../modules/driver_detail/bindings/driver_detail_binding.dart';
 import '../modules/driver_detail/views/driver_detail_view.dart';
 import '../modules/expense_detail/bindings/expense_detail_binding.dart';
 import '../modules/expense_detail/views/expense_detail_view.dart';
+import '../modules/notification_permission/bindings/notification_permission_binding.dart';
+import '../modules/notification_permission/views/notification_permission_view.dart';
+import '../modules/location_permission/bindings/location_permission_binding.dart';
+import '../modules/location_permission/views/location_permission_view.dart';
+import '../modules/clock_in/bindings/clock_in_binding.dart';
+import '../modules/clock_in/views/clock_in_view.dart';
 import '../core/middleware/auth_middleware.dart';
+import '../core/middleware/clock_in_middleware.dart';
 
 part 'app_routes.dart';
 
@@ -65,19 +72,19 @@ class AppPages {
       name: _Paths.HOME,
       page: () => const HomeView(),
       binding: HomeBinding(),
-      middlewares: [AuthMiddleware()],
+      middlewares: [AuthMiddleware(), ClockInMiddleware()],
     ),
     GetPage(
       name: _Paths.TRIP_DETAILS,
       page: () => const TripStatusView(),
       binding: TripDetailsBinding(),
-      middlewares: [AuthMiddleware()],
+      middlewares: [AuthMiddleware(), ClockInMiddleware()],
     ),
     GetPage(
       name: _Paths.PROOF_OF_DELIVERY,
       page: () => const ProofOfDeliveryView(),
       binding: ProofOfDeliveryBinding(),
-      middlewares: [AuthMiddleware()],
+      middlewares: [AuthMiddleware(), ClockInMiddleware()],
     ),
     GetPage(
       name: _Paths.ADMIN_HOME,
@@ -106,6 +113,24 @@ class AppPages {
       name: _Paths.EXPENSE_DETAIL,
       page: () => const ExpenseDetailView(),
       binding: ExpenseDetailBinding(),
+      middlewares: [AuthMiddleware()],
+    ),
+    GetPage(
+      name: _Paths.NOTIFICATION_PERMISSION,
+      page: () => const NotificationPermissionView(),
+      binding: NotificationPermissionBinding(),
+      middlewares: [AuthMiddleware()],
+    ),
+    GetPage(
+      name: _Paths.LOCATION_PERMISSION,
+      page: () => const LocationPermissionView(),
+      binding: LocationPermissionBinding(),
+      middlewares: [AuthMiddleware()],
+    ),
+    GetPage(
+      name: _Paths.CLOCK_IN,
+      page: () => const ClockInView(),
+      binding: ClockInBinding(),
       middlewares: [AuthMiddleware()],
     ),
   ];

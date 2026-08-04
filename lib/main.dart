@@ -15,6 +15,7 @@ import 'app/data/services/firebase_service.dart';
 import 'app/data/services/session_service.dart';
 import 'app/data/services/auth_service.dart';
 import 'app/data/services/push_service.dart';
+import 'app/data/services/clock_in_service.dart';
 import 'app/data/notifications_controller.dart';
 import 'app/routes/app_pages.dart';
 
@@ -79,6 +80,8 @@ Future<void> initServices() async {
   // FCM push (permission, token save, foreground handler) — degrades to no-op
   // where FCM isn't configured, so it never blocks startup.
   await Get.putAsync(() => PushService().init());
+  // Initialize Driver Clock-in & duty tracking service
+  await Get.putAsync(() => ClockInService().init());
   debugPrint('All services successfully registered.');
 }
 

@@ -1168,6 +1168,8 @@ class FirebaseService extends GetxService {
         final r = (doc.data()['role'] ?? '').toString().toLowerCase();
         if (r == 'admin' || r == 'owner') {
           targetIds.add(doc.id);
+          final normDocId = SessionService.normalizePhone(doc.id);
+          if (normDocId.isNotEmpty) targetIds.add(normDocId);
           final p = doc.data()['phone']?.toString() ?? '';
           if (p.isNotEmpty) targetIds.add(p);
           final normP = SessionService.normalizePhone(p);
@@ -1518,6 +1520,31 @@ class FirebaseService extends GetxService {
         'currentAddress': address,
         'lastLocationUpdate': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+    } catch (_) {}
+  }
+
+  Future<void> updateDriverShiftStatus({
+    required bool isClockedIn,
+    DateTime? clockInTime,
+    DateTime? clockOutTime,
+    String? vehicleNumber,
+    String? location,
+    String? key,
+  }) async {
+    try {
+      final data = <String, dynamic>{
+        'isClockedIn': isClockedIn,
+        'dutyStatus': isClockedIn ? 'ON_DUTY' : 'OFF_DUTY',
+        'lastDutyChange': FieldValue.serverTimestamp(),
+      };
+      if (isClockedIn) {
+        if (clockInTime != null) data['lastClockInTime'] = clockInTime.toIso8601String();
+        if (vehicleNumber != null) data['vehicleNumber'] = vehicleNumber;
+        if (location != null) data['clockInLocation'] = location;
+      } else {
+        if (clockOutTime != null) data['lastClockOutTime'] = clockOutTime.toIso8601String();
+      }
+      await _ownerDoc(key).set(data, SetOptions(merge: true));
     } catch (_) {}
   }
 

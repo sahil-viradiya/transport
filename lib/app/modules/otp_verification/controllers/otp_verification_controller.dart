@@ -9,6 +9,7 @@ import 'package:transport/app/routes/app_pages.dart';
 
 import 'package:transport/app/core/utils/app_logger.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
+import 'package:transport/app/data/services/clock_in_service.dart';
 
 class OtpVerificationController extends GetxController {
   final _session = Get.find<SessionService>();
@@ -164,11 +165,12 @@ class OtpVerificationController extends GetxController {
         avatarUrl: avatarUrl,
       );
 
-      // 4. Navigate directly to Dashboard
+      // 4. Navigate directly to Dashboard or Onboarding / Clock In
       if (role == 'admin') {
         Get.offAllNamed(Routes.ADMIN_HOME);
       } else {
-        Get.offAllNamed(Routes.HOME);
+        final clockInService = Get.find<ClockInService>();
+        Get.offAllNamed(clockInService.getInitialRoute());
       }
       AppSnackBar.showSuccess(
         title: 'Welcome Back',

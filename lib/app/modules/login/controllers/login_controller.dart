@@ -6,6 +6,7 @@ import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/routes/app_pages.dart';
 import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
+import 'package:transport/app/data/services/clock_in_service.dart';
 
 import 'package:transport/app/core/config/app_config.dart';
 import 'package:transport/app/core/utils/app_logger.dart';
@@ -204,7 +205,8 @@ class LoginController extends GetxController {
         if (role == 'admin') {
           Get.offAllNamed(Routes.ADMIN_HOME);
         } else {
-          Get.offAllNamed(Routes.HOME);
+          final clockInService = Get.find<ClockInService>();
+          Get.offAllNamed(clockInService.getInitialRoute());
         }
         AppSnackBar.showSuccess(title: 'Welcome', message: 'Logged in as ${role.toUpperCase()}!');
       }
