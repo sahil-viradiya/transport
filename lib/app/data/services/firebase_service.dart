@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -160,9 +161,22 @@ class FirebaseService extends GetxService {
       deliveryRejectCount: (data['deliveryRejectCount'] as num?)?.toInt() ?? 0,
       deliveryRejectReason: data['deliveryRejectReason'] ?? '',
       deliveryRejectAudit: data['deliveryRejectAudit'],
-      hasTruckOwnerPass: data['hasTruckOwnerPass'] ?? false,
+      hasTruckOwnerPass: (data['hasTruckOwnerPass'] == true) ||
+          (data['truckOwnerPassUrl'] != null && data['truckOwnerPassUrl'].toString().isNotEmpty) ||
+          (data['truckOwnerPassData'] != null) ||
+          (data['destinationDocUrl'] != null && data['destinationDocUrl'].toString().isNotEmpty) ||
+          (data['destinationPhotoUrl'] != null && data['destinationPhotoUrl'].toString().isNotEmpty),
       truckOwnerPassId: data['truckOwnerPassId'] ?? '',
-      truckOwnerPassUrl: data['truckOwnerPassUrl'] ?? '',
+      truckOwnerPassUrl: ((data['truckOwnerPassUrl'] ?? '').toString().isNotEmpty
+              ? data['truckOwnerPassUrl']
+              : ((data['truckOwnerPassData'] as Map?)?['passPhotoUrl'] ??
+                  (data['truckOwnerPassData'] as Map?)?['passDocumentUrl'] ??
+                  (data['truckOwnerPassData'] as Map?)?['adminPhotoUrl'] ??
+                  (data['truckOwnerPassData'] as Map?)?['truckOwnerPassUrl'] ??
+                  data['destinationDocUrl'] ??
+                  data['destinationPhotoUrl'] ??
+                  ''))
+          .toString(),
       truckOwnerPassData: data['truckOwnerPassData'] as Map<String, dynamic>?,
     );
   }
@@ -505,8 +519,20 @@ class FirebaseService extends GetxService {
     String customerAddress = '',
     double? dropLatitude,
     double? dropLongitude,
+    String? destinationDocUrl,
+    String? destinationPhotoUrl,
   }) async {
     try {
+      String finalDocUrl = destinationDocUrl ?? '';
+      if (finalDocUrl.isNotEmpty && !finalDocUrl.startsWith('http')) {
+        finalDocUrl = await uploadTruckOwnerPassPhoto(tripId, finalDocUrl);
+      }
+
+      String finalPhotoUrl = destinationPhotoUrl ?? '';
+      if (finalPhotoUrl.isNotEmpty && !finalPhotoUrl.startsWith('http')) {
+        finalPhotoUrl = await uploadTruckOwnerPassPhoto(tripId, finalPhotoUrl);
+      }
+
       await _db.collection('trips').doc(tripId).set({
         'dropCity': dropCity,
         'dropLocation': dropLocation,
@@ -514,6 +540,8 @@ class FirebaseService extends GetxService {
         if (customerAddress.isNotEmpty) 'customerAddress': customerAddress,
         if (dropLatitude != null) 'dropLatitude': dropLatitude,
         if (dropLongitude != null) 'dropLongitude': dropLongitude,
+        if (finalDocUrl.isNotEmpty) 'destinationDocUrl': finalDocUrl,
+        if (finalPhotoUrl.isNotEmpty) 'destinationPhotoUrl': finalPhotoUrl,
         'destinationSetAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (_) {}
@@ -593,6 +621,62 @@ class FirebaseService extends GetxService {
       _warnStorage('Gate Pass Photo', e);
       throw Exception('Gate Pass Photo upload failed: $e');
     }
+  }
+
+  /// Upload a Truck Owner Pass document/photo to Storage, returning its URL.
+  /// If storage fails or isn't enabled, returns the input URL string safely.
+  Future<String> uploadTruckOwnerPassPhoto(String tripId, String? urlOrBase64) async {
+    if (urlOrBase64 == null || urlOrBase64.trim().isEmpty) return '';
+    final url = urlOrBase64.trim();
+    if (url.startsWith('http')) return url;
+
+    try {
+      final owner = ownerKey.isEmpty ? 'unknown' : ownerKey;
+      Uint8List? bytes;
+      String contentType = 'image/jpeg';
+      String ext = 'jpg';
+
+      if (url.contains('application/pdf') || url.toLowerCase().endsWith('.pdf')) {
+        contentType = 'application/pdf';
+        ext = 'pdf';
+      } else if (url.contains('image/png') || url.toLowerCase().endsWith('.png')) {
+        contentType = 'image/png';
+        ext = 'png';
+      }
+
+      if (url.contains(',')) {
+        final cleanBase64 = url.split(',').last.replaceAll(RegExp(r'\s+'), '');
+        bytes = base64Decode(cleanBase64);
+      }
+
+      if (bytes != null && bytes.isNotEmpty && !useMockStorage) {
+        final ref = _storage
+            .ref()
+            .child('truck_owner_passes')
+            .child(owner)
+            .child('${tripId}_pass.$ext');
+        final task = await ref.putData(bytes, SettableMetadata(contentType: contentType));
+        final downloadUrl = await task.ref.getDownloadURL();
+        if (downloadUrl.isNotEmpty) return downloadUrl;
+      }
+    } catch (e) {
+      _warnStorage('Truck Owner Pass Upload', e);
+    }
+
+    // Safety fallback when Firebase Storage rules deny permission ([firebase_storage/unauthorized]):
+    // If the base64 string is extremely long (>400KB), downsample/cap it so Firestore doc write (1MB limit) never fails.
+    if (url.length > 400000) {
+      debugPrint('⚠️ Base64 dataUrl is very large (${url.length} chars). Truncating for safe Firestore write.');
+      final parts = url.split(',');
+      final prefix = parts.first;
+      final rawBase64 = parts.last;
+      const targetLength = 350000;
+      final truncated = rawBase64.substring(0, targetLength);
+      final cleanChunk = truncated.substring(0, truncated.length - (truncated.length % 4));
+      return '$prefix,$cleanChunk==';
+    }
+
+    return url;
   }
 
   /// Driver has loaded goods at pickup and asks the admin to activate the trip.
@@ -1074,23 +1158,36 @@ class FirebaseService extends GetxService {
     final p = SessionService.normalizePhone(phone);
     final session = Get.find<SessionService>();
     final isAdmin = session.isAdmin || rawP == 'admin' || p == 'admin';
+    final adminPhone = session.ownerKey.trim();
+    final normAdminPhone = SessionService.normalizePhone(adminPhone);
 
     Query<Map<String, dynamic>> query = _db.collection('notifications');
     if (!isAdmin && p.isNotEmpty) {
       query = query.where('toPhone', isEqualTo: p);
     }
 
-    return query.snapshots().map((s) {
+    return query.snapshots().handleError((e) {
+      debugPrint('⚠️ [Notifications Stream] Permission/Network info: $e');
+    }).map((s) {
       final list = s.docs.map((d) {
         final m = d.data();
         m['id'] = d.id;
         return m;
       }).where((m) {
-        if (isAdmin) return true;
         final toP = (m['toPhone'] ?? '').toString().trim();
         if (toP.isEmpty) return false;
         final normToP = SessionService.normalizePhone(toP);
-        return toP == rawP || normToP == p || toP == 'admin';
+
+        if (isAdmin) {
+          return toP.toLowerCase() == 'admin' ||
+              (adminPhone.isNotEmpty && toP == adminPhone) ||
+              (normAdminPhone.isNotEmpty && normToP == normAdminPhone) ||
+              toP == rawP ||
+              (p.isNotEmpty && normToP == p);
+        } else {
+          return toP.toLowerCase() != 'admin' &&
+              (toP == rawP || (p.isNotEmpty && normToP == p));
+        }
       }).toList();
 
       list.sort((a, b) {
@@ -1107,18 +1204,45 @@ class FirebaseService extends GetxService {
   }
 
   Future<List<Map<String, dynamic>>> getNotifications(String phone) async {
+    final rawP = phone.trim();
     final p = SessionService.normalizePhone(phone);
-    if (p.isEmpty) return [];
+    final session = Get.find<SessionService>();
+    final isAdmin = session.isAdmin || rawP == 'admin' || p == 'admin';
+    final adminPhone = session.ownerKey.trim();
+    final normAdminPhone = SessionService.normalizePhone(adminPhone);
+
     try {
-      final snap = await _db
-          .collection('notifications')
-          .where('toPhone', isEqualTo: p)
-          .get();
+      final snap = await _db.collection('notifications').get();
       final list = snap.docs.map((d) {
         final m = d.data();
         m['id'] = d.id;
         return m;
+      }).where((m) {
+        final toP = (m['toPhone'] ?? '').toString().trim();
+        if (toP.isEmpty) return false;
+        final normToP = SessionService.normalizePhone(toP);
+
+        if (isAdmin) {
+          return toP.toLowerCase() == 'admin' ||
+              (adminPhone.isNotEmpty && toP == adminPhone) ||
+              (normAdminPhone.isNotEmpty && normToP == normAdminPhone) ||
+              toP == rawP ||
+              (p.isNotEmpty && normToP == p);
+        } else {
+          return toP.toLowerCase() != 'admin' &&
+              (toP == rawP || (p.isNotEmpty && normToP == p));
+        }
       }).toList();
+
+      list.sort((a, b) {
+        final da = a['createdAt'] is Timestamp
+            ? (a['createdAt'] as Timestamp).toDate()
+            : DateTime.fromMillisecondsSinceEpoch(0);
+        final db = b['createdAt'] is Timestamp
+            ? (b['createdAt'] as Timestamp).toDate()
+            : DateTime.fromMillisecondsSinceEpoch(0);
+        return db.compareTo(da);
+      });
       return list;
     } catch (_) {
       return [];
@@ -1146,16 +1270,37 @@ class FirebaseService extends GetxService {
   }
 
   Future<void> markAllNotificationsRead(String phone) async {
+    final rawP = phone.trim();
     final p = SessionService.normalizePhone(phone);
-    if (p.isEmpty) return;
+    final session = Get.find<SessionService>();
+    final isAdmin = session.isAdmin || rawP == 'admin' || p == 'admin';
+    final adminPhone = session.ownerKey.trim();
+    final normAdminPhone = SessionService.normalizePhone(adminPhone);
+
     try {
       final snap = await _db
           .collection('notifications')
-          .where('toPhone', isEqualTo: p)
           .where('read', isEqualTo: false)
           .get();
-      await _setInBatches(
-          snap.docs.map((doc) => doc.reference), {'read': true});
+
+      final docsToMark = snap.docs.where((doc) {
+        final toP = (doc.data()['toPhone'] ?? '').toString().trim();
+        if (toP.isEmpty) return false;
+        final normToP = SessionService.normalizePhone(toP);
+
+        if (isAdmin) {
+          return toP.toLowerCase() == 'admin' ||
+              (adminPhone.isNotEmpty && toP == adminPhone) ||
+              (normAdminPhone.isNotEmpty && normToP == normAdminPhone) ||
+              toP == rawP ||
+              (p.isNotEmpty && normToP == p);
+        } else {
+          return toP.toLowerCase() != 'admin' &&
+              (toP == rawP || (p.isNotEmpty && normToP == p));
+        }
+      }).map((doc) => doc.reference);
+
+      await _setInBatches(docsToMark, {'read': true});
     } catch (_) {}
   }
 
@@ -1172,6 +1317,8 @@ class FirebaseService extends GetxService {
     final p = SessionService.normalizePhone(phone);
     final session = Get.find<SessionService>();
     final isAdmin = session.isAdmin || rawP == 'admin' || p == 'admin';
+    final adminPhone = session.ownerKey.trim();
+    final normAdminPhone = SessionService.normalizePhone(adminPhone);
 
     try {
       final snap = await _db.collection('notifications').get();
@@ -1181,7 +1328,20 @@ class FirebaseService extends GetxService {
         for (final doc in snap.docs.skip(i).take(400)) {
           final toP = (doc.data()['toPhone'] ?? '').toString().trim();
           final normToP = SessionService.normalizePhone(toP);
-          if (isAdmin || toP == rawP || normToP == p || toP == 'admin') {
+
+          bool shouldDelete = false;
+          if (isAdmin) {
+            shouldDelete = toP.toLowerCase() == 'admin' ||
+                (adminPhone.isNotEmpty && toP == adminPhone) ||
+                (normAdminPhone.isNotEmpty && normToP == normAdminPhone) ||
+                toP == rawP ||
+                (p.isNotEmpty && normToP == p);
+          } else {
+            shouldDelete = toP.toLowerCase() != 'admin' &&
+                (toP == rawP || (p.isNotEmpty && normToP == p));
+          }
+
+          if (shouldDelete) {
             batch.delete(doc.reference);
             count++;
           }

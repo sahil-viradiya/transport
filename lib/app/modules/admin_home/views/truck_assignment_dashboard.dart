@@ -489,7 +489,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: widget.isDark ? Colors.white10 : Colors.grey.shade200,
+          color: widget.isDark ? const Color.from(alpha: 0.102, red: 1, green: 1, blue: 1) : Colors.grey.shade200,
           style: BorderStyle.solid,
         ),
       ),

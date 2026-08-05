@@ -554,14 +554,19 @@ class AdminHomeController extends GetxController {
   /// loading). The driver sees it only after the load is approved.
   Future<void> setDestination(
       String tripId, String dropCity, String dropLocation,
-      {String customerName = '', String customerAddress = ''}) async {
+      {String customerName = '',
+      String customerAddress = '',
+      String? destinationDocUrl,
+      String? destinationPhotoUrl}) async {
     AppPopup.showLoading(message: 'Setting destination...');
     try {
       await _firebaseService.setTripDestination(tripId,
           dropCity: dropCity,
           dropLocation: dropLocation,
           customerName: customerName,
-          customerAddress: customerAddress);
+          customerAddress: customerAddress,
+          destinationDocUrl: destinationDocUrl,
+          destinationPhotoUrl: destinationPhotoUrl);
       AppPopup.hideLoading();
       AppSnackBar.showSuccess(
           title: 'Destination Set 📍',
@@ -645,6 +650,10 @@ class AdminHomeController extends GetxController {
         'loadingPhotoUrl': trip.loadingPhotoUrl,
         'gatePassPhotoUrl': trip.gatePassPhotoUrl,
         'loadingPassGeneratedAt': trip.loadingPassGeneratedAt,
+        'hasTruckOwnerPass': trip.hasTruckOwnerPass,
+        'truckOwnerPassId': trip.truckOwnerPassId,
+        'truckOwnerPassUrl': trip.truckOwnerPassUrl,
+        'truckOwnerPassData': trip.truckOwnerPassData,
       };
 
   void changeTabIndex(int index) {

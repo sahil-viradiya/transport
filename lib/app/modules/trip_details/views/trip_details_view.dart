@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -8,6 +10,8 @@ import '../../../../widgets/app_text.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/session_service.dart';
 import '../../../core/utils/document_viewer_helper.dart';
+import '../../../core/utils/image_url.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class TripDetailsView extends GetView<TripDetailsController> {
   const TripDetailsView({super.key});
@@ -242,77 +246,254 @@ class TripDetailsView extends GetView<TripDetailsController> {
 
   Widget _buildTripDocumentsCard(
       BuildContext context, bool isDark, Map<String, dynamic> ex) {
-    final loadingUrl =
-        (ex['loadingPhotoUrl'] ?? ex['loadingPhoto'] ?? '').toString();
-    final gatePassUrl =
-        (ex['gatePassPhotoUrl'] ?? ex['gatePassPhoto'] ?? '').toString();
+    final loadingPhotoUrl = (ex['loadingPhotoUrl'] ?? ex['loadingPhoto'] ?? '').toString();
+    final gatePassPhotoUrl = (ex['gatePassPhotoUrl'] ?? ex['gatePassPhoto'] ?? '').toString();
     final passData = ex['truckOwnerPassData'] as Map?;
-    final passUrl = (passData?['passPhotoUrl'] ??
-            passData?['passDocumentUrl'] ??
-            passData?['adminPhotoUrl'] ??
-            '')
-        .toString();
-    final podUrl = (ex['podPhotoUrl'] ?? ex['podPhoto'] ?? '').toString();
-
-    final docs = <Map<String, String>>[];
-    if (loadingUrl.isNotEmpty) {
-      docs.add({'title': 'Loading Photo / Document', 'url': loadingUrl});
-    }
-    if (gatePassUrl.isNotEmpty) {
-      docs.add({'title': 'Gate Pass Photo / Document', 'url': gatePassUrl});
-    }
-    if (passUrl.isNotEmpty) {
-      docs.add({'title': 'Truck Owner Pass Document', 'url': passUrl});
-    }
-    if (podUrl.isNotEmpty) {
-      docs.add({'title': 'Proof of Delivery (POD)', 'url': podUrl});
+    final truckOwnerPassId = (ex['truckOwnerPassId'] ?? passData?['passId'] ?? '').toString();
+    String truckOwnerPassUrl = (ex['truckOwnerPassUrl'] ?? '').toString().trim();
+    if (truckOwnerPassUrl.isEmpty && passData != null) {
+      truckOwnerPassUrl = (passData['passPhotoUrl'] ??
+              passData['passDocumentUrl'] ??
+              passData['adminPhotoUrl'] ??
+              passData['truckOwnerPassUrl'] ??
+              '')
+          .toString()
+          .trim();
     }
 
-    if (docs.isEmpty) return const SizedBox.shrink();
+    String destinationDocUrl = (ex['destinationDocUrl'] ?? '').toString().trim();
+    if (destinationDocUrl.isEmpty) {
+      destinationDocUrl = (ex['destinationPhotoUrl'] ??
+              ex['adminDocUrl'] ??
+              ex['adminPhotoUrl'] ??
+              '')
+          .toString()
+          .trim();
+    }
+    final podUrl = (ex['podPhotoUrl'] ?? ex['podPhoto'] ?? ex['podUrl'] ?? '').toString();
+    final remarks = (ex['remarks'] ?? '').toString();
+
+    final hasTruckOwnerPass = (ex['hasTruckOwnerPass'] == true) ||
+        truckOwnerPassId.isNotEmpty ||
+        truckOwnerPassUrl.isNotEmpty ||
+        passData != null;
+
+    final hasLoadingProof = loadingPhotoUrl.isNotEmpty || gatePassPhotoUrl.isNotEmpty;
+    final hasAdminProof = hasTruckOwnerPass || destinationDocUrl.isNotEmpty;
+    final hasPodProof = podUrl.isNotEmpty;
+
+    if (!hasLoadingProof && !hasAdminProof && !hasPodProof) {
+      return const SizedBox.shrink();
+    }
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isDark ? Colors.white10 : AppColors.border),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.folder_shared_rounded,
-                  color: AppColors.primary, size: 20),
-              SizedBox(width: 8),
-              AppText('Trip Documents & Attachments 📄',
-                  style: AppTextStyle.bodyLarge, fontWeight: FontWeight.bold),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...docs.map((doc) {
-            final title = doc['title']!;
-            final url = doc['url']!;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: ElevatedButton.icon(
-                onPressed: () => DocumentViewerHelper.showDocument(context, url,
-                    title: title),
-                icon: const Icon(Icons.description_rounded, size: 16),
-                label: AppText(title,
-                    style: AppTextStyle.labelMedium,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 42),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+              Icon(Icons.verified_user_rounded, color: AppColors.primary, size: 22),
+              SizedBox(width: 10),
+              Expanded(
+                child: AppText(
+                  'VERIFICATION PROOFS',
+                  style: AppTextStyle.labelLarge,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            );
-          }),
+            ],
+          ),
+          const Divider(height: 32),
+
+          // A. Loading Proof Section
+          if (hasLoadingProof) ...[
+            const AppText('LOADING STAGE PROOFS', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (loadingPhotoUrl.isNotEmpty) ...[
+                  _buildDriverPhotoThumbnail(context, loadingPhotoUrl, 'Loading Photo', isDark),
+                  const SizedBox(width: 12),
+                ],
+                if (gatePassPhotoUrl.isNotEmpty) ...[
+                  _buildDriverPhotoThumbnail(context, gatePassPhotoUrl, 'Gate Pass Photo', isDark),
+                ],
+              ],
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // B. Truck Owner Pass & Admin Documents Section
+          if (hasAdminProof) ...[
+            const AppText('TRUCK OWNER PASS & ADMIN DOCUMENTS', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (truckOwnerPassUrl.isNotEmpty) ...[
+                  _buildDriverPhotoThumbnail(context, truckOwnerPassUrl, 'Truck Owner Pass', isDark),
+                  const SizedBox(width: 12),
+                ] else if (hasTruckOwnerPass) ...[
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 24),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                AppText('Truck Owner Pass Issued ✅', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46)),
+                                if (truckOwnerPassId.isNotEmpty)
+                                  AppText('Pass ID: #$truckOwnerPassId', style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                                if (passData?['ownerName']?.toString().isNotEmpty == true)
+                                  AppText('Owner/Transporter: ${passData!['ownerName']}', style: AppTextStyle.bodyMedium, color: Colors.grey),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                if (destinationDocUrl.isNotEmpty) ...[
+                  _buildDriverPhotoThumbnail(context, destinationDocUrl, 'Destination Doc/Photo', isDark),
+                ],
+              ],
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // C. POD Proof Section
+          if (hasPodProof) ...[
+            const AppText('PROOF OF DELIVERY (POD)', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey),
+            const SizedBox(height: 12),
+            if (remarks.isNotEmpty) ...[
+              const AppText('DRIVER REMARKS / NOTES', style: AppTextStyle.labelMedium, color: Colors.grey),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade100),
+                ),
+                child: AppText(remarks, style: AppTextStyle.bodyMedium),
+              ),
+              const SizedBox(height: 16),
+            ],
+            _buildDriverPhotoThumbnail(context, podUrl, 'POD Document', isDark),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDriverPhotoThumbnail(BuildContext context, String url, String label, bool isDark) {
+    final isPdf = DocumentViewerHelper.isPdf(url);
+
+    Uint8List? base64Bytes;
+    bool isBase64 = false;
+    if (!isPdf && (url.startsWith('data:image') || (!url.startsWith('http') && !url.startsWith('/')))) {
+      try {
+        var str = url.trim();
+        if (str.contains(',')) {
+          str = str.split(',').last.trim();
+        }
+        str = str.replaceAll(RegExp(r'\s+'), '');
+        while (str.length % 4 != 0) {
+          str += '=';
+        }
+        base64Bytes = base64Decode(str);
+        if (base64Bytes.isNotEmpty) {
+          isBase64 = true;
+        }
+      } catch (_) {}
+    }
+
+    Widget imageWidget;
+    if (isPdf) {
+      imageWidget = Container(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFFEF2F2),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.picture_as_pdf_rounded, size: 36, color: Colors.redAccent),
+            SizedBox(height: 4),
+            Text('PDF File', style: TextStyle(fontSize: 10, color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      );
+    } else if (isBase64 && base64Bytes != null) {
+      imageWidget = Image.memory(
+        base64Bytes,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => Container(
+          color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+          child: const Center(
+            child: Icon(Icons.broken_image_outlined, size: 24, color: Colors.grey),
+          ),
+        ),
+      );
+    } else if (url.startsWith('/')) {
+      imageWidget = Image.file(
+        File(url),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => Container(
+          color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+          child: const Center(
+            child: Icon(Icons.broken_image_outlined, size: 24, color: Colors.grey),
+          ),
+        ),
+      );
+    } else {
+      imageWidget = CachedNetworkImage(
+        imageUrl: corsSafeImageUrl(url),
+        fit: BoxFit.cover,
+        placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+        errorWidget: (context, url, error) => Container(
+          color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+          child: const Center(
+            child: Icon(Icons.broken_image_outlined, size: 24, color: Colors.grey),
+          ),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () => DocumentViewerHelper.showDocument(context, url, title: label),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(11),
+              child: imageWidget,
+            ),
+          ),
+          const SizedBox(height: 4),
+          AppText(label, style: AppTextStyle.labelMedium, color: Colors.grey, fontWeight: FontWeight.bold),
         ],
       ),
     );
@@ -600,6 +781,9 @@ class TripDetailsView extends GetView<TripDetailsController> {
                 icon: Icons.check_circle_outline_rounded,
                 label: 'Reached Drop',
               ),
+              const SizedBox(height: 16),
+              Obx(() => _buildTripDocumentsCard(
+                  context, isDark, controller.tripExtra.value ?? {})),
               _buildPODDetailsCard(context, isDark),
               const SizedBox(height: 32),
             ],

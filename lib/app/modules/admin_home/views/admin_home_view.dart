@@ -9707,14 +9707,20 @@ class AdminHomeView extends GetView<AdminHomeController> {
                     AppPopup.showLoading(
                         message: 'Generating Pass & Activating Trip...');
                     try {
+                      String finalPassUrl = passPhotoUrl ?? '';
+                      if (finalPassUrl.isNotEmpty) {
+                        finalPassUrl = await Get.find<FirebaseService>()
+                            .uploadTruckOwnerPassPhoto(tripId, finalPassUrl);
+                      }
+
                       final ownerPassData = {
                         'passId': passIdCtrl.text.trim(),
                         'ownerName': ownerNameCtrl.text.trim(),
                         'remarks': remarksCtrl.text.trim(),
-                        if (passPhotoUrl != null && passPhotoUrl!.isNotEmpty)
-                          'passPhotoUrl': passPhotoUrl,
-                        if (passPhotoUrl != null && passPhotoUrl!.isNotEmpty)
-                          'passDocumentUrl': passPhotoUrl,
+                        if (finalPassUrl.isNotEmpty)
+                          'passPhotoUrl': finalPassUrl,
+                        if (finalPassUrl.isNotEmpty)
+                          'passDocumentUrl': finalPassUrl,
                         'generatedAt':
                             DateTime.now().toString().substring(0, 16),
                         if (adminPhotoUrl != null && adminPhotoUrl!.isNotEmpty)
@@ -9723,10 +9729,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                       final err = await Get.find<FirebaseService>().approveLoad(
                         tripId,
                         truckOwnerPassId: passIdCtrl.text.trim(),
-                        truckOwnerPassUrl: passPhotoUrl ?? '',
+                        truckOwnerPassUrl: finalPassUrl,
                         truckOwnerPassData: ownerPassData,
                       );
-                      AppPopup.hideLoading();
                       if (err != null) {
                         Get.snackbar('Alert', err,
                             snackPosition: SnackPosition.BOTTOM,
@@ -9739,10 +9744,11 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             colorText: Colors.white);
                       }
                     } catch (e) {
-                      AppPopup.hideLoading();
                       Get.snackbar('Error', e.toString(),
                           snackPosition: SnackPosition.BOTTOM,
                           backgroundColor: Colors.redAccent);
+                    } finally {
+                      AppPopup.hideLoading();
                     }
                   }
                 },

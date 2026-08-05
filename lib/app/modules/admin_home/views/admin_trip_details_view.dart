@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -10,6 +12,8 @@ import 'package:transport/app/core/utils/image_url.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/core/utils/image_picker_helper.dart';
+
+import 'package:transport/app/core/utils/document_viewer_helper.dart';
 
 class AdminTripDetailsView extends GetView<AdminHomeController> {
   const AdminTripDetailsView({super.key});
@@ -416,13 +420,9 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                 _buildPassRoyaltyDetailsCard(context, isDark, trip),
                 const SizedBox(height: 24),
 
-                // 2b. Verification Proofs (if load/delivery requested or rejected)
-                if (trip['loadingPhotoUrl']?.toString().isNotEmpty == true ||
-                    trip['gatePassPhotoUrl']?.toString().isNotEmpty == true ||
-                    trip['podUrl']?.toString().isNotEmpty == true) ...[
-                  _buildVerificationProofPanel(context, isDark, trip),
-                  const SizedBox(height: 24),
-                ],
+                // 2b. Verification Proofs (Loading, Truck Owner Pass, Admin Docs, POD)
+                _buildVerificationProofPanel(context, isDark, trip),
+                const SizedBox(height: 24),
 
                 // 3. Driver & Vehicle Profile Cards
                 _buildMetadataProfileRow(context, isDark, trip, driverName, driverPhone, isWebOrDesktop),
@@ -1431,10 +1431,39 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
     final podUrl = (trip['podUrl'] ?? '').toString();
     final remarks = (trip['remarks'] ?? '').toString();
 
+    final passData = trip['truckOwnerPassData'] as Map?;
+    final truckOwnerPassId = (trip['truckOwnerPassId'] ?? passData?['passId'] ?? '').toString();
+    String truckOwnerPassUrl = (trip['truckOwnerPassUrl'] ?? '').toString().trim();
+    if (truckOwnerPassUrl.isEmpty && passData != null) {
+      truckOwnerPassUrl = (passData['passPhotoUrl'] ??
+              passData['passDocumentUrl'] ??
+              passData['adminPhotoUrl'] ??
+              passData['truckOwnerPassUrl'] ??
+              '')
+          .toString()
+          .trim();
+    }
+
+    String destinationDocUrl = (trip['destinationDocUrl'] ?? '').toString().trim();
+    if (destinationDocUrl.isEmpty) {
+      destinationDocUrl = (trip['destinationPhotoUrl'] ??
+              trip['adminDocUrl'] ??
+              trip['adminPhotoUrl'] ??
+              '')
+          .toString()
+          .trim();
+    }
+
+    final hasTruckOwnerPass = (trip['hasTruckOwnerPass'] == true) ||
+        truckOwnerPassId.isNotEmpty ||
+        truckOwnerPassUrl.isNotEmpty ||
+        passData != null;
+
     final hasLoadingProof = loadingPhotoUrl.isNotEmpty || gatePassPhotoUrl.isNotEmpty;
     final hasPodProof = podUrl.isNotEmpty;
+    final hasAdminProof = hasTruckOwnerPass || destinationDocUrl.isNotEmpty;
 
-    if (!hasLoadingProof && !hasPodProof) {
+    if (!hasLoadingProof && !hasPodProof && !hasAdminProof) {
       return const SizedBox.shrink();
     }
 
@@ -1512,7 +1541,56 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
             const SizedBox(height: 24),
           ],
 
-          // B. POD Proof Section
+          // B. Admin & Truck Owner Pass Section
+          if (hasAdminProof) ...[
+            const AppText('TRUCK OWNER PASS & ADMIN DOCUMENTS', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (truckOwnerPassUrl.isNotEmpty) ...[
+                  _buildPhotoThumbnail(context, truckOwnerPassUrl, 'Truck Owner Pass', isDark),
+                  const SizedBox(width: 12),
+                ] else if (hasTruckOwnerPass) ...[
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 24),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                AppText('Truck Owner Pass Issued ✅', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46)),
+                                if (truckOwnerPassId.isNotEmpty)
+                                  AppText('Pass ID: #$truckOwnerPassId', style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+                                if (passData?['ownerName']?.toString().isNotEmpty == true)
+                                  AppText('Owner/Transporter: ${passData!['ownerName']}', style: AppTextStyle.bodyMedium, color: Colors.grey),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                if (destinationDocUrl.isNotEmpty) ...[
+                  _buildPhotoThumbnail(context, destinationDocUrl, 'Destination Doc/Photo', isDark),
+                ],
+              ],
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // C. POD Proof Section
           if (hasPodProof) ...[
             const AppText('PROOF OF DELIVERY (POD)', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey),
             const SizedBox(height: 12),
@@ -1554,7 +1632,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
             const SizedBox(height: 24),
           ],
 
-          // C. Approve / Reject Action row inside the card for awaiting approval
+          // D. Approve / Reject Action row inside the card for awaiting approval
           if (status == 'LOAD_REQUESTED') ...[
             Row(
               children: [
@@ -1630,8 +1708,78 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
   }
 
   Widget _buildPhotoThumbnail(BuildContext context, String url, String label, bool isDark) {
+    final isPdf = DocumentViewerHelper.isPdf(url);
+
+    Uint8List? base64Bytes;
+    bool isBase64 = false;
+    if (!isPdf && (url.startsWith('data:image') || (!url.startsWith('http') && !url.startsWith('/')))) {
+      try {
+        var str = url.trim();
+        if (str.contains(',')) {
+          str = str.split(',').last.trim();
+        }
+        str = str.replaceAll(RegExp(r'\s+'), '');
+        while (str.length % 4 != 0) {
+          str += '=';
+        }
+        base64Bytes = base64Decode(str);
+        if (base64Bytes.isNotEmpty) {
+          isBase64 = true;
+        }
+      } catch (_) {}
+    }
+
+    Widget imageWidget;
+    if (isPdf) {
+      imageWidget = Container(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFFEF2F2),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.picture_as_pdf_rounded, size: 36, color: Colors.redAccent),
+            SizedBox(height: 4),
+            Text('PDF File', style: TextStyle(fontSize: 10, color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      );
+    } else if (isBase64 && base64Bytes != null) {
+      imageWidget = Image.memory(
+        base64Bytes,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => Container(
+          color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+          child: const Center(
+            child: Icon(Icons.broken_image_outlined, size: 24, color: Colors.grey),
+          ),
+        ),
+      );
+    } else if (url.startsWith('/')) {
+      imageWidget = Image.file(
+        File(url),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => Container(
+          color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+          child: const Center(
+            child: Icon(Icons.broken_image_outlined, size: 24, color: Colors.grey),
+          ),
+        ),
+      );
+    } else {
+      imageWidget = CachedNetworkImage(
+        imageUrl: corsSafeImageUrl(url),
+        fit: BoxFit.cover,
+        placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+        errorWidget: (context, url, error) => Container(
+          color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+          child: const Center(
+            child: Icon(Icons.broken_image_outlined, size: 24, color: Colors.grey),
+          ),
+        ),
+      );
+    }
+
     return GestureDetector(
-      onTap: () => _showFullImageDialog(url),
+      onTap: () => DocumentViewerHelper.showDocument(context, url, title: label),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1644,17 +1792,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(11),
-              child: CachedNetworkImage(
-                imageUrl: corsSafeImageUrl(url),
-                fit: BoxFit.cover,
-                placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-                errorWidget: (context, url, error) => Container(
-                  color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
-                  child: const Center(
-                    child: Icon(Icons.broken_image_outlined, size: 24, color: Colors.grey),
-                  ),
-                ),
-              ),
+              child: imageWidget,
             ),
           ),
           const SizedBox(height: 4),
@@ -1664,41 +1802,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
     );
   }
 
-  void _showFullImageDialog(String imageUrl) {
-    final safeUrl = corsSafeImageUrl(imageUrl);
-    Get.dialog(
-      Dialog(
-        backgroundColor: Colors.transparent,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: IconButton(
-                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 30),
-                onPressed: () => Get.back(),
-              ),
-            ),
-            Hero(
-              tag: imageUrl,
-              child: Container(
-                constraints: const BoxConstraints(maxHeight: 500, maxWidth: 500),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: CachedNetworkImage(
-                    imageUrl: safeUrl,
-                    fit: BoxFit.contain,
-                    placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-                    errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Future<void> _approveLoadDirectly(String tripId) async {
     _showTruckOwnerPassApprovalDialog(tripId);
@@ -1710,7 +1814,6 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
     final ownerNameCtrl = TextEditingController();
     final remarksCtrl = TextEditingController();
     String? passPhotoUrl;
-    String? adminPhotoUrl;
 
     Get.dialog(
       StatefulBuilder(
@@ -1836,33 +1939,37 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                     Get.back();
                     AppPopup.showLoading(message: 'Generating Pass & Activating Trip...');
                     try {
+                      String finalPassUrl = passPhotoUrl ?? '';
+                      if (finalPassUrl.isNotEmpty) {
+                        finalPassUrl = await Get.find<FirebaseService>()
+                            .uploadTruckOwnerPassPhoto(tripId, finalPassUrl);
+                      }
+
                       final ownerPassData = {
-                        'passId': passIdCtrl.text.trim(),
+                        'passId': passIdCtrl.text.trim(), 
                         'ownerName': ownerNameCtrl.text.trim(),
                         'remarks': remarksCtrl.text.trim(),
-                        if (passPhotoUrl != null && passPhotoUrl!.isNotEmpty)
-                          'passPhotoUrl': passPhotoUrl,
-                        if (passPhotoUrl != null && passPhotoUrl!.isNotEmpty)
-                          'passDocumentUrl': passPhotoUrl,
+                        if (finalPassUrl.isNotEmpty)
+                          'passPhotoUrl': finalPassUrl,
+                        if (finalPassUrl.isNotEmpty)
+                          'passDocumentUrl': finalPassUrl,
                         'generatedAt': DateTime.now().toString().substring(0, 16),
-                        if (adminPhotoUrl != null && adminPhotoUrl!.isNotEmpty)
-                          'adminPhotoUrl': adminPhotoUrl,
                       };
                       final err = await Get.find<FirebaseService>().approveLoad(
                         tripId,
                         truckOwnerPassId: passIdCtrl.text.trim(),
-                        truckOwnerPassUrl: passPhotoUrl ?? '',
+                        truckOwnerPassUrl: finalPassUrl,
                         truckOwnerPassData: ownerPassData,
                       );
-                      AppPopup.hideLoading();
                       if (err != null) {
                         Get.snackbar('Alert', err, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.orangeAccent);
                       } else {
                         Get.snackbar('Success', 'Truck Owner Pass uploaded & Trip activated! 🚛', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
                       }
                     } catch (e) {
-                      AppPopup.hideLoading();
                       Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent);
+                    } finally {
+                      AppPopup.hideLoading();
                     }
                   }
                 },
@@ -2074,6 +2181,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
     final customerSiteCtrl = TextEditingController(text: (trip['customerSite'] ?? trip['siteName'] ?? '').toString());
     final customerLocCtrl = TextEditingController(text: (trip['dropLocation'] ?? trip['location'] ?? '').toString());
     final detailsCtrl = TextEditingController();
+    String? destinationDocUrl;
     TextEditingController? siteTextController;
     TextEditingController? locTextController;
 
@@ -2104,242 +2212,300 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
         : ["Pune, Maharashtra", "Chennai, Tamil Nadu", "Kolkata, West Bengal", "Delhi NCR", "Nagpur, Maharashtra"];
 
     Get.dialog(
-      AlertDialog(
-        backgroundColor: Theme.of(context).cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.add_location_alt_rounded, color: Color(0xFF3B82F6)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Destination Setup: $truckNo',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+      StatefulBuilder(
+        builder: (context, setStateDialog) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return AlertDialog(
+            backgroundColor: Theme.of(context).cardColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.add_location_alt_rounded, color: Color(0xFF3B82F6)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Destination Setup: $truckNo',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 420,
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const AppText(
+                        'Step 2: Enter destination details. Upload optional photo/PDF document for driver.',
+                        style: AppTextStyle.labelMedium,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 1. Customer Name Autocomplete
+                      Autocomplete<String>(
+                        initialValue: TextEditingValue(text: customerNameCtrl.text),
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          final currentDbNames = adminController.customers
+                              .map((c) => (c['name'] ?? '').toString().trim())
+                              .where((n) => n.isNotEmpty)
+                              .toList();
+                          final currentCustomersList = currentDbNames.isNotEmpty
+                              ? currentDbNames
+                              : customersList;
+
+                          if (textEditingValue.text.isEmpty) {
+                            return currentCustomersList;
+                          }
+                          return currentCustomersList.where((String option) {
+                            return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                          });
+                        },
+                        fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                          textEditingController.addListener(() {
+                            customerNameCtrl.text = textEditingController.text;
+                          });
+                          return TextFormField(
+                            controller: textEditingController,
+                            focusNode: focusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Customer Name',
+                              labelStyle: const TextStyle(fontSize: 12),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              prefixIcon: const Icon(Icons.business_rounded, size: 18),
+                            ),
+                            validator: (value) => value == null || value.trim().isEmpty ? 'Enter customer name' : null,
+                          );
+                        },
+                        onSelected: (String selection) {
+                          customerNameCtrl.text = selection;
+                          final foundCust = adminController.customers.firstWhereOrNull(
+                              (c) => (c['name'] ?? '').toString().trim().toLowerCase() == selection.trim().toLowerCase());
+                          if (foundCust != null) {
+                            final site = (foundCust['siteName'] ?? foundCust['customerSite'] ?? '').toString().trim();
+                            final loc = (foundCust['location'] ?? foundCust['address'] ?? foundCust['city'] ?? '').toString().trim();
+                            if (site.isNotEmpty) {
+                              customerSiteCtrl.text = site;
+                              if (siteTextController != null) {
+                                siteTextController!.text = site;
+                              }
+                            }
+                            if (loc.isNotEmpty) {
+                              customerLocCtrl.text = loc;
+                              if (locTextController != null) {
+                                locTextController!.text = loc;
+                              }
+                            }
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 14),
+
+                      // 2. Customer Site Name Autocomplete
+                      Autocomplete<String>(
+                        initialValue: TextEditingValue(text: customerSiteCtrl.text),
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          final currentDbSites = adminController.customers
+                              .map((c) => (c['siteName'] ?? c['customerSite'] ?? '').toString().trim())
+                              .where((s) => s.isNotEmpty)
+                              .toSet()
+                              .toList();
+                          final currentSitesList = currentDbSites.isNotEmpty
+                              ? currentDbSites
+                              : sitesList;
+
+                          if (textEditingValue.text.isEmpty) {
+                            return currentSitesList;
+                          }
+                          return currentSitesList.where((String option) {
+                            return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                          });
+                        },
+                        fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                          siteTextController = textEditingController;
+                          textEditingController.addListener(() {
+                            customerSiteCtrl.text = textEditingController.text;
+                          });
+                          return TextFormField(
+                            controller: textEditingController,
+                            focusNode: focusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Customer Site Name',
+                              labelStyle: const TextStyle(fontSize: 12),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              prefixIcon: const Icon(Icons.factory_rounded, size: 18),
+                            ),
+                          );
+                        },
+                        onSelected: (String selection) {
+                          customerSiteCtrl.text = selection;
+                        },
+                      ),
+                      const SizedBox(height: 14),
+
+                      // 3. Customer Location / Address Autocomplete
+                      Autocomplete<String>(
+                        initialValue: TextEditingValue(text: customerLocCtrl.text),
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          final currentDbLocs = adminController.customers
+                              .map((c) => (c['location'] ?? c['address'] ?? c['city'] ?? '').toString().trim())
+                              .where((l) => l.isNotEmpty)
+                              .toSet()
+                              .toList();
+                          final currentLocsList = currentDbLocs.isNotEmpty
+                              ? currentDbLocs
+                              : locationsList;
+
+                          if (textEditingValue.text.isEmpty) {
+                            return currentLocsList;
+                          }
+                          return currentLocsList.where((String option) {
+                            return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                          });
+                        },
+                        fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                          locTextController = textEditingController;
+                          textEditingController.addListener(() {
+                            customerLocCtrl.text = textEditingController.text;
+                          });
+                          return TextFormField(
+                            controller: textEditingController,
+                            focusNode: focusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Delivery Address / Location',
+                              labelStyle: const TextStyle(fontSize: 12),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              prefixIcon: const Icon(Icons.pin_drop_rounded, size: 18),
+                            ),
+                            validator: (value) => value == null || value.trim().isEmpty ? 'Enter delivery location' : null,
+                          );
+                        },
+                        onSelected: (String selection) {
+                          customerLocCtrl.text = selection;
+                        },
+                      ),
+                      const SizedBox(height: 14),
+
+                      // 4. Additional destination details
+                      TextFormField(
+                        controller: detailsCtrl,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: 'Additional Destination Details',
+                          labelStyle: const TextStyle(fontSize: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          prefixIcon: const Icon(Icons.description_rounded, size: 18),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // 5. Destination Document / Photo Attachment (Optional)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white10 : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              destinationDocUrl != null ? Icons.check_circle_rounded : Icons.upload_file_rounded,
+                              color: destinationDocUrl != null ? Colors.green : Colors.blue,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                destinationDocUrl != null ? 'Destination Document Attached ✅' : 'Upload Destination Document / Photo',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                final url = await ImagePickerHelper.pickImageAsBase64(context, isDark);
+                                if (url != null) {
+                                  setStateDialog(() {
+                                    destinationDocUrl = url;
+                                  });
+                                }
+                              },
+                              child: Text(destinationDocUrl != null ? 'Change' : 'Attach'),
+                            ),
+                            if (destinationDocUrl != null)
+                              IconButton(
+                                icon: const Icon(Icons.close_rounded, size: 18, color: Colors.red),
+                                onPressed: () {
+                                  setStateDialog(() {
+                                    destinationDocUrl = null;
+                                  });
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-          ],
-        ),
-        content: SizedBox(
-          width: 420,
-          child: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const AppText(
-                    'Step 2: Enter destination details. "Save & Next" will launch the Create Trip wizard.',
-                    style: AppTextStyle.labelMedium,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // 1. Customer Name Autocomplete
-                  Autocomplete<String>(
-                    initialValue: TextEditingValue(text: customerNameCtrl.text),
-                    optionsBuilder: (TextEditingValue textEditingValue) {
-                      final currentDbNames = adminController.customers
-                          .map((c) => (c['name'] ?? '').toString().trim())
-                          .where((n) => n.isNotEmpty)
-                          .toList();
-                      final currentCustomersList = currentDbNames.isNotEmpty
-                          ? currentDbNames
-                          : customersList;
-
-                      if (textEditingValue.text.isEmpty) {
-                        return currentCustomersList;
-                      }
-                      return currentCustomersList.where((String option) {
-                        return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
-                      });
-                    },
-                    fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
-                      textEditingController.addListener(() {
-                        customerNameCtrl.text = textEditingController.text;
-                      });
-                      return TextFormField(
-                        controller: textEditingController,
-                        focusNode: focusNode,
-                        decoration: InputDecoration(
-                          labelText: 'Customer Name',
-                          labelStyle: const TextStyle(fontSize: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          prefixIcon: const Icon(Icons.business_rounded, size: 18),
-                        ),
-                        validator: (value) => value == null || value.trim().isEmpty ? 'Enter customer name' : null,
-                      );
-                    },
-                    onSelected: (String selection) {
-                      customerNameCtrl.text = selection;
-                      final foundCust = adminController.customers.firstWhereOrNull(
-                          (c) => (c['name'] ?? '').toString().trim().toLowerCase() == selection.trim().toLowerCase());
-                      if (foundCust != null) {
-                        final site = (foundCust['siteName'] ?? foundCust['customerSite'] ?? '').toString().trim();
-                        final loc = (foundCust['location'] ?? foundCust['address'] ?? foundCust['city'] ?? '').toString().trim();
-                        if (site.isNotEmpty) {
-                          customerSiteCtrl.text = site;
-                          if (siteTextController != null) {
-                            siteTextController!.text = site;
-                          }
-                        }
-                        if (loc.isNotEmpty) {
-                          customerLocCtrl.text = loc;
-                          if (locTextController != null) {
-                            locTextController!.text = loc;
-                          }
-                        }
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 2. Customer Site Name Autocomplete
-                  Autocomplete<String>(
-                    initialValue: TextEditingValue(text: customerSiteCtrl.text),
-                    optionsBuilder: (TextEditingValue textEditingValue) {
-                      final currentDbSites = adminController.customers
-                          .map((c) => (c['siteName'] ?? c['customerSite'] ?? '').toString().trim())
-                          .where((s) => s.isNotEmpty)
-                          .toSet()
-                          .toList();
-                      final currentSitesList = currentDbSites.isNotEmpty
-                          ? currentDbSites
-                          : sitesList;
-
-                      if (textEditingValue.text.isEmpty) {
-                        return currentSitesList;
-                      }
-                      return currentSitesList.where((String option) {
-                        return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
-                      });
-                    },
-                    fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
-                      siteTextController = textEditingController;
-                      textEditingController.addListener(() {
-                        customerSiteCtrl.text = textEditingController.text;
-                      });
-                      return TextFormField(
-                        controller: textEditingController,
-                        focusNode: focusNode,
-                        decoration: InputDecoration(
-                          labelText: 'Customer Site Name',
-                          labelStyle: const TextStyle(fontSize: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          prefixIcon: const Icon(Icons.factory_rounded, size: 18),
-                        ),
-                      );
-                    },
-                    onSelected: (String selection) {
-                      customerSiteCtrl.text = selection;
-                    },
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 3. Customer Location / Address Autocomplete
-                  Autocomplete<String>(
-                    initialValue: TextEditingValue(text: customerLocCtrl.text),
-                    optionsBuilder: (TextEditingValue textEditingValue) {
-                      final currentDbLocs = adminController.customers
-                          .map((c) => (c['location'] ?? c['address'] ?? c['city'] ?? '').toString().trim())
-                          .where((l) => l.isNotEmpty)
-                          .toSet()
-                          .toList();
-                      final currentLocsList = currentDbLocs.isNotEmpty
-                          ? currentDbLocs
-                          : locationsList;
-
-                      if (textEditingValue.text.isEmpty) {
-                        return currentLocsList;
-                      }
-                      return currentLocsList.where((String option) {
-                        return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
-                      });
-                    },
-                    fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
-                      locTextController = textEditingController;
-                      textEditingController.addListener(() {
-                        customerLocCtrl.text = textEditingController.text;
-                      });
-                      return TextFormField(
-                        controller: textEditingController,
-                        focusNode: focusNode,
-                        decoration: InputDecoration(
-                          labelText: 'Delivery Address / Location',
-                          labelStyle: const TextStyle(fontSize: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          prefixIcon: const Icon(Icons.pin_drop_rounded, size: 18),
-                        ),
-                        validator: (value) => value == null || value.trim().isEmpty ? 'Enter delivery location' : null,
-                      );
-                    },
-                    onSelected: (String selection) {
-                      customerLocCtrl.text = selection;
-                    },
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 4. Additional destination details
-                  TextFormField(
-                    controller: detailsCtrl,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      labelText: 'Additional Destination Details',
-                      labelStyle: const TextStyle(fontSize: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      prefixIcon: const Icon(Icons.description_rounded, size: 18),
-                    ),
-                  ),
-                ],
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('Cancel'),
               ),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF3B82F6),
-              foregroundColor: Colors.white,
-              elevation: 0,
-            ),
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) return;
-              final siteVal = customerSiteCtrl.text.trim();
-              final locVal = customerLocCtrl.text.trim();
-              final combinedSite = (siteVal.isNotEmpty && locVal.isNotEmpty)
-                  ? '$siteVal ($locVal)'
-                  : (siteVal.isNotEmpty ? siteVal : locVal);
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF3B82F6),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                ),
+                onPressed: () async {
+                  if (!formKey.currentState!.validate()) return;
+                  final siteVal = customerSiteCtrl.text.trim();
+                  final locVal = customerLocCtrl.text.trim();
+                  final combinedSite = (siteVal.isNotEmpty && locVal.isNotEmpty)
+                      ? '$siteVal ($locVal)'
+                      : (siteVal.isNotEmpty ? siteVal : locVal);
 
-              final data = {
-                'customerName': customerNameCtrl.text.trim(),
-                'customerSite': combinedSite,
-                'siteName': siteVal,
-                'customerLocation': locVal,
-                'additionalDetails': detailsCtrl.text.trim(),
-              };
-              Get.back();
-              AppPopup.showLoading(message: 'Saving Destination...');
-              try {
-                // Update Firestore for trip
-                await controller.setDestination(tripId, data['customerName']!, combinedSite);
-                
-                // Update active truck config if truckNo is valid
-                if (truckNo.isNotEmpty && truckNo != '-') {
-                  await Get.find<FirebaseService>().saveDestinationSetup(truckNo, data);
-                }
-                AppPopup.hideLoading();
-              } catch (e) {
-                AppPopup.hideLoading();
-                Get.snackbar('Error', e.toString());
-              }
-            },
-            child: const Text('Save', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+                  final data = {
+                    'customerName': customerNameCtrl.text.trim(),
+                    'customerSite': combinedSite,
+                    'siteName': siteVal,
+                    'customerLocation': locVal,
+                    'additionalDetails': detailsCtrl.text.trim(),
+                    if (destinationDocUrl != null && destinationDocUrl!.isNotEmpty)
+                      'destinationDocUrl': destinationDocUrl,
+                  };
+                  Get.back();
+                  AppPopup.showLoading(message: 'Saving Destination...');
+                  try {
+                    // Update Firestore for trip
+                    await adminController.setDestination(
+                      tripId,
+                      data['customerName']!,
+                      combinedSite,
+                      destinationDocUrl: destinationDocUrl,
+                    );
+                    
+                    // Update active truck config if truckNo is valid
+                    if (truckNo.isNotEmpty && truckNo != '-') {
+                      await Get.find<FirebaseService>().saveDestinationSetup(truckNo, data);
+                    }
+                    AppPopup.hideLoading();
+                  } catch (e) {
+                    AppPopup.hideLoading();
+                    Get.snackbar('Error', e.toString());
+                  }
+                },
+                child: const Text('Save', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -131,6 +131,29 @@ class TripDetailsController extends GetxController {
             hasCoords = true;
           }
 
+          tripExtra.value = {
+            'id': trip.id,
+            'truckNo': trip.truckNo,
+            'status': trip.status,
+            'loadingPhotoUrl': trip.loadingPhotoUrl ?? '',
+            'gatePassPhotoUrl': trip.gatePassPhotoUrl ?? '',
+            'truckOwnerPassUrl': trip.truckOwnerPassUrl,
+            'truckOwnerPassData': trip.truckOwnerPassData,
+            'podUrl': trip.podUrl ?? '',
+            'podPhotoUrl': trip.podUrl ?? '',
+            'remarks': trip.remarks ?? '',
+            'vendorName': trip.vendorName,
+            'vendorLocation': trip.vendorLocation,
+            'materialName': trip.materialName,
+            'productName': trip.productName,
+            'passHolderName': trip.passHolderName,
+            'royaltyName': trip.royaltyName,
+            'loadingPassId': trip.loadingPassId,
+            'minPassId': trip.minPassId,
+            'maxPassId': trip.maxPassId,
+            'pickupDistrict': trip.pickupDistrict,
+          };
+
           if (trip.status == 'DELIVERED') {
             isJourneyStarted.value = true;
             currentMilestone.value = 4;
@@ -245,7 +268,8 @@ class TripDetailsController extends GetxController {
 
   void _applyLiveStatus(Map<String, dynamic> data) {
     tripStatus.value = (data['status'] ?? '').toString();
-    tripExtra.value = data;
+    final current = tripExtra.value ?? {};
+    tripExtra.value = {...current, ...data};
 
     // Destination stays hidden until the load is approved.
     if (destinationRevealed &&

@@ -187,23 +187,7 @@ service cloud.firestore {
     // NOTIFICATIONS
     // =========================
     match /notifications/{noteId} {
-
-      allow read:
-          if isSignedIn() && (
-            isPhoneMatch(resource.data.toPhone) ||
-            resource.data.toPhone == 'admin' ||
-            isAdmin()
-          );
-
-      allow create:
-          if isSignedIn();
-
-      allow update, delete:
-          if isSignedIn() && (
-            isPhoneMatch(resource.data.toPhone) ||
-            resource.data.toPhone == 'admin' ||
-            isAdmin()
-          );
+      allow read, write: if true;
     }
 
     // =========================

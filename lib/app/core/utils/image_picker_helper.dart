@@ -30,8 +30,12 @@ class ImagePickerHelper {
 
   static Future<PickedFileResult?> _pickImage(ImageSource source) async {
     try {
-      final XFile? image =
-          await _picker.pickImage(source: source, imageQuality: 80);
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        imageQuality: 70,
+        maxWidth: 1024,
+        maxHeight: 1024,
+      );
       if (image == null) return null;
       return PickedFileResult(image.name, await image.readAsBytes());
     } catch (_) {

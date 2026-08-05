@@ -126,7 +126,8 @@ class DashboardView extends GetView<DashboardController> {
           children: [
             const Row(
               children: [
-                Icon(Icons.check_circle_rounded, color: AppColors.primaryDark, size: 20),
+                Icon(Icons.check_circle_rounded,
+                    color: AppColors.primaryDark, size: 20),
                 SizedBox(width: 8),
                 Expanded(
                   child: AppText(
@@ -151,9 +152,11 @@ class DashboardView extends GetView<DashboardController> {
                 backgroundColor: AppColors.primaryDark,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text('Accept Truck', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('Accept Truck',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -168,8 +171,7 @@ class DashboardView extends GetView<DashboardController> {
         Obx(() => CircleAvatar(
               radius: 22,
               backgroundColor: AppColors.primaryLight,
-              backgroundImage:
-                  _getImageProvider(controller.avatarUrl.value),
+              backgroundImage: _getImageProvider(controller.avatarUrl.value),
             )),
         const SizedBox(width: 12),
         Expanded(
@@ -192,33 +194,33 @@ class DashboardView extends GetView<DashboardController> {
                           overflow: TextOverflow.ellipsis,
                         )),
                   ),
-                  if (Get.isRegistered<ClockInService>())
-                    Obx(() {
-                      final cs = Get.find<ClockInService>();
-                      if (!cs.isClockedIn.value) return const SizedBox.shrink();
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            const CircleAvatar(radius: 3.5, backgroundColor: AppColors.primary),
-                            const SizedBox(width: 5),
-                            Text(
-                              'On Duty • ${cs.shiftDurationText.value}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
+                  // if (Get.isRegistered<ClockInService>())
+                  //   Obx(() {
+                  //     final cs = Get.find<ClockInService>();
+                  //     if (!cs.isClockedIn.value) return const SizedBox.shrink();
+                  //     return Container(
+                  //       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  //       decoration: BoxDecoration(
+                  //         color: AppColors.primary.withOpacity(0.12),
+                  //         borderRadius: BorderRadius.circular(12),
+                  //         border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                  //       ),
+                  //       child: Row(
+                  //         children: [
+                  //           const CircleAvatar(radius: 3.5, backgroundColor: AppColors.primary),
+                  //           const SizedBox(width: 5),
+                  //           Text(
+                  //             'On Duty • ${cs.shiftDurationText.value}',
+                  //             style: const TextStyle(
+                  //               fontSize: 11,
+                  //               fontWeight: FontWeight.bold,
+                  //               color: AppColors.primary,
+                  //             ),
+                  //           ),
+                  //         ],
+                  //       ),
+                  //     );
+                  //   }),
                 ],
               ),
             ],
@@ -247,8 +249,8 @@ class DashboardView extends GetView<DashboardController> {
   Widget _buildMyTruckCard() {
     return Obx(() {
       final truck = controller.myTruck.value;
-      final truckNo = (truck?['truckNo'] ?? controller.vehicleNo.value)
-          .toString();
+      final truckNo =
+          (truck?['truckNo'] ?? controller.vehicleNo.value).toString();
       final model =
           (truck?['model'] ?? controller.vehicleModel.value).toString();
       return Container(
@@ -366,8 +368,7 @@ class DashboardView extends GetView<DashboardController> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppText(label,
-                      style: AppTextStyle.labelMedium, color: tint),
+                  AppText(label, style: AppTextStyle.labelMedium, color: tint),
                   const SizedBox(height: 2),
                   AppText(value,
                       style: AppTextStyle.bodyLarge,
@@ -465,17 +466,14 @@ class DashboardView extends GetView<DashboardController> {
         mainAxisSpacing: 10,
         childAspectRatio: 1.15,
         children: [
-          tile(Icons.local_shipping_rounded, 'My Trips', AppColors.primary,
-              () {
+          tile(Icons.local_shipping_rounded, 'My Trips', AppColors.primary, () {
             if (!controller.ensureCheckedIn()) return;
             home.changeTabIndex(1);
           }),
-          tile(Icons.fact_check_rounded, 'Inspection', AppColors.info,
-              () {
+          tile(Icons.fact_check_rounded, 'Inspection', AppColors.info, () {
             if (!controller.ensureCheckedIn()) return;
             home.changeTabIndex(3);
-          },
-              badge: inspectionBadge),
+          }, badge: inspectionBadge),
           tile(Icons.workspace_premium_rounded, 'Pass & Royalty',
               const Color(0xFF7E22CE), () {
             if (!controller.ensureCheckedIn()) return;
@@ -498,8 +496,7 @@ class DashboardView extends GetView<DashboardController> {
               Get.find<ProfileController>().selectSubTab(1);
             } catch (_) {}
           }),
-          tile(Icons.currency_rupee_rounded, 'Earnings', AppColors.success,
-              () {
+          tile(Icons.currency_rupee_rounded, 'Earnings', AppColors.success, () {
             if (!controller.ensureCheckedIn()) return;
             home.changeTabIndex(2);
           }),
@@ -507,8 +504,7 @@ class DashboardView extends GetView<DashboardController> {
               () {
             if (!controller.ensureCheckedIn()) return;
             const NotificationBell().open(context);
-          },
-              badge: notifBadge),
+          }, badge: notifBadge),
         ],
       );
     });
@@ -533,7 +529,8 @@ class DashboardView extends GetView<DashboardController> {
       switch (trip.status) {
         case 'EN_ROUTE_VENDOR':
           done = 0;
-          info = 'You are on the way to ${trip.vendorLocation.isEmpty ? trip.pickupLocation : trip.vendorLocation}';
+          info =
+              'You are on the way to ${trip.vendorLocation.isEmpty ? trip.pickupLocation : trip.vendorLocation}';
           break;
         case 'LOADING':
         case 'LOAD_REJECTED':
@@ -606,9 +603,7 @@ class DashboardView extends GetView<DashboardController> {
                     child: Container(
                       height: 3,
                       margin: const EdgeInsets.only(top: 11),
-                      color: idx < done
-                          ? AppColors.success
-                          : AppColors.border,
+                      color: idx < done ? AppColors.success : AppColors.border,
                     ),
                   );
                 }
@@ -680,7 +675,9 @@ class DashboardView extends GetView<DashboardController> {
                     borderRadius: BorderRadius.circular(13),
                   ),
                   child: Icon(
-                    onDuty ? Icons.check_circle_rounded : Icons.nightlight_round,
+                    onDuty
+                        ? Icons.check_circle_rounded
+                        : Icons.nightlight_round,
                     color: accent,
                     size: 24,
                   ),
@@ -746,8 +743,7 @@ class DashboardView extends GetView<DashboardController> {
     return BoxDecoration(
       color: isDark ? const Color(0xFF1E293B) : Colors.white,
       borderRadius: BorderRadius.circular(16),
-      border:
-          Border.all(color: isDark ? Colors.white10 : AppColors.border),
+      border: Border.all(color: isDark ? Colors.white10 : AppColors.border),
     );
   }
 
@@ -761,7 +757,8 @@ class DashboardView extends GetView<DashboardController> {
           Container(
             height: 160,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: AppColors.charcoalGradient),
+              gradient:
+                  const LinearGradient(colors: AppColors.charcoalGradient),
               borderRadius: BorderRadius.circular(24),
             ),
             child: const Center(
