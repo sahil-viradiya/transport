@@ -21,8 +21,8 @@ class AppPopup {
       AlertDialog(
         backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: AppText(title, style: AppTextStyle.headlineSmall),
-        content: AppText(description, style: AppTextStyle.bodyMedium),
+        title: AppText(title.tr, style: AppTextStyle.headlineSmall),
+        content: AppText(description.tr, style: AppTextStyle.bodyMedium),
         actions: [
           TextButton(
             onPressed: () {
@@ -34,7 +34,7 @@ class AppPopup {
               if (onCancel != null) onCancel();
             },
             child: AppText(
-              cancelText,
+              cancelText.tr,
               style: AppTextStyle.labelLarge,
               color: isDark ? Colors.white60 : AppColors.textSecondary,
             ),
@@ -53,7 +53,7 @@ class AppPopup {
               if (onConfirm != null) onConfirm();
             },
             child: AppText(
-              confirmText,
+              confirmText.tr,
               style: AppTextStyle.labelLarge,
               color: Colors.white,
             ),
@@ -85,7 +85,7 @@ class AppPopup {
                 ),
                 const SizedBox(height: 16),
                 AppText(
-                  message,
+                  message.tr,
                   style: AppTextStyle.bodyMedium,
                 ),
               ],

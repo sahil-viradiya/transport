@@ -8,6 +8,7 @@ import '../../../../widgets/app_button.dart';
 import '../../dashboard/controllers/dashboard_controller.dart';
 import '../../../core/utils/image_url.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/config/app_config.dart';
 import '../controllers/profile_controller.dart';
 
 class ProfileView extends GetView<ProfileController> {
@@ -491,14 +492,19 @@ class ProfileView extends GetView<ProfileController> {
           ),
         ),
 
+        const SizedBox(height: 8),
+
+        // 6. Language Switcher Card
+        _buildLanguageCard(isDark),
+
         const SizedBox(height: 16),
 
-        // 6. Logout Action Button
+        // 7. Logout Action Button
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: OutlinedButton.icon(
             icon: const Icon(Icons.logout_rounded, color: AppColors.error),
-            label: const AppText('Logout',
+            label: AppText('logout'.tr,
                 style: AppTextStyle.bodyLarge,
                 color: AppColors.error,
                 fontWeight: FontWeight.bold),
@@ -959,6 +965,95 @@ class ProfileView extends GetView<ProfileController> {
             fontWeight: FontWeight.bold,
             color: isDark ? Colors.white : AppColors.textPrimary),
       ],
+    );
+  }
+
+  // Language Switcher Card
+  Widget _buildLanguageCard(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+            color: isDark ? Colors.white10 : AppColors.border, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.language_rounded, color: AppColors.primary, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: AppText(
+                  'select_language'.tr,
+                  style: AppTextStyle.bodyLarge,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Obx(() {
+            final currentLang = AppConfig.currentLocale.value.languageCode;
+            return Row(
+              children: [
+                Expanded(
+                  child: ChoiceChip(
+                    label: Container(
+                      width: double.infinity,
+                      alignment: Alignment.center,
+                      child: Text(
+                        'english_lang'.tr,
+                        style: TextStyle(
+                          color: currentLang == 'en' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    selected: currentLang == 'en',
+                    selectedColor: AppColors.primary,
+                    backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                    onSelected: (selected) {
+                      if (selected) {
+                        AppConfig.changeLanguage('en');
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ChoiceChip(
+                    label: Container(
+                      width: double.infinity,
+                      alignment: Alignment.center,
+                      child: Text(
+                        'hindi_lang'.tr,
+                        style: TextStyle(
+                          color: currentLang == 'hi' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    selected: currentLang == 'hi',
+                    selectedColor: AppColors.primary,
+                    backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                    onSelected: (selected) {
+                      if (selected) {
+                        AppConfig.changeLanguage('hi');
+                      }
+                    },
+                  ),
+                ),
+              ],
+            );
+          }),
+        ],
+      ),
     );
   }
 }

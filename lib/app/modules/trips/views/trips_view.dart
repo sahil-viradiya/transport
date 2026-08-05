@@ -28,7 +28,7 @@ class TripsView extends GetView<TripsController> {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : AppColors.background,
       appBar: AppBar(
-        title: const AppText('My Trips',
+        title: AppText('my_trips'.tr,
             style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
       ),
       body: Column(
@@ -52,6 +52,15 @@ class TripsView extends GetView<TripsController> {
                 final tab = filterTabs[index];
                 return Obx(() {
                   final isSelected = controller.activeTab.value == tab;
+                  final label = tab == 'Today'
+                      ? 'today'.tr
+                      : (tab == 'All'
+                          ? 'all'.tr
+                          : (tab == 'Upcoming'
+                              ? 'upcoming'.tr
+                              : (tab == 'Ongoing'
+                                  ? 'ongoing'.tr
+                                  : 'completedTrips'.tr)));
                   return GestureDetector(
                     onTap: () => controller.selectTab(tab),
                     child: Container(
@@ -70,7 +79,7 @@ class TripsView extends GetView<TripsController> {
                       ),
                       child: Center(
                         child: AppText(
-                          tab,
+                          label,
                           style: AppTextStyle.labelMedium,
                           color: isSelected
                               ? Colors.white

@@ -13,7 +13,6 @@ import '../../../../widgets/notification_bell.dart';
 import '../../../data/notifications_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../routes/app_pages.dart';
-import '../../../data/services/clock_in_service.dart';
 import '../../../../widgets/dialogs/app_snackbar.dart';
 
 /// Reference driver dashboard: greeting header, green My Truck card, Today's
@@ -466,15 +465,15 @@ class DashboardView extends GetView<DashboardController> {
         mainAxisSpacing: 10,
         childAspectRatio: 1.15,
         children: [
-          tile(Icons.local_shipping_rounded, 'My Trips', AppColors.primary, () {
+          tile(Icons.local_shipping_rounded, 'my_trips'.tr, AppColors.primary, () {
             if (!controller.ensureCheckedIn()) return;
             home.changeTabIndex(1);
           }),
-          tile(Icons.fact_check_rounded, 'Inspection', AppColors.info, () {
+          tile(Icons.fact_check_rounded, 'inspection'.tr, AppColors.info, () {
             if (!controller.ensureCheckedIn()) return;
             home.changeTabIndex(3);
           }, badge: inspectionBadge),
-          tile(Icons.workspace_premium_rounded, 'Pass & Royalty',
+          tile(Icons.workspace_premium_rounded, 'pass_and_royalty'.tr,
               const Color(0xFF7E22CE), () {
             if (!controller.ensureCheckedIn()) return;
             final trip = controller.currentTrip;
@@ -488,7 +487,7 @@ class DashboardView extends GetView<DashboardController> {
               arguments: {'tripId': trip.id, 'isAlreadyActive': trip.isActive},
             );
           }),
-          tile(Icons.description_rounded, 'Documents', AppColors.tertiaryDark,
+          tile(Icons.description_rounded, 'driver_documents'.tr, AppColors.tertiaryDark,
               () {
             if (!controller.ensureCheckedIn()) return;
             home.changeTabIndex(4);
@@ -496,11 +495,11 @@ class DashboardView extends GetView<DashboardController> {
               Get.find<ProfileController>().selectSubTab(1);
             } catch (_) {}
           }),
-          tile(Icons.currency_rupee_rounded, 'Earnings', AppColors.success, () {
+          tile(Icons.currency_rupee_rounded, 'earnings'.tr, AppColors.success, () {
             if (!controller.ensureCheckedIn()) return;
             home.changeTabIndex(2);
           }),
-          tile(Icons.notifications_rounded, 'Notifications', AppColors.error,
+          tile(Icons.notifications_rounded, 'notifications'.tr, AppColors.error,
               () {
             if (!controller.ensureCheckedIn()) return;
             const NotificationBell().open(context);

@@ -71,7 +71,7 @@ class AppSnackBar {
     if (Get.overlayContext == null) return;
     Get.rawSnackbar(
       titleText: Text(
-        title,
+        title.tr,
         style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.bold,
@@ -79,7 +79,7 @@ class AppSnackBar {
         ),
       ),
       messageText: Text(
-        message,
+        message.tr,
         style: const TextStyle(
           color: Colors.white,
           fontSize: 12,

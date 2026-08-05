@@ -40,32 +40,32 @@ class HomeView extends GetView<HomeController> {
               onDestinationSelected: controller.changeTabIndex,
               backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
               indicatorColor: AppColors.primaryLight,
-              destinations: const [
+              destinations: [
                 NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home_rounded, color: AppColors.primary),
-                  label: 'Home',
+                  icon: const Icon(Icons.home_outlined),
+                  selectedIcon: const Icon(Icons.home_rounded, color: AppColors.primary),
+                  label: 'home'.tr,
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.local_shipping_outlined),
-                  selectedIcon: Icon(Icons.local_shipping_rounded, color: AppColors.primary),
-                  label: 'Trips',
+                  icon: const Icon(Icons.local_shipping_outlined),
+                  selectedIcon: const Icon(Icons.local_shipping_rounded, color: AppColors.primary),
+                  label: 'trips'.tr,
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.receipt_long_outlined),
-                  selectedIcon: Icon(Icons.receipt_long_rounded, color: AppColors.primary),
-                  label: 'Expenses',
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  selectedIcon: const Icon(Icons.receipt_long_rounded, color: AppColors.primary),
+                  label: 'expenses'.tr,
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.fact_check_outlined),
+                  icon: const Icon(Icons.fact_check_outlined),
                   selectedIcon:
-                      Icon(Icons.fact_check_rounded, color: AppColors.primary),
-                  label: 'Inspection',
+                      const Icon(Icons.fact_check_rounded, color: AppColors.primary),
+                  label: 'inspection'.tr,
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.person_outline_rounded),
-                  selectedIcon: Icon(Icons.person_rounded, color: AppColors.primary),
-                  label: 'Profile',
+                  icon: const Icon(Icons.person_outline_rounded),
+                  selectedIcon: const Icon(Icons.person_rounded, color: AppColors.primary),
+                  label: 'profile'.tr,
                 ),
               ],
             )),
