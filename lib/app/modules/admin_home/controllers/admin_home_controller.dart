@@ -626,6 +626,7 @@ class AdminHomeController extends GetxController {
         'isActive': trip.isActive,
         'priority': trip.priority,
         'currentMilestone': trip.currentMilestone,
+        'tripSequence': trip.tripSequence,
         'vendorName': trip.vendorName,
         'vendorLocation': trip.vendorLocation,
         'materialName': trip.materialName,
@@ -655,6 +656,60 @@ class AdminHomeController extends GetxController {
         'truckOwnerPassUrl': trip.truckOwnerPassUrl,
         'truckOwnerPassData': trip.truckOwnerPassData,
       };
+
+  /// Returns all trips assigned to a specific driver, sorted by trip sequence.
+  List<Map<String, dynamic>> driverTrips(String driverPhone) {
+    if (driverPhone.isEmpty) return [];
+    final norm = SessionService.normalizePhone(driverPhone);
+    final list = trips.where((t) {
+      final p = (t['driverPhone'] ?? '').toString();
+      return p == driverPhone || SessionService.normalizePhone(p) == norm;
+    }).toList();
+    list.sort((a, b) {
+      final seqA = (a['tripSequence'] as num?)?.toInt() ?? 1;
+      final seqB = (b['tripSequence'] as num?)?.toInt() ?? 1;
+      return seqA.compareTo(seqB);
+    });
+    return list;
+  }
+
+  /// Count of non-delivered, non-rejected active/queued trips for a driver.
+  int driverActiveTripCount(String driverPhone) {
+    return driverTrips(driverPhone)
+        .where((t) => t['status'] != 'DELIVERED' && t['status'] != 'REJECTED')
+        .length;
+  }
+
+  /// Label showing trip sequence status (e.g., "Trip #1", "Trip #2 (Queued)")
+  String tripSequenceLabel(Map<String, dynamic> trip) {
+    final phone = (trip['driverPhone'] ?? '').toString();
+    final dTrips = driverTrips(phone);
+    if (dTrips.length <= 1) {
+      return '';
+    }
+    final seq = (trip['tripSequence'] as num?)?.toInt() ?? 1;
+    final status = (trip['status'] ?? '').toString();
+    if (status == 'DELIVERED' || status == 'REJECTED') {
+      return 'Trip #$seq';
+    } else {
+      // Check if there is an earlier unfinished trip
+      final idx = dTrips.indexWhere((t) => t['id'] == trip['id']);
+      if (idx > 0) {
+        bool priorUnfinished = false;
+        for (int i = 0; i < idx; i++) {
+          final s = (dTrips[i]['status'] ?? '').toString();
+          if (s != 'DELIVERED' && s != 'REJECTED') {
+            priorUnfinished = true;
+            break;
+          }
+        }
+        if (priorUnfinished) {
+          return 'Trip #$seq (Queued)';
+        }
+      }
+      return 'Trip #$seq';
+    }
+  }
 
   void changeTabIndex(int index) {
     currentTabIndex.value = index;
@@ -802,11 +857,34 @@ class AdminHomeController extends GetxController {
 
   /// The driver's running (not delivered/rejected) trip, for assigned-truck
   /// card details on the dashboard.
-  Map<String, dynamic>? currentTripForDriver(String phone) =>
-      trips.firstWhereOrNull((t) =>
-          (t['driverPhone'] ?? '').toString() == phone &&
-          t['status'] != 'DELIVERED' &&
-          t['status'] != 'REJECTED');
+  Map<String, dynamic>? currentTripForDriver(String phone) {
+    if (phone.trim().isEmpty) return null;
+    final norm = SessionService.normalizePhone(phone);
+    final driverMatchingTrips = trips.where((t) {
+      final p = (t['driverPhone'] ?? '').toString();
+      final status = (t['status'] ?? '').toString();
+      return (p == phone || SessionService.normalizePhone(p) == norm) &&
+          status != 'DELIVERED' &&
+          status != 'REJECTED';
+    }).toList();
+
+    if (driverMatchingTrips.isEmpty) return null;
+
+    // Prioritize ongoing trips and lower tripSequence
+    driverMatchingTrips.sort((a, b) {
+      final seqA = (a['tripSequence'] as num?)?.toInt() ?? 1;
+      final seqB = (b['tripSequence'] as num?)?.toInt() ?? 1;
+      if (seqA != seqB) return seqA.compareTo(seqB);
+
+      final isOngoingA = a['status'] != 'PENDING';
+      final isOngoingB = b['status'] != 'PENDING';
+      if (isOngoingA != isOngoingB) return isOngoingA ? -1 : 1;
+
+      return (a['id'] ?? '').toString().compareTo((b['id'] ?? '').toString());
+    });
+
+    return driverMatchingTrips.first;
+  }
 
   Future<void> completeTrip(String tripId) async {
     AppPopup.showLoading(message: 'Completing trip...');

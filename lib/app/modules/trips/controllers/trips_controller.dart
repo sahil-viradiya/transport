@@ -87,9 +87,49 @@ class TripsController extends GetxController {
     }
   }
 
+  /// Returns true if [trip] is unlocked and visible to the driver.
+  /// Trip 1 is always unlocked. Trip N is locked if any prior trip in sequence
+  /// assigned to this driver has not been completed (status is not DELIVERED or REJECTED).
+  bool isTripUnlockedForDriver(TripItemModel trip) {
+    if (allTrips.isEmpty) return true;
+
+    // Sort all driver trips by tripSequence ascending, then id
+    final sorted = List<TripItemModel>.from(allTrips);
+    sorted.sort((a, b) {
+      final seqA = a.tripSequence;
+      final seqB = b.tripSequence;
+      if (seqA != seqB) return seqA.compareTo(seqB);
+      return a.id.compareTo(b.id);
+    });
+
+    final targetIdx = sorted.indexWhere((t) => t.id == trip.id);
+    if (targetIdx <= 0) {
+      // First trip in sequence is always unlocked
+      return true;
+    }
+
+    // Check if ALL trips prior to this trip are finished (DELIVERED or REJECTED)
+    for (int i = 0; i < targetIdx; i++) {
+      final prior = sorted[i];
+      if (prior.status != 'DELIVERED' && prior.status != 'REJECTED') {
+        // Prior trip is still ongoing / pending! Target trip is LOCKED!
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Number of queued trips assigned to driver that are currently locked behind an ongoing trip.
+  int get lockedQueuedTripsCount {
+    return allTrips.where((t) => !isTripUnlockedForDriver(t)).length;
+  }
+
   // Filtered trips list getter — active/ongoing first, then scheduled/upcoming, then completed.
+  // Only shows trips that are unlocked for the driver (2nd trip unlocks after 1st trip is completed).
   List<TripItemModel> get filteredTrips {
     final list = allTrips.where((trip) {
+      if (!isTripUnlockedForDriver(trip)) return false;
+
       final matchesSearch = searchQuery.value.isEmpty ||
           trip.id.toLowerCase().contains(searchQuery.value.toLowerCase()) ||
           trip.truckNo.toLowerCase().contains(searchQuery.value.toLowerCase()) ||
@@ -106,7 +146,7 @@ class TripsController extends GetxController {
       if (a.priority != b.priority) {
         return a.priority ? -1 : 1;
       }
-      return 0;
+      return a.tripSequence.compareTo(b.tripSequence);
     });
     return list;
   }
@@ -348,6 +388,7 @@ class TripItemModel {
   final bool isActive;
   final bool priority;
   final int currentMilestone;
+  final int tripSequence;
   // Vendor / material details (morning assignment form)
   final String vendorName;
   final String vendorLocation;
@@ -403,6 +444,7 @@ class TripItemModel {
     required this.isActive,
     this.priority = false,
     this.currentMilestone = 0,
+    this.tripSequence = 1,
     this.vendorName = '',
     this.vendorLocation = '',
     this.materialName = '',
@@ -454,6 +496,7 @@ class TripItemModel {
     bool? isActive,
     bool? priority,
     int? currentMilestone,
+    int? tripSequence,
     String? vendorName,
     String? vendorLocation,
     String? materialName,
@@ -504,6 +547,7 @@ class TripItemModel {
       isActive: isActive ?? this.isActive,
       priority: priority ?? this.priority,
       currentMilestone: currentMilestone ?? this.currentMilestone,
+      tripSequence: tripSequence ?? this.tripSequence,
       vendorName: vendorName ?? this.vendorName,
       vendorLocation: vendorLocation ?? this.vendorLocation,
       materialName: materialName ?? this.materialName,

@@ -129,6 +129,7 @@ class FirebaseService extends GetxService {
       isActive: data['isActive'] ?? false,
       priority: data['priority'] ?? false,
       currentMilestone: (data['currentMilestone'] as num?)?.toInt() ?? 0,
+      tripSequence: (data['tripSequence'] as num?)?.toInt() ?? 1,
       vendorName: data['vendorName'] ?? '',
       vendorLocation: data['vendorLocation'] ?? '',
       materialName: data['materialName'] ?? '',
@@ -268,8 +269,20 @@ class FirebaseService extends GetxService {
         final normalized = SessionService.normalizePhone(assigned);
         tripData['driverPhone'] = normalized;
         tripData['ownerId'] = normalized;
+
+        if (!tripData.containsKey('tripSequence') || tripData['tripSequence'] == null) {
+          try {
+            final existingTrips = await getTripsForOwner(normalized);
+            // Count non-delivered, non-rejected trips to determine next sequence
+            final activeCount = existingTrips.where((t) => t.id != tripId && t.status != 'DELIVERED' && t.status != 'REJECTED').length;
+            tripData['tripSequence'] = activeCount + 1;
+          } catch (_) {
+            tripData['tripSequence'] = 1;
+          }
+        }
       } else {
         tripData.putIfAbsent('ownerId', () => ownerKey);
+        tripData.putIfAbsent('tripSequence', () => 1);
       }
       // Remember who assigned the trip so the driver's accept/reject can notify
       // them back.
@@ -306,16 +319,14 @@ class FirebaseService extends GetxService {
         'confirmedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      final assignedBy = data['assignedBy']?.toString() ?? '';
-      if (assignedBy.isNotEmpty) {
-        await createNotification(
-          toPhone: assignedBy,
-          title: 'Trip Confirmed ✅',
-          body: '${driverName ?? 'Driver'} confirmed trip $tripId.',
-          type: 'trip_accepted',
-          tripId: tripId,
-        );
-      }
+      final assignedBy = data['assignedBy']?.toString();
+      await _notifyAdmin(
+        assignedBy: assignedBy,
+        title: 'Trip Confirmed ✅',
+        body: '${driverName ?? 'Driver'} confirmed trip $tripId.',
+        type: 'trip_accepted',
+        tripId: tripId,
+      );
     } catch (_) {}
   }
 
@@ -342,17 +353,15 @@ class FirebaseService extends GetxService {
         });
       }
 
-      final assignedBy = data['assignedBy']?.toString() ?? '';
-      if (assignedBy.isNotEmpty) {
-        await createNotification(
-          toPhone: assignedBy,
-          title: 'Trip Rejected ❌',
-          body: '${driverName ?? 'Driver'} rejected trip $tripId.'
-              '${reason.isNotEmpty ? ' Reason: $reason' : ''}',
-          type: 'trip_rejected',
-          tripId: tripId,
-        );
-      }
+      final assignedBy = data['assignedBy']?.toString();
+      await _notifyAdmin(
+        assignedBy: assignedBy,
+        title: 'Trip Rejected ❌',
+        body: '${driverName ?? 'Driver'} rejected trip $tripId.'
+            '${reason.isNotEmpty ? ' Reason: $reason' : ''}',
+        type: 'trip_rejected',
+        tripId: tripId,
+      );
     } catch (_) {}
   }
 
@@ -445,18 +454,16 @@ class FirebaseService extends GetxService {
         ]),
       }, SetOptions(merge: true));
 
-      final assignedBy = data['assignedBy']?.toString() ?? '';
-      if (assignedBy.isNotEmpty) {
-        await createNotification(
-          toPhone: assignedBy,
-          title: 'Driver On The Way 🛻',
-          body: '${driverName ?? 'Driver'} vendor '
-              '${(data['vendorName'] ?? '').toString().isNotEmpty ? '${data['vendorName']} ' : ''}'
-              'ke paas material lene nikla hai (trip $tripId).',
-          type: 'vendor_way',
-          tripId: tripId,
-        );
-      }
+      final assignedBy = data['assignedBy']?.toString();
+      await _notifyAdmin(
+        assignedBy: assignedBy,
+        title: 'Driver On The Way 🛻',
+        body: '${driverName ?? 'Driver'} vendor '
+            '${(data['vendorName'] ?? '').toString().isNotEmpty ? '${data['vendorName']} ' : ''}'
+            'ke paas material lene nikla hai (trip $tripId).',
+        type: 'vendor_way',
+        tripId: tripId,
+      );
     } catch (_) {}
   }
 
@@ -495,17 +502,15 @@ class FirebaseService extends GetxService {
         ]),
       }, SetOptions(merge: true));
 
-      final assignedBy = data['assignedBy']?.toString() ?? '';
-      if (assignedBy.isNotEmpty) {
-        await createNotification(
-          toPhone: assignedBy,
-          title: 'Truck Loading 📦',
-          body: '${driverName ?? 'Driver'} ka truck load ho raha hai '
-              '(trip $tripId). Abhi destination set kar dein.',
-          type: 'loading_started',
-          tripId: tripId,
-        );
-      }
+      final assignedBy = data['assignedBy']?.toString();
+      await _notifyAdmin(
+        assignedBy: assignedBy,
+        title: 'Truck Loading 📦',
+        body: '${driverName ?? 'Driver'} ka truck load ho raha hai '
+            '(trip $tripId). Abhi destination set kar dein.',
+        type: 'loading_started',
+        tripId: tripId,
+      );
     } catch (_) {}
   }
 
@@ -663,19 +668,6 @@ class FirebaseService extends GetxService {
       _warnStorage('Truck Owner Pass Upload', e);
     }
 
-    // Safety fallback when Firebase Storage rules deny permission ([firebase_storage/unauthorized]):
-    // If the base64 string is extremely long (>400KB), downsample/cap it so Firestore doc write (1MB limit) never fails.
-    if (url.length > 400000) {
-      debugPrint('⚠️ Base64 dataUrl is very large (${url.length} chars). Truncating for safe Firestore write.');
-      final parts = url.split(',');
-      final prefix = parts.first;
-      final rawBase64 = parts.last;
-      const targetLength = 350000;
-      final truncated = rawBase64.substring(0, targetLength);
-      final cleanChunk = truncated.substring(0, truncated.length - (truncated.length % 4));
-      return '$prefix,$cleanChunk==';
-    }
-
     return url;
   }
 
@@ -723,17 +715,15 @@ class FirebaseService extends GetxService {
         ]),
       }, SetOptions(merge: true));
 
-      final assignedBy = data['assignedBy']?.toString() ?? '';
-      if (assignedBy.isNotEmpty) {
-        await createNotification(
-          toPhone: assignedBy,
-          title: 'Load Approval Needed 📦',
-          body:
-              '${driverName ?? 'Driver'} loaded goods${(pickupLocation ?? data['pickupLocation'] ?? '').toString().isNotEmpty ? ' at ${pickupLocation ?? data['pickupLocation']}' : ''} for trip $tripId. Approve to activate.',
-          type: 'load_request',
-          tripId: tripId,
-        );
-      }
+      final assignedBy = data['assignedBy']?.toString();
+      await _notifyAdmin(
+        assignedBy: assignedBy,
+        title: 'Load Approval Needed 📦',
+        body:
+            '${driverName ?? 'Driver'} loaded goods${(pickupLocation ?? data['pickupLocation'] ?? '').toString().isNotEmpty ? ' at ${pickupLocation ?? data['pickupLocation']}' : ''} for trip $tripId. Approve to activate.',
+        type: 'load_request',
+        tripId: tripId,
+      );
     } catch (_) {}
   }
 
@@ -759,14 +749,24 @@ class FirebaseService extends GetxService {
         return 'Pehle destination set karein — uske bina load approve nahi '
             'ho sakta.';
       }
+      Map<String, String>? cleanPassData;
+      if (truckOwnerPassData != null) {
+        cleanPassData = <String, String>{};
+        truckOwnerPassData.forEach((k, v) {
+          if (v != null) {
+            cleanPassData![k.toString()] = v.toString();
+          }
+        });
+      }
+
       await docRef.set({
         'hasTruckOwnerPass': true,
         if (truckOwnerPassId != null && truckOwnerPassId.isNotEmpty)
           'truckOwnerPassId': truckOwnerPassId,
         if (truckOwnerPassUrl != null && truckOwnerPassUrl.isNotEmpty)
           'truckOwnerPassUrl': truckOwnerPassUrl,
-        if (truckOwnerPassData != null)
-          'truckOwnerPassData': truckOwnerPassData,
+        if (cleanPassData != null && cleanPassData.isNotEmpty)
+          'truckOwnerPassData': cleanPassData,
       }, SetOptions(merge: true));
 
       await updateTripMilestone(
@@ -895,18 +895,16 @@ class FirebaseService extends GetxService {
         ]),
       }, SetOptions(merge: true));
 
-      final assignedBy = data['assignedBy']?.toString() ?? '';
-      if (assignedBy.isNotEmpty) {
-        await createNotification(
-          toPhone: assignedBy,
-          title: 'Delivery Approval Needed 📍',
-          body: '${driverName ?? 'Driver'} reached the drop for trip $tripId'
-              '${(location ?? '').toString().isNotEmpty ? ' at $location' : ''}'
-              ' • $now. Approve to complete.',
-          type: 'delivery_request',
-          tripId: tripId,
-        );
-      }
+      final assignedBy = data['assignedBy']?.toString();
+      await _notifyAdmin(
+        assignedBy: assignedBy,
+        title: 'Delivery Approval Needed 📍',
+        body: '${driverName ?? 'Driver'} reached the drop for trip $tripId'
+            '${(location ?? '').toString().isNotEmpty ? ' at $location' : ''}'
+            ' • $now. Approve to complete.',
+        type: 'delivery_request',
+        tripId: tripId,
+      );
     } catch (_) {}
   }
 
@@ -1112,7 +1110,35 @@ class FirebaseService extends GetxService {
 
   // ---------------------------------------------------------------------------
   // NOTIFICATIONS  (in-app, recipient-scoped by phone)
-  // ---------------------------------------------------------------------------
+  Future<void> _notifyAdmin({
+    required String? assignedBy,
+    required String title,
+    required String body,
+    required String type,
+    String? tripId,
+    String? refId,
+  }) async {
+    await createNotification(
+      toPhone: 'admin',
+      title: title,
+      body: body,
+      type: type,
+      tripId: tripId,
+      refId: refId,
+    );
+
+    final cleanAssigned = (assignedBy ?? '').trim();
+    if (cleanAssigned.isNotEmpty && cleanAssigned.toLowerCase() != 'admin') {
+      await createNotification(
+        toPhone: cleanAssigned,
+        title: title,
+        body: body,
+        type: type,
+        tripId: tripId,
+        refId: refId,
+      );
+    }
+  }
 
   Future<void> createNotification({
     required String toPhone,

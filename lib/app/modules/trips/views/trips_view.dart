@@ -97,6 +97,39 @@ class TripsView extends GetView<TripsController> {
             ),
           ),
           const SizedBox(height: 8),
+          Obx(() {
+            final lockedCount = controller.lockedQueuedTripsCount;
+            if (lockedCount <= 0) return const SizedBox.shrink();
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? Colors.blue.shade800 : const Color(0xFFBFDBFE),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.queue_play_next_rounded,
+                      size: 20,
+                      color: isDark ? Colors.blue.shade300 : AppColors.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '$lockedCount Next Trip${lockedCount > 1 ? 's' : ''} Queued — Pehli trip complete hone par unlock hogi',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.blue.shade200 : AppColors.primaryDark,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
           Expanded(
             child: RefreshIndicator(
               onRefresh: controller.fetchTripsFromFirebase,
@@ -224,15 +257,39 @@ class TripsView extends GetView<TripsController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header: id + priority + status chip
+          // Header: id + sequence + priority + status chip
           Row(
             children: [
               Expanded(
-                child: AppText(trip.id,
-                    style: AppTextStyle.bodyLarge,
-                    fontWeight: FontWeight.w800,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: AppText(trip.id,
+                          style: AppTextStyle.bodyLarge,
+                          fontWeight: FontWeight.w800,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    if (trip.tripSequence > 1) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade100,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Trip #${trip.tripSequence}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
               if (trip.priority) ...[
                 Container(

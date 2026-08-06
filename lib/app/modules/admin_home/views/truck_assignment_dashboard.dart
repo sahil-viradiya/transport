@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:transport/widgets/app_text.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
+import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/core/utils/image_url.dart';
 import 'package:transport/app/core/utils/image_picker_helper.dart';
@@ -254,23 +255,40 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         final hasDestinationSetup = t['hasDestinationSetup'] == true;
         final destinationSetup = t['destinationSetup'] as Map<String, dynamic>?;
 
-        // Check if this truck already has an active (non-completed) trip
+        // Check if this truck or driver already has an active (non-completed) trip
         String cleanTruck(String val) =>
             val.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
 
         final truckTrips = controller.trips.where((trip) {
           final tripTruck = (trip['truckNo'] ?? '').toString();
-          return cleanTruck(tripTruck) == cleanTruck(truckNo);
+          final tripDriver = (trip['driverPhone'] ?? '').toString();
+          final matchesTruck = cleanTruck(tripTruck) == cleanTruck(truckNo);
+          final matchesDriver = assignedTo.isNotEmpty &&
+              SessionService.normalizePhone(tripDriver) ==
+                  SessionService.normalizePhone(assignedTo);
+          return matchesTruck || matchesDriver;
         }).toList();
 
-        // Sort by ID descending to get the latest trip first
-        truckTrips.sort((a, b) =>
-            (b['id'] ?? '').toString().compareTo((a['id'] ?? '').toString()));
+        final nonCompletedTrips = truckTrips.where((t) {
+          final s = (t['status'] ?? '').toString();
+          return s != 'DELIVERED' && s != 'REJECTED';
+        }).toList();
 
-        final hasActiveTrip = assignedTo.isNotEmpty &&
-            truckTrips.isNotEmpty &&
-            truckTrips.first['status'] != 'DELIVERED' &&
-            truckTrips.first['status'] != 'REJECTED';
+        // Sort: ongoing trips first, then lower tripSequence
+        nonCompletedTrips.sort((a, b) {
+          final seqA = (a['tripSequence'] as num?)?.toInt() ?? 1;
+          final seqB = (b['tripSequence'] as num?)?.toInt() ?? 1;
+          if (seqA != seqB) return seqA.compareTo(seqB);
+
+          final isOngoingA = a['status'] != 'PENDING';
+          final isOngoingB = b['status'] != 'PENDING';
+          if (isOngoingA != isOngoingB) return isOngoingA ? -1 : 1;
+
+          return (a['id'] ?? '').toString().compareTo((b['id'] ?? '').toString());
+        });
+
+        final activeTripDoc = nonCompletedTrips.firstOrNull;
+        final hasActiveTrip = assignedTo.isNotEmpty && activeTripDoc != null;
 
         return MockTruck(
           id: truckNo,
@@ -285,17 +303,15 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           destinationSetup: destinationSetup,
           hasActiveTrip: hasActiveTrip,
           activeTripStatus:
-              hasActiveTrip ? truckTrips.first['status'].toString() : null,
-          activeTripPhotoUrl: hasActiveTrip
-              ? truckTrips.first['loadingPhotoUrl']?.toString()
-              : null,
-          activeTripGatePassUrl: hasActiveTrip
-              ? truckTrips.first['gatePassPhotoUrl']?.toString()
-              : null,
+              activeTripDoc?['status']?.toString(),
+          activeTripPhotoUrl:
+              activeTripDoc?['loadingPhotoUrl']?.toString(),
+          activeTripGatePassUrl:
+              activeTripDoc?['gatePassPhotoUrl']?.toString(),
           activeTripPodUrl:
-              hasActiveTrip ? truckTrips.first['podUrl']?.toString() : null,
+              activeTripDoc?['podUrl']?.toString(),
           activeTripRemarks:
-              hasActiveTrip ? truckTrips.first['remarks']?.toString() : null,
+              activeTripDoc?['remarks']?.toString(),
         );
       }).toList();
 
@@ -329,7 +345,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
       final bool hasExpandedAssignedCard = assignedTrucks.any(
           (t) => t.hasActiveTrip || t.hasLoadingPass || t.hasDestinationSetup);
       final double assignedContainerHeight =
-          hasExpandedAssignedCard ? 480.0 : 210.0;
+          hasExpandedAssignedCard ? 540.0 : 275.0;
 
       // Check auto reset condition reactively
       _checkAutoReset(dbTrucks);
@@ -726,27 +742,80 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               child: _buildInteractiveButton(truck),
             ),
           ],
+          if (truck.selectedDriver != null && widget.onOpenTripForm != null) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 34,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  widget.onOpenTripForm!({
+                    'driverPhone': truck.selectedDriver!.phone,
+                    'truckNo': truck.truckNo,
+                  });
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF2563EB),
+                  backgroundColor: widget.isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                  side: BorderSide(color: widget.isDark ? const Color(0xFF3B82F6) : const Color(0xFFBFDBFE)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 16, color: Color(0xFF2563EB)),
+                label: const Text(
+                  '+ Add 2nd Trip',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2563EB),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildActiveTripStatusWidget(MockTruck truck) {
-    final status = truck.activeTripStatus ?? '';
-
     // Find active trip ID
     final controller = Get.find<AdminHomeController>();
     String cleanTruck(String val) =>
         val.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
-    final activeTrip = controller.trips.firstWhereOrNull((trip) {
+    final driverPhone = truck.selectedDriver?.phone ?? '';
+
+    final matchingTrips = controller.trips.where((trip) {
       final tripTruck = (trip['truckNo'] ?? '').toString();
+      final tripDriver = (trip['driverPhone'] ?? '').toString();
       final tripStatus = (trip['status'] ?? '').toString();
-      return cleanTruck(tripTruck) == cleanTruck(truck.truckNo) &&
+      final matchesTruck = cleanTruck(tripTruck) == cleanTruck(truck.truckNo);
+      final matchesDriver = driverPhone.isNotEmpty &&
+          SessionService.normalizePhone(tripDriver) ==
+              SessionService.normalizePhone(driverPhone);
+      return (matchesTruck || matchesDriver) &&
           tripStatus != 'DELIVERED' &&
           tripStatus != 'REJECTED';
+    }).toList();
+
+    if (matchingTrips.isEmpty) return const SizedBox();
+
+    matchingTrips.sort((a, b) {
+      final seqA = (a['tripSequence'] as num?)?.toInt() ?? 1;
+      final seqB = (b['tripSequence'] as num?)?.toInt() ?? 1;
+      if (seqA != seqB) return seqA.compareTo(seqB);
+
+      final isOngoingA = a['status'] != 'PENDING';
+      final isOngoingB = b['status'] != 'PENDING';
+      if (isOngoingA != isOngoingB) return isOngoingA ? -1 : 1;
+
+      return (a['id'] ?? '').toString().compareTo((b['id'] ?? '').toString());
     });
 
-    if (activeTrip == null) return const SizedBox();
+    final activeTrip = matchingTrips.first;
+    final status = (activeTrip['status'] ?? '').toString();
     final tripId = activeTrip['id'].toString();
 
     String label;
@@ -1014,6 +1083,33 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: 34,
+            child: OutlinedButton.icon(
+              onPressed: () => _showDestinationSetupDialog(context, truck),
+              icon: const Icon(Icons.add_location_alt_rounded, size: 14, color: Color(0xFF2563EB)),
+              label: Text(
+                truck.hasDestinationSetup && truck.destinationSetup?['customerName'] != null
+                    ? 'Edit Destination (${truck.destinationSetup!['customerName']})'
+                    : '📍 Setup / Set Drop Destination',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2563EB),
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF2563EB),
+                backgroundColor: widget.isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                side: BorderSide(color: widget.isDark ? const Color(0xFF3B82F6) : const Color(0xFFBFDBFE)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+            ),
           ),
         ],
         if (status == 'DELIVERY_REQUESTED') ...[
@@ -1374,28 +1470,29 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 child: const Text('Cancel'),
               ),
               ElevatedButton.icon(
-                onPressed: adminPhotoUrl == null
-                    ? null
-                    : () async {
+                onPressed: () async {
                         if (formKey.currentState!.validate()) {
                           Get.back();
                           AppPopup.showLoading(
                               message: 'Generating Pass & Activating Trip...');
                           try {
-                            final ownerPassData = {
+                            String cleanAdminPhoto = '';
+                            if (adminPhotoUrl != null && adminPhotoUrl!.isNotEmpty) {
+                              cleanAdminPhoto = await _firebaseService.uploadTruckOwnerPassPhoto(tripId, adminPhotoUrl);
+                            }
+                            final ownerPassData = <String, String>{
                               'passId': passIdCtrl.text.trim(),
                               'ownerName': ownerNameCtrl.text.trim(),
                               'remarks': remarksCtrl.text.trim(),
                               'generatedAt':
                                   DateTime.now().toString().substring(0, 16),
-                              if (adminPhotoUrl != null &&
-                                  adminPhotoUrl!.isNotEmpty)
-                                'adminPhotoUrl': adminPhotoUrl,
+                              if (cleanAdminPhoto.isNotEmpty)
+                                'adminPhotoUrl': cleanAdminPhoto,
                             };
                             final err = await _firebaseService.approveLoad(
                               tripId,
                               truckOwnerPassId: passIdCtrl.text.trim(),
-                              truckOwnerPassUrl: passPhotoUrl ?? '',
+                              truckOwnerPassUrl: cleanAdminPhoto.isNotEmpty ? cleanAdminPhoto : (passPhotoUrl ?? ''),
                               truckOwnerPassData: ownerPassData,
                             );
                             AppPopup.hideLoading();
