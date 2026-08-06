@@ -9,6 +9,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'in_app_pdf_viewer_screen.dart';
 import 'package:open_filex/open_filex.dart';
+import 'app_image_helper.dart';
+import 'image_url.dart';
 import '../../../widgets/app_text.dart';
 import '../../../widgets/dialogs/app_snackbar.dart';
 
@@ -42,27 +44,25 @@ class DocumentViewerHelper {
   }
 
   static Uint8List? _extractBytes(String urlOrBase64) {
-    if (urlOrBase64.isEmpty) return null;
-    try {
-      var str = urlOrBase64.trim();
-      if (str.contains(',')) {
-        str = str.split(',').last.trim();
-      }
-      str = str.replaceAll(RegExp(r'\s+'), '');
-      if (str.isEmpty) return null;
-      while (str.length % 4 != 0) {
-        str += '=';
-      }
-      return base64Decode(str);
-    } catch (e) {
-      debugPrint('📄 [PDF DOWNLOAD] base64Decode failed: $e');
-      return null;
-    }
+    return AppImageHelper.decodeBase64(urlOrBase64);
   }
 
   static Future<Uint8List?> _resolveBytes(String urlOrBase64) async {
     debugPrint(
         '📄 [PDF DOWNLOAD] Starting _resolveBytes. Length: ${urlOrBase64.length}');
+    if (urlOrBase64.startsWith('/')) {
+      try {
+        final file = File(urlOrBase64);
+        if (file.existsSync()) {
+          final bytes = await file.readAsBytes();
+          debugPrint('📄 [PDF DOWNLOAD] Local file bytes read: ${bytes.length} bytes');
+          return bytes;
+        }
+      } catch (e) {
+        debugPrint('📄 [PDF DOWNLOAD] Local file read failed: $e');
+      }
+    }
+
     final bytes = _extractBytes(urlOrBase64);
     if (bytes != null && bytes.isNotEmpty) {
       debugPrint(
@@ -71,11 +71,12 @@ class DocumentViewerHelper {
     }
 
     if (urlOrBase64.startsWith('http')) {
+      final safeUrl = corsSafeImageUrl(urlOrBase64);
       debugPrint(
-          '📄 [PDF DOWNLOAD] Attempting HTTP fetch via Dio from: $urlOrBase64');
+          '📄 [PDF DOWNLOAD] Attempting HTTP fetch via Dio from: $safeUrl');
       try {
         final res = await Dio().get<List<int>>(
-          urlOrBase64,
+          safeUrl,
           options: Options(responseType: ResponseType.bytes),
         );
         if (res.data != null) {
@@ -85,7 +86,17 @@ class DocumentViewerHelper {
           return fetched;
         }
       } catch (e) {
-        debugPrint('📄 [PDF DOWNLOAD] Dio fetch failed: $e');
+        debugPrint('📄 [PDF DOWNLOAD] Dio fetch failed with safeUrl ($safeUrl): $e');
+        try {
+          final res = await Dio().get<List<int>>(
+            urlOrBase64,
+            options: Options(responseType: ResponseType.bytes),
+          );
+          if (res.data != null) {
+            final fetched = Uint8List.fromList(res.data!);
+            return fetched;
+          }
+        } catch (_) {}
       }
     }
     debugPrint('📄 [PDF DOWNLOAD] Unable to resolve bytes from input!');
@@ -243,17 +254,10 @@ class DocumentViewerHelper {
   }
 
   static Widget _buildImage(String urlOrBase64) {
-    if (urlOrBase64.startsWith('data:image') ||
-        !urlOrBase64.startsWith('http')) {
-      final bytes = _extractBytes(urlOrBase64);
-      if (bytes != null) {
-        return Image.memory(bytes, fit: BoxFit.contain);
-      }
-    }
-    return Image.network(
-      urlOrBase64,
+    return AppImageHelper.buildImageWidget(
+      source: urlOrBase64,
       fit: BoxFit.contain,
-      errorBuilder: (_, __, ___) => const Center(
+      errorWidget: const Center(
         child: Icon(Icons.image_not_supported_rounded,
             size: 48, color: Colors.grey),
       ),

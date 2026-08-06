@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/clock_in_controller.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/image_url.dart';
 
 class ClockInView extends GetView<ClockInController> {
   const ClockInView({super.key});
@@ -102,7 +103,7 @@ class ClockInView extends GetView<ClockInController> {
                           radius: 28,
                           backgroundColor: AppColors.primary,
                           backgroundImage: controller.driverAvatar.value.isNotEmpty
-                              ? NetworkImage(controller.driverAvatar.value)
+                              ? NetworkImage(corsSafeImageUrl(controller.driverAvatar.value))
                               : null,
                           child: controller.driverAvatar.value.isEmpty
                               ? const Icon(Icons.person, color: Colors.white, size: 30)

@@ -9,6 +9,8 @@ import 'package:transport/app/data/services/session_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:transport/app/core/config/app_config.dart';
 import 'package:transport/app/core/utils/app_logger.dart';
+import 'dart:io';
+import 'package:transport/app/core/utils/app_image_helper.dart';
 import 'package:transport/app/core/errors/validation_exception.dart';
 
 /// Firestore + Storage data layer.
@@ -588,10 +590,10 @@ class FirebaseService extends GetxService {
 
   /// Upload a loading-proof photo taken at the vendor site.
   Future<String> uploadLoadingPhoto(String tripId, Uint8List? bytes) async {
+    if (bytes == null || bytes.isEmpty) return '';
     final owner = ownerKey.isEmpty ? 'unknown' : ownerKey;
-    const placeholder =
-        'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=600';
-    if (bytes == null || bytes.isEmpty || useMockStorage) return placeholder;
+    final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    if (useMockStorage) return base64String;
     try {
       final ref = _storage
           .ref()
@@ -600,19 +602,19 @@ class FirebaseService extends GetxService {
           .child('$tripId.jpg');
       final task =
           await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
-      return await task.ref.getDownloadURL();
+      final downloadUrl = await task.ref.getDownloadURL();
+      if (downloadUrl.isNotEmpty) return downloadUrl;
     } catch (e) {
       _warnStorage('Loading Photo', e);
-      throw Exception('Loading Photo upload failed: $e');
     }
+    return base64String;
   }
 
-  /// Upload a gate pass photo taken at the vendor site.
   Future<String> uploadGatePassPhoto(String tripId, Uint8List? bytes) async {
+    if (bytes == null || bytes.isEmpty) return '';
     final owner = ownerKey.isEmpty ? 'unknown' : ownerKey;
-    const placeholder =
-        'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600';
-    if (bytes == null || bytes.isEmpty || useMockStorage) return placeholder;
+    final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    if (useMockStorage) return base64String;
     try {
       final ref = _storage
           .ref()
@@ -621,15 +623,14 @@ class FirebaseService extends GetxService {
           .child('$tripId.jpg');
       final task =
           await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
-      return await task.ref.getDownloadURL();
+      final downloadUrl = await task.ref.getDownloadURL();
+      if (downloadUrl.isNotEmpty) return downloadUrl;
     } catch (e) {
       _warnStorage('Gate Pass Photo', e);
-      throw Exception('Gate Pass Photo upload failed: $e');
     }
+    return base64String;
   }
 
-  /// Upload a Truck Owner Pass document/photo to Storage, returning its URL.
-  /// If storage fails or isn't enabled, returns the input URL string safely.
   Future<String> uploadTruckOwnerPassPhoto(String tripId, String? urlOrBase64) async {
     if (urlOrBase64 == null || urlOrBase64.trim().isEmpty) return '';
     final url = urlOrBase64.trim();
@@ -637,7 +638,16 @@ class FirebaseService extends GetxService {
 
     try {
       final owner = ownerKey.isEmpty ? 'unknown' : ownerKey;
-      Uint8List? bytes;
+      Uint8List? bytes = AppImageHelper.decodeBase64(url);
+      if (bytes == null && url.startsWith('/')) {
+        try {
+          final file = File(url);
+          if (file.existsSync()) {
+            bytes = await file.readAsBytes();
+          }
+        } catch (_) {}
+      }
+
       String contentType = 'image/jpeg';
       String ext = 'jpg';
 
@@ -649,11 +659,6 @@ class FirebaseService extends GetxService {
         ext = 'png';
       }
 
-      if (url.contains(',')) {
-        final cleanBase64 = url.split(',').last.replaceAll(RegExp(r'\s+'), '');
-        bytes = base64Decode(cleanBase64);
-      }
-
       if (bytes != null && bytes.isNotEmpty && !useMockStorage) {
         final ref = _storage
             .ref()
@@ -663,6 +668,10 @@ class FirebaseService extends GetxService {
         final task = await ref.putData(bytes, SettableMetadata(contentType: contentType));
         final downloadUrl = await task.ref.getDownloadURL();
         if (downloadUrl.isNotEmpty) return downloadUrl;
+      }
+
+      if (bytes != null && bytes.isNotEmpty) {
+        return 'data:$contentType;base64,${base64Encode(bytes)}';
       }
     } catch (e) {
       _warnStorage('Truck Owner Pass Upload', e);
@@ -1667,10 +1676,10 @@ class FirebaseService extends GetxService {
   // ---------------------------------------------------------------------------
 
   Future<String> uploadProofOfDelivery(String tripId, Uint8List? bytes) async {
+    if (bytes == null || bytes.isEmpty) return '';
     final owner = ownerKey.isEmpty ? 'unknown' : ownerKey;
-    const placeholder =
-        'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=600';
-    if (bytes == null || bytes.isEmpty || useMockStorage) return placeholder;
+    final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    if (useMockStorage) return base64String;
     try {
       final ref = _storage
           .ref()
@@ -1679,11 +1688,12 @@ class FirebaseService extends GetxService {
           .child('$tripId.jpg');
       final task =
           await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
-      return await task.ref.getDownloadURL();
+      final downloadUrl = await task.ref.getDownloadURL();
+      if (downloadUrl.isNotEmpty) return downloadUrl;
     } catch (e) {
       _warnStorage('Proof of Delivery', e);
-      throw Exception('Proof of Delivery upload failed: $e');
     }
+    return base64String;
   }
 
   /// Saves the uploaded POD proof + remarks on the trip. Deliberately does NOT

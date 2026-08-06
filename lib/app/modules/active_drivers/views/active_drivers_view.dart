@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../admin_home/controllers/admin_home_controller.dart';
 import '../../../../widgets/app_text.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/image_url.dart';
 
 /// List of drivers currently on duty (Available) or running an active trip.
 /// Tapping a driver opens their detail screen. Reuses the live AdminHome data.
@@ -67,7 +68,7 @@ class ActiveDriversView extends GetView<AdminHomeController> {
               radius: 26,
               backgroundColor: AppColors.primaryLight,
               backgroundImage: (u['avatarUrl'] ?? '').toString().startsWith('http')
-                  ? NetworkImage(u['avatarUrl'])
+                  ? NetworkImage(corsSafeImageUrl(u['avatarUrl']))
                   : null,
               child: (u['avatarUrl'] ?? '').toString().startsWith('http')
                   ? null

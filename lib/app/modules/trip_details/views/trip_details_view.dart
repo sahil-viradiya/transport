@@ -11,6 +11,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/services/session_service.dart';
 import '../../../core/utils/document_viewer_helper.dart';
 import '../../../core/utils/image_url.dart';
+import '../../../core/utils/app_image_helper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class TripDetailsView extends GetView<TripDetailsController> {
@@ -318,11 +319,11 @@ class TripDetailsView extends GetView<TripDetailsController> {
             Row(
               children: [
                 if (loadingPhotoUrl.isNotEmpty) ...[
-                  _buildDriverPhotoThumbnail(context, loadingPhotoUrl, 'Loading Photo', isDark),
+                  _buildPhotoTile(context, loadingPhotoUrl, 'Loading Photo', isDark),
                   const SizedBox(width: 12),
                 ],
                 if (gatePassPhotoUrl.isNotEmpty) ...[
-                  _buildDriverPhotoThumbnail(context, gatePassPhotoUrl, 'Gate Pass Photo', isDark),
+                  _buildPhotoTile(context, gatePassPhotoUrl, 'Gate Pass Photo', isDark),
                 ],
               ],
             ),
@@ -337,7 +338,7 @@ class TripDetailsView extends GetView<TripDetailsController> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (truckOwnerPassUrl.isNotEmpty) ...[
-                  _buildDriverPhotoThumbnail(context, truckOwnerPassUrl, 'Truck Owner Pass', isDark),
+                  _buildPhotoTile(context, truckOwnerPassUrl, 'Truck Owner Pass', isDark),
                   const SizedBox(width: 12),
                 ] else if (hasTruckOwnerPass) ...[
                   Expanded(
@@ -371,7 +372,7 @@ class TripDetailsView extends GetView<TripDetailsController> {
                   const SizedBox(width: 12),
                 ],
                 if (destinationDocUrl.isNotEmpty) ...[
-                  _buildDriverPhotoThumbnail(context, destinationDocUrl, 'Destination Doc/Photo', isDark),
+                  _buildPhotoTile(context, destinationDocUrl, 'Destination Doc/Photo', isDark),
                 ],
               ],
             ),
@@ -397,34 +398,15 @@ class TripDetailsView extends GetView<TripDetailsController> {
               ),
               const SizedBox(height: 16),
             ],
-            _buildDriverPhotoThumbnail(context, podUrl, 'POD Document', isDark),
+            _buildPhotoTile(context, podUrl, 'POD Document', isDark),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildDriverPhotoThumbnail(BuildContext context, String url, String label, bool isDark) {
+  Widget _buildPhotoTile(BuildContext context, String url, String label, bool isDark) {
     final isPdf = DocumentViewerHelper.isPdf(url);
-
-    Uint8List? base64Bytes;
-    bool isBase64 = false;
-    if (!isPdf && (url.startsWith('data:image') || (!url.startsWith('http') && !url.startsWith('/')))) {
-      try {
-        var str = url.trim();
-        if (str.contains(',')) {
-          str = str.split(',').last.trim();
-        }
-        str = str.replaceAll(RegExp(r'\s+'), '');
-        while (str.length % 4 != 0) {
-          str += '=';
-        }
-        base64Bytes = base64Decode(str);
-        if (base64Bytes.isNotEmpty) {
-          isBase64 = true;
-        }
-      } catch (_) {}
-    }
 
     Widget imageWidget;
     if (isPdf) {
@@ -439,34 +421,11 @@ class TripDetailsView extends GetView<TripDetailsController> {
           ],
         ),
       );
-    } else if (isBase64 && base64Bytes != null) {
-      imageWidget = Image.memory(
-        base64Bytes,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Container(
-          color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
-          child: const Center(
-            child: Icon(Icons.broken_image_outlined, size: 24, color: Colors.grey),
-          ),
-        ),
-      );
-    } else if (url.startsWith('/')) {
-      imageWidget = Image.file(
-        File(url),
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Container(
-          color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
-          child: const Center(
-            child: Icon(Icons.broken_image_outlined, size: 24, color: Colors.grey),
-          ),
-        ),
-      );
     } else {
-      imageWidget = CachedNetworkImage(
-        imageUrl: corsSafeImageUrl(url),
+      imageWidget = AppImageHelper.buildImageWidget(
+        source: url,
         fit: BoxFit.cover,
-        placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-        errorWidget: (context, url, error) => Container(
+        errorWidget: Container(
           color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
           child: const Center(
             child: Icon(Icons.broken_image_outlined, size: 24, color: Colors.grey),
@@ -801,18 +760,6 @@ class TripDetailsView extends GetView<TripDetailsController> {
       final imgPath = controller.podUrl.value;
       final remarksText = controller.remarks.value;
 
-      ImageProvider? imgProvider;
-      if (imgPath.isNotEmpty) {
-        if (imgPath.startsWith('http://') || imgPath.startsWith('https://')) {
-          imgProvider = NetworkImage(imgPath);
-        } else if (!kIsWeb && File(imgPath).existsSync()) {
-          imgProvider = FileImage(File(imgPath));
-        } else {
-          imgProvider = const NetworkImage(
-              'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=600');
-        }
-      }
-
       return Container(
         margin: const EdgeInsets.only(top: 16),
         padding: const EdgeInsets.all(16),
@@ -868,29 +815,24 @@ class TripDetailsView extends GetView<TripDetailsController> {
               ),
               const SizedBox(height: 16),
             ],
-            if (imgProvider != null) ...[
+            if (imgPath.isNotEmpty) ...[
               const AppText(
                 'DELIVERY RECEIPT PHOTO',
                 style: AppTextStyle.labelMedium,
                 fontWeight: FontWeight.bold,
               ),
               const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  height: 180,
-                  width: double.infinity,
-                  child: Image(
-                    image: imgProvider,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Colors.black12,
-                        child: const Center(
-                          child: Icon(Icons.broken_image_outlined, color: Colors.grey, size: 40),
-                        ),
-                      );
-                    },
+              GestureDetector(
+                onTap: () => DocumentViewerHelper.showDocument(context, imgPath, title: 'POD Document'),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    height: 180,
+                    width: double.infinity,
+                    child: AppImageHelper.buildImageWidget(
+                      source: imgPath,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
               ),

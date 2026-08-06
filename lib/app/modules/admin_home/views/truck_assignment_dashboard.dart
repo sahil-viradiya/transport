@@ -11,6 +11,8 @@ import 'package:transport/app/core/utils/image_picker_helper.dart';
 import '../controllers/admin_home_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import 'admin_trip_details_view.dart';
+import '../../../core/utils/document_viewer_helper.dart';
+import '../../../core/utils/app_image_helper.dart';
 
 class DriverInfo {
   final String name;
@@ -304,12 +306,19 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           hasActiveTrip: hasActiveTrip,
           activeTripStatus:
               activeTripDoc?['status']?.toString(),
-          activeTripPhotoUrl:
-              activeTripDoc?['loadingPhotoUrl']?.toString(),
-          activeTripGatePassUrl:
-              activeTripDoc?['gatePassPhotoUrl']?.toString(),
-          activeTripPodUrl:
-              activeTripDoc?['podUrl']?.toString(),
+          activeTripPhotoUrl: (activeTripDoc?['loadingPhotoUrl'] ??
+                  activeTripDoc?['loadingPhoto'] ??
+                  activeTripDoc?['photoUrl'])
+              ?.toString(),
+          activeTripGatePassUrl: (activeTripDoc?['gatePassPhotoUrl'] ??
+                  activeTripDoc?['gatePassPhoto'] ??
+                  activeTripDoc?['gatePassUrl'])
+              ?.toString(),
+          activeTripPodUrl: (activeTripDoc?['podUrl'] ??
+                  activeTripDoc?['podPhotoUrl'] ??
+                  activeTripDoc?['podPhoto'] ??
+                  activeTripDoc?['podProof'])
+              ?.toString(),
           activeTripRemarks:
               activeTripDoc?['remarks']?.toString(),
         );
@@ -989,30 +998,30 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             ),
           ),
         ],
-        if (status == 'LOAD_REQUESTED' ||
+        if ((status == 'LOAD_REQUESTED' && (hasPhoto || hasGatePassPhoto)) ||
             (status == 'DELIVERY_REQUESTED' && hasPodPhoto)) ...[
           const SizedBox(height: 8),
           Row(
             children: [
               if (status == 'LOAD_REQUESTED') ...[
-                _buildPhotoPreview(
-                  context,
-                  hasPhoto
-                      ? truck.activeTripPhotoUrl!
-                      : 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=600',
-                  'Loading Proof',
-                  widget.isDark,
-                ),
-                const SizedBox(width: 10),
-                _buildPhotoPreview(
-                  context,
-                  hasGatePassPhoto
-                      ? truck.activeTripGatePassUrl!
-                      : 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600',
-                  'Gate Pass',
-                  widget.isDark,
-                ),
-                const SizedBox(width: 10),
+                if (hasPhoto) ...[
+                  _buildPhotoPreview(
+                    context,
+                    truck.activeTripPhotoUrl!,
+                    'Loading Proof',
+                    widget.isDark,
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                if (hasGatePassPhoto) ...[
+                  _buildPhotoPreview(
+                    context,
+                    truck.activeTripGatePassUrl!,
+                    'Gate Pass',
+                    widget.isDark,
+                  ),
+                  const SizedBox(width: 10),
+                ],
               ],
               if (status == 'DELIVERY_REQUESTED' && hasPodPhoto) ...[
                 _buildPhotoPreview(
@@ -1159,9 +1168,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
 
   Widget _buildPhotoPreview(
       BuildContext context, String url, String label, bool isDark) {
-    final safeUrl = corsSafeImageUrl(url);
     return GestureDetector(
-      onTap: () => _showFullImageDialog(url),
+      onTap: () => DocumentViewerHelper.showDocument(context, url, title: label),
       child: Tooltip(
         message: 'Click to view full $label',
         child: Container(
@@ -1183,17 +1191,10 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8.5),
-            child: CachedNetworkImage(
-              imageUrl: safeUrl,
+            child: AppImageHelper.buildImageWidget(
+              source: url,
               fit: BoxFit.cover,
-              placeholder: (context, url) => const Center(
-                child: SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-              errorWidget: (context, url, error) => Container(
+              errorWidget: Container(
                 color: isDark ? Colors.white10 : Colors.grey.shade100,
                 child: const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -1216,43 +1217,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
   }
 
   void _showFullImageDialog(String imageUrl) {
-    final safeUrl = corsSafeImageUrl(imageUrl);
-    Get.dialog(
-      Dialog(
-        backgroundColor: Colors.transparent,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: IconButton(
-                icon: const Icon(Icons.close_rounded,
-                    color: Colors.white, size: 30),
-                onPressed: () => Get.back(),
-              ),
-            ),
-            Hero(
-              tag: imageUrl,
-              child: Container(
-                constraints:
-                    const BoxConstraints(maxHeight: 500, maxWidth: 500),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: CachedNetworkImage(
-                    imageUrl: safeUrl,
-                    fit: BoxFit.contain,
-                    placeholder: (context, url) =>
-                        const Center(child: CircularProgressIndicator()),
-                    errorWidget: (context, url, error) =>
-                        const Icon(Icons.error, color: Colors.white),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    DocumentViewerHelper.showDocument(context, imageUrl, title: 'Proof Document');
   }
 
   Future<void> _approveLoadDirectly(String tripId) async {

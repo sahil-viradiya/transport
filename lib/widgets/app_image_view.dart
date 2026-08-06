@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../app/core/theme/app_colors.dart';
+import '../app/core/utils/app_image_helper.dart';
 
 class AppImageView extends StatelessWidget {
   final String imagePath;
@@ -29,72 +30,15 @@ class AppImageView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget imageWidget;
-
-    if (imagePath.isEmpty) {
-      imageWidget = _buildPlaceholder();
-    } else if (imagePath.startsWith('data:image/')) {
-      try {
-        final base64String =
-            imagePath.contains(',') ? imagePath.split(',')[1] : imagePath;
-        final bytes = base64Decode(base64String);
-        imageWidget = Image.memory(
-          bytes,
-          width: width,
-          height: height,
-          fit: fit,
-          color: color,
-          errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
-        );
-      } catch (_) {
-        imageWidget = _buildPlaceholder();
-      }
-    } else if (imagePath.startsWith('http') || imagePath.startsWith('https')) {
-      // Remote Network Image with Caching
-      imageWidget = CachedNetworkImage(
-        imageUrl: imagePath,
-        width: width,
-        height: height,
-        fit: fit,
-        color: color,
-        placeholder: (context, url) => _buildShimmer(),
-        errorWidget: (context, url, error) => _buildPlaceholder(),
-      );
-    } else if (imagePath.startsWith('assets/')) {
-      // Local Assets (SVG or Normal Image)
-      if (imagePath.endsWith('.svg')) {
-        imageWidget = SvgPicture.asset(
-          imagePath,
-          width: width,
-          height: height,
-          fit: fit,
-          colorFilter: color != null
-              ? ColorFilter.mode(color!, BlendColorFilterMode.srcIn)
-              : null,
-        );
-      } else {
-        imageWidget = Image.asset(
-          imagePath,
-          width: width,
-          height: height,
-          fit: fit,
-          color: color,
-          errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
-        );
-      }
-    } else if (!kIsWeb && File(imagePath).existsSync()) {
-      // Local File Image (mobile/desktop only — File is unsupported on web)
-      imageWidget = Image.file(
-        File(imagePath),
-        width: width,
-        height: height,
-        fit: fit,
-        color: color,
-        errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
-      );
-    } else {
-      imageWidget = _buildPlaceholder();
-    }
+    Widget imageWidget = AppImageHelper.buildImageWidget(
+      source: imagePath,
+      width: width,
+      height: height,
+      fit: fit,
+      color: color,
+      placeholder: _buildShimmer(),
+      errorWidget: _buildPlaceholder(),
+    );
 
     if (borderRadius > 0) {
       return ClipRRect(

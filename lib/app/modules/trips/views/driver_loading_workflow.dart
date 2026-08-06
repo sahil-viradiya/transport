@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import 'package:transport/widgets/app_image_view.dart';
 import 'package:transport/app/core/utils/document_viewer_helper.dart';
 import 'package:transport/app/core/utils/image_picker_helper.dart';
+import 'package:transport/app/core/utils/app_image_helper.dart';
 
 /// A 4-step loading workflow widget shown inside the trip card for active
 /// trips (ASSIGNED → EN_ROUTE_VENDOR → LOADING → LOAD_REQUESTED → ACTIVE NOW).
@@ -25,36 +26,7 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
   Uint8List? _gatePassPhotoBytes;
 
   void _showFullImageDialog(String imageUrl) {
-    Get.dialog(
-      Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: IconButton(
-                icon: const Icon(Icons.close_rounded,
-                    color: Colors.white, size: 28),
-                onPressed: () => Get.back(),
-              ),
-            ),
-            Container(
-              constraints:
-                  const BoxConstraints(maxHeight: 500, maxWidth: 500),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: AppImageView(
-                  imagePath: imageUrl,
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    DocumentViewerHelper.showDocument(context, imageUrl, title: 'Proof Document');
   }
 
   /// Maps trip status to step index (0-based).
@@ -1045,11 +1017,11 @@ class _DriverLoadingWorkflowState extends State<DriverLoadingWorkflow> {
         img = const Icon(Icons.image_not_supported_rounded, size: 48, color: Colors.grey);
       }
     } else {
-      img = Image.network(
-        passDocUrl,
+      img = AppImageHelper.buildImageWidget(
+        source: passDocUrl,
         fit: BoxFit.contain,
         height: 180,
-        errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_rounded, size: 48, color: Colors.grey),
+        errorWidget: const Icon(Icons.image_not_supported_rounded, size: 48, color: Colors.grey),
       );
     }
 

@@ -173,7 +173,7 @@ class NotificationDetailView extends GetView<NotificationDetailController> {
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
-                podUrl,
+                corsSafeImageUrl(podUrl),
                 height: 240,
                 width: double.infinity,
                 fit: BoxFit.cover,

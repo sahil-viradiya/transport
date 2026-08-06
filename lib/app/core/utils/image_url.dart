@@ -9,8 +9,11 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 /// The durable fix is to set a CORS policy on the bucket (see README/NOTES);
 /// once that's done this proxy can be removed.
 String corsSafeImageUrl(String url) {
-  if (kIsWeb && url.startsWith('http')) {
-    return 'https://images.weserv.nl/?url=${Uri.encodeComponent(url)}';
+  if (url.trim().isEmpty) return '';
+  final clean = url.trim();
+  if (kIsWeb && clean.startsWith('http') && !clean.startsWith('blob:')) {
+    if (clean.contains('images.weserv.nl')) return clean;
+    return 'https://images.weserv.nl/?url=${Uri.encodeComponent(clean)}';
   }
-  return url;
+  return clean;
 }

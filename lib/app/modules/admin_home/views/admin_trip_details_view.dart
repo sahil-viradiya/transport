@@ -14,6 +14,7 @@ import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/core/utils/image_picker_helper.dart';
 
 import 'package:transport/app/core/utils/document_viewer_helper.dart';
+import 'package:transport/app/core/utils/app_image_helper.dart';
 
 class AdminTripDetailsView extends GetView<AdminHomeController> {
   const AdminTripDetailsView({super.key});
@@ -1710,25 +1711,6 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
   Widget _buildPhotoThumbnail(BuildContext context, String url, String label, bool isDark) {
     final isPdf = DocumentViewerHelper.isPdf(url);
 
-    Uint8List? base64Bytes;
-    bool isBase64 = false;
-    if (!isPdf && (url.startsWith('data:image') || (!url.startsWith('http') && !url.startsWith('/')))) {
-      try {
-        var str = url.trim();
-        if (str.contains(',')) {
-          str = str.split(',').last.trim();
-        }
-        str = str.replaceAll(RegExp(r'\s+'), '');
-        while (str.length % 4 != 0) {
-          str += '=';
-        }
-        base64Bytes = base64Decode(str);
-        if (base64Bytes.isNotEmpty) {
-          isBase64 = true;
-        }
-      } catch (_) {}
-    }
-
     Widget imageWidget;
     if (isPdf) {
       imageWidget = Container(
@@ -1742,34 +1724,11 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
           ],
         ),
       );
-    } else if (isBase64 && base64Bytes != null) {
-      imageWidget = Image.memory(
-        base64Bytes,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Container(
-          color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
-          child: const Center(
-            child: Icon(Icons.broken_image_outlined, size: 24, color: Colors.grey),
-          ),
-        ),
-      );
-    } else if (url.startsWith('/')) {
-      imageWidget = Image.file(
-        File(url),
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Container(
-          color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
-          child: const Center(
-            child: Icon(Icons.broken_image_outlined, size: 24, color: Colors.grey),
-          ),
-        ),
-      );
     } else {
-      imageWidget = CachedNetworkImage(
-        imageUrl: corsSafeImageUrl(url),
+      imageWidget = AppImageHelper.buildImageWidget(
+        source: url,
         fit: BoxFit.cover,
-        placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-        errorWidget: (context, url, error) => Container(
+        errorWidget: Container(
           color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
           child: const Center(
             child: Icon(Icons.broken_image_outlined, size: 24, color: Colors.grey),
