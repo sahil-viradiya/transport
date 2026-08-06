@@ -1167,8 +1167,9 @@ class FirebaseService extends GetxService {
           ? tripId
           : (refId != null && refId.isNotEmpty)
               ? refId
-              : '${DateTime.now().microsecondsSinceEpoch}_${_db.collection('notifications').doc().id}';
-      final docId = '${p}_${type}_$keyId';
+              : 'global';
+      final ts = DateTime.now().microsecondsSinceEpoch;
+      final docId = '${p}_${type}_${keyId}_$ts';
 
       await _db.collection('notifications').doc(docId).set({
         'toPhone': p,
@@ -1424,15 +1425,16 @@ class FirebaseService extends GetxService {
         }
       }
 
+      final ts = DateTime.now().microsecondsSinceEpoch;
       final batch = _db.batch();
       for (final targetId in targetIds) {
         final keyId = (tripId != null && tripId.isNotEmpty)
             ? tripId
             : (refId != null && refId.isNotEmpty)
                 ? refId
-                : '${DateTime.now().microsecondsSinceEpoch}_$targetId';
+                : 'global';
         final noteRef =
-            _db.collection('notifications').doc('${targetId}_${type}_$keyId');
+            _db.collection('notifications').doc('${targetId}_${type}_${keyId}_$ts');
         batch.set(
             noteRef,
             {

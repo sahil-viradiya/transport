@@ -45,23 +45,36 @@ class FloatingNotify {
   }
 
   /// Resolve the root navigator's overlay (survives route changes). Falls back
-  /// to the GetX overlay context if the key isn't ready yet.
+  /// to Get.overlayContext or Get.context if key isn't ready yet.
   static OverlayState? _overlay() {
     try {
       final ov = Get.key.currentState?.overlay;
       if (ov != null) return ov;
     } catch (_) {}
-    final ctx = Get.overlayContext;
-    if (ctx == null) return null;
-    return Overlay.maybeOf(ctx);
+    try {
+      final ctx = Get.overlayContext ?? Get.context;
+      if (ctx != null) return Overlay.maybeOf(ctx);
+    } catch (_) {}
+    return null;
   }
 
   static void _ensureHost(OverlayState overlay) {
-    if (_hostEntry != null && _hostEntry!.mounted) return;
+    if (_hostEntry != null) {
+      try {
+        if (_hostEntry!.mounted) {
+          _hostEntry!.remove();
+        }
+      } catch (_) {}
+      _hostEntry = null;
+    }
     _hostEntry = OverlayEntry(
       builder: (_) => _FloatingHost(items: _items, onDismiss: dismiss),
     );
-    overlay.insert(_hostEntry!);
+    try {
+      overlay.insert(_hostEntry!);
+    } catch (_) {
+      _hostEntry = null;
+    }
   }
 }
 

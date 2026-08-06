@@ -24,7 +24,7 @@ class NotificationsController extends GetxController {
   final RxList<Map<String, dynamic>> items = <Map<String, dynamic>>[].obs;
   StreamSubscription? _sub;
 
-  final Set<String> _seenIds = {};
+  final Set<String> _floatedIds = {};
   bool _primed = false; // skip floating popups for the initial snapshot
 
   int get unreadCount => items.where((n) => n['read'] == false).length;
@@ -33,13 +33,14 @@ class NotificationsController extends GetxController {
   void onInit() {
     super.onInit();
     _bind();
-    // Re-subscribe when the user logs in / out (phone changes).
+    // Re-subscribe when the user logs in / out (phone or role changes).
     ever(_session.phone, (_) => _bind());
+    ever(_session.role, (_) => _bind());
   }
 
   void _bind() {
     _sub?.cancel();
-    _seenIds.clear();
+    _floatedIds.clear();
     _primed = false;
     final phone = _session.isAdmin ? 'admin' : _session.ownerKey;
     if (phone.isEmpty) {
@@ -48,7 +49,7 @@ class NotificationsController extends GetxController {
     }
     _sub = _fb.watchNotifications(phone).listen((list) {
       // After the first snapshot, surface any brand-new notification as a
-      // floating OS notification.
+      // floating in-app notification.
       if (_primed) {
         final Set<String> surfacedThisBatchKeys = {};
         for (final n in list) {
@@ -57,18 +58,20 @@ class NotificationsController extends GetxController {
           final body = n['body']?.toString() ?? '';
           final key = '$title|$body';
 
-          if (id.isNotEmpty && !_seenIds.contains(id) && n['read'] == false) {
+          final isUnread = n['read'] != true;
+          if (id.isNotEmpty && !_floatedIds.contains(id) && isUnread) {
             if (!surfacedThisBatchKeys.contains(key)) {
               surfacedThisBatchKeys.add(key);
+              _floatedIds.add(id);
               _floatLocal(n);
             }
           }
         }
+      } else {
+        // Initial snapshot: mark all current notification IDs as already floated
+        _floatedIds.addAll(list.map((n) => n['id'].toString()));
+        _primed = true;
       }
-      _seenIds
-        ..clear()
-        ..addAll(list.map((n) => n['id'].toString()));
-      _primed = true;
       items.assignAll(list);
     });
   }
@@ -121,14 +124,26 @@ class NotificationsController extends GetxController {
       case 'trip_accepted':
         return (Icons.check_circle_rounded, AppColors.success);
       case 'trip_rejected':
+      case 'load_rejected':
+      case 'delivery_rejected':
+      case 'expense_rejected':
         return (Icons.cancel_rounded, AppColors.error);
       case 'truck_inspection_submitted':
         return (Icons.fact_check_rounded, AppColors.info);
+      case 'vendor_way':
+        return (Icons.directions_bus_rounded, AppColors.info);
+      case 'loading_started':
+        return (Icons.inventory_2_rounded, AppColors.warning);
+      case 'expense_submitted':
+        return (Icons.receipt_long_rounded, AppColors.warning);
       case 'load_request':
       case 'delivery_request':
         return (Icons.pending_actions_rounded, AppColors.tertiaryDark);
       case 'trip_activated':
       case 'delivery_approved':
+      case 'expense_approved':
+      case 'truck_ready':
+      case 'inspection_approved':
         return (Icons.task_alt_rounded, AppColors.success);
       case 'check_in':
         return (Icons.login_rounded, AppColors.success);
