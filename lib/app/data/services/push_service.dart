@@ -63,14 +63,16 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     );
     await localNotifications.initialize(settings: initSettings);
 
-    final title = message.data['title']?.toString() ??
-        message.data['type']?.toString() ??
-        'Notification';
-    final body = message.data['body']?.toString() ?? '';
+    final title = (message.data['title']?.toString() ??
+            message.data['type']?.toString() ??
+            'Notification')
+        .trim();
+    final body = (message.data['body']?.toString() ?? '').trim();
+    final int notifId = '$title|$body'.hashCode.abs() % 100000;
 
     if (title.isNotEmpty || body.isNotEmpty) {
       await localNotifications.show(
-        id: message.hashCode,
+        id: notifId,
         title: title,
         body: body,
         payload: jsonEncode(message.data),
@@ -179,10 +181,14 @@ class PushService extends GetxService {
         if (n == null) return;
 
         if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+          final title = (n.title ?? '').trim();
+          final body = (n.body ?? '').trim();
+          final int notifId = '$title|$body'.hashCode.abs() % 100000;
+
           _localNotifications.show(
-            id: msg.hashCode,
-            title: n.title,
-            body: n.body,
+            id: notifId,
+            title: title,
+            body: body,
             payload: jsonEncode(msg.data),
             notificationDetails: NotificationDetails(
               android: AndroidNotificationDetails(
@@ -278,8 +284,12 @@ class PushService extends GetxService {
       return;
     }
     try {
+      final cleanTitle = title.trim();
+      final cleanBody = body.trim();
+      final int notifId = '$cleanTitle|$cleanBody'.hashCode.abs() % 100000;
+
       await _localNotifications.show(
-        id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        id: notifId,
         title: title,
         body: body,
         payload: payload,

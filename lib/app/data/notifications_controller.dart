@@ -26,6 +26,7 @@ class NotificationsController extends GetxController {
 
   final Set<String> _floatedIds = {};
   bool _primed = false; // skip floating popups for the initial snapshot
+  String? _lastBoundPhone;
 
   int get unreadCount => items.where((n) => n['read'] == false).length;
 
@@ -39,14 +40,27 @@ class NotificationsController extends GetxController {
   }
 
   void _bind() {
-    _sub?.cancel();
-    _floatedIds.clear();
-    _primed = false;
     final phone = _session.isAdmin ? 'admin' : _session.ownerKey;
     if (phone.isEmpty) {
+      _sub?.cancel();
+      _sub = null;
+      _lastBoundPhone = null;
+      _floatedIds.clear();
+      _primed = false;
       items.clear();
       return;
     }
+
+    // Do not re-subscribe or wipe _floatedIds if already listening for this phone
+    if (phone == _lastBoundPhone && _sub != null) {
+      return;
+    }
+
+    _sub?.cancel();
+    _floatedIds.clear();
+    _primed = false;
+    _lastBoundPhone = phone;
+
     _sub = _fb.watchNotifications(phone).listen((list) {
       // After the first snapshot, surface any brand-new notification as a
       // floating in-app notification.
@@ -97,20 +111,9 @@ class NotificationsController extends GetxController {
       },
     );
 
-    // Also route to the OS/browser layer: a real heads-up on mobile, or a
-    // native browser notification on web (useful when the tab isn't focused).
-    if (!Get.isRegistered<PushService>()) return;
-    final push = Get.find<PushService>();
-    if (GetPlatform.isWeb) {
-      push.showWebBrowserNotification(title, body);
-    } else {
-      final payload = jsonEncode({
-        'type': type,
-        'tripId': n['tripId']?.toString() ?? '',
-        'refId': n['refId']?.toString() ?? '',
-        'id': n['id']?.toString() ?? '',
-      });
-      push.showLocal(title, body, payload: payload);
+    // On Web: native browser notification when tab isn't focused
+    if (GetPlatform.isWeb && Get.isRegistered<PushService>()) {
+      Get.find<PushService>().showWebBrowserNotification(title, body);
     }
   }
 
