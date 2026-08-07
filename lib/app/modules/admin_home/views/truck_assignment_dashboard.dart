@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:transport/widgets/app_text.dart';
@@ -8,6 +9,7 @@ import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/core/utils/image_url.dart';
 import 'package:transport/app/core/utils/image_picker_helper.dart';
+import 'package:transport/app/core/utils/truck_owner_pass_pdf_generator.dart';
 import '../controllers/admin_home_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import 'admin_trip_details_view.dart';
@@ -821,6 +823,127 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     );
   }
 
+  String _formatStatusTime(dynamic raw) {
+    if (raw == null) return '';
+    final str = raw.toString().trim();
+    if (str.isEmpty) return '';
+
+    if (str.contains('AM') || str.contains('PM')) {
+      final parts = str.split(' ');
+      if (parts.length >= 2) {
+        return parts.sublist(parts.length - 2).join(' ');
+      }
+      return str;
+    }
+
+    try {
+      DateTime dt;
+      if (raw is Timestamp) {
+        dt = raw.toDate();
+      } else {
+        dt = DateTime.parse(str);
+      }
+      final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      final minute = dt.minute.toString().padLeft(2, '0');
+      final period = dt.hour >= 12 ? 'PM' : 'AM';
+      return '${hour.toString().padLeft(2, '0')}:$minute $period';
+    } catch (_) {
+      if (str.length >= 16 && str.contains('-')) {
+        final timeSection = str.substring(11, 16);
+        final timeParts = timeSection.split(':');
+        if (timeParts.length == 2) {
+          final h = int.tryParse(timeParts[0]);
+          final m = timeParts[1];
+          if (h != null) {
+            final period = h >= 12 ? 'PM' : 'AM';
+            final h12 = h % 12 == 0 ? 12 : h % 12;
+            return '${h12.toString().padLeft(2, '0')}:$m $period';
+          }
+        }
+      }
+      return str;
+    }
+  }
+
+  String _getFormattedStatusTime(Map<String, dynamic> trip) {
+    final status = (trip['status'] ?? '').toString();
+    final milestonesLog = trip['milestonesLog'];
+
+    if (milestonesLog is List && milestonesLog.isNotEmpty) {
+      int targetMilestone = -1;
+      switch (status) {
+        case 'EN_ROUTE_VENDOR':
+          targetMilestone = 1;
+          break;
+        case 'LOADING':
+          targetMilestone = 2;
+          break;
+        case 'LOAD_REQUESTED':
+          targetMilestone = 3;
+          break;
+        case 'ACTIVE NOW':
+          targetMilestone = 4;
+          break;
+        case 'DELIVERY_REQUESTED':
+          targetMilestone = 5;
+          break;
+        case 'DELIVERED':
+          targetMilestone = 6;
+          break;
+      }
+
+      if (targetMilestone != -1) {
+        for (final item in milestonesLog.reversed) {
+          if (item is Map && item['milestone'] == targetMilestone) {
+            final rawTs = item['timestamp'];
+            if (rawTs != null) {
+              final formatted = _formatStatusTime(rawTs);
+              if (formatted.isNotEmpty) return formatted;
+            }
+          }
+        }
+      }
+
+      final lastItem = milestonesLog.last;
+      if (lastItem is Map && lastItem['timestamp'] != null) {
+        final formatted = _formatStatusTime(lastItem['timestamp']);
+        if (formatted.isNotEmpty) return formatted;
+      }
+    }
+
+    dynamic rawField;
+    switch (status) {
+      case 'EN_ROUTE_VENDOR':
+        rawField = trip['enRouteVendorAt'] ?? trip['updatedAt'];
+        break;
+      case 'LOADING':
+        rawField = trip['loadingStartedAt'] ?? trip['updatedAt'];
+        break;
+      case 'LOAD_REQUESTED':
+        rawField = trip['loadRequestedAt'] ?? trip['updatedAt'];
+        break;
+      case 'ACTIVE NOW':
+        rawField = trip['activeNowAt'] ?? trip['updatedAt'];
+        break;
+      case 'DELIVERY_REQUESTED':
+        rawField = trip['deliveryRequestedAt'] ?? trip['updatedAt'];
+        break;
+      case 'DELIVERED':
+        rawField = trip['deliveredAt'] ?? trip['updatedAt'];
+        break;
+      case 'ASSIGNED':
+        rawField = trip['driverConfirmedAt'] ?? trip['assignedAt'];
+        break;
+      default:
+        rawField = trip['updatedAt'] ?? trip['createdAt'];
+    }
+
+    if (rawField != null) {
+      return _formatStatusTime(rawField);
+    }
+    return '';
+  }
+
   Widget _buildActiveTripStatusWidget(MockTruck truck) {
     // Find active trip ID
     final controller = Get.find<AdminHomeController>();
@@ -913,7 +1036,10 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         label = 'Trip Active';
         icon = Icons.info_outline;
         color = Colors.grey;
+        break;
     }
+
+    final statusTime = _getFormattedStatusTime(activeTrip);
 
     final hasPhoto = truck.activeTripPhotoUrl != null &&
         truck.activeTripPhotoUrl!.isNotEmpty;
@@ -953,6 +1079,31 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                     ),
                   ),
                 ),
+                if (statusTime.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.access_time_rounded, size: 10, color: color),
+                        const SizedBox(width: 3),
+                        Text(
+                          statusTime,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: color,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1269,9 +1420,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     Get.dialog(
       StatefulBuilder(
         builder: (context, setStateDialog) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
           return AlertDialog(
-            backgroundColor:
-                widget.isDark ? const Color(0xFF1E293B) : Colors.white,
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: const Row(
@@ -1281,7 +1432,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Generate Supplier Pass',
+                    'Generate Truck Owner Pass',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
@@ -1296,135 +1447,74 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // const Text(
-                      //   'Driver ne loading proof upload kar diya hai. Ab naya Truck Owner Pass banayein aur upload karein. Iske baad hi driver ko Step 4 customer details dikhenge.',
-                      //   style: TextStyle(fontSize: 12, color: Colors.grey),
-                      // ),
-                      // const SizedBox(height: 16),
-                      // TextFormField(
-                      //   controller: passIdCtrl,
-                      //   decoration: InputDecoration(
-                      //     labelText: 'Truck Owner Pass ID *',
-                      //     prefixIcon: const Icon(
-                      //         Icons.confirmation_number_rounded,
-                      //         size: 18),
-                      //     border: OutlineInputBorder(
-                      //         borderRadius: BorderRadius.circular(10)),
-                      //   ),
-                      //   validator: (v) => (v == null || v.trim().isEmpty)
-                      //       ? 'Pass ID enter karein'
-                      //       : null,
-                      // ),
-                      // const SizedBox(height: 12),
-                      // TextFormField(
-                      //   controller: ownerNameCtrl,
-                      //   decoration: InputDecoration(
-                      //     labelText: 'Truck Owner / Transporter Name',
-                      //     prefixIcon:
-                      //         const Icon(Icons.business_rounded, size: 18),
-                      //     border: OutlineInputBorder(
-                      //         borderRadius: BorderRadius.circular(10)),
-                      //   ),
-                      // ),
-                      // const SizedBox(height: 12),
-                      // TextFormField(
-                      //   controller: remarksCtrl,
-                      //   decoration: InputDecoration(
-                      //     labelText: 'Pass Remarks / Notes (Optional)',
-                      //     prefixIcon: const Icon(Icons.notes_rounded, size: 18),
-                      //     border: OutlineInputBorder(
-                      //         borderRadius: BorderRadius.circular(10)),
-                      //   ),
-                      // ),
+                      const Text(
+                        'Pass details fill karein. Photo upload ki jarurat nahi hai — Save & Approve karne par official Truck Owner Pass PDF automatically generate hoke driver ko mil jayegi.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
                       const SizedBox(height: 16),
-                      // Container(
-                      //   padding: const EdgeInsets.all(12),
-                      //   decoration: BoxDecoration(
-                      //     color: widget.isDark
-                      //         ? Colors.white10
-                      //         : const Color(0xFFF8FAFC),
-                      //     borderRadius: BorderRadius.circular(10),
-                      //     border: Border.all(
-                      //         color: widget.isDark
-                      //             ? Colors.white24
-                      //             : Colors.grey.shade300),
-                      //   ),
-                      //   child: Row(
-                      //     children: [
-                      //       Icon(
-                      //         passPhotoUrl != null
-                      //             ? Icons.check_circle_rounded
-                      //             : Icons.upload_file_rounded,
-                      //         color: passPhotoUrl != null
-                      //             ? Colors.green
-                      //             : AppColors.primary,
-                      //       ),
-                      //       const SizedBox(width: 10),
-                      //       Expanded(
-                      //         child: Text(
-                      //           passPhotoUrl != null
-                      //               ? 'Truck Owner Pass Attached ✅'
-                      //               : 'Upload Truck Owner Pass Document',
-                      //           style: const TextStyle(
-                      //               fontWeight: FontWeight.bold, fontSize: 12),
-                      //         ),
-                      //       ),
-                      //       TextButton(
-                      //         onPressed: () async {
-                      //           final url =
-                      //               await ImagePickerHelper.pickImageAsBase64(
-                      //                   context, widget.isDark);
-                      //           if (url != null) {
-                      //             setStateDialog(() {
-                      //               passPhotoUrl = url;
-                      //             });
-                      //           }
-                      //         },
-                      //         child: Text(
-                      //             passPhotoUrl != null ? 'Change' : 'Attach'),
-                      //       ),
-                      //       if (passPhotoUrl != null)
-                      //         IconButton(
-                      //           icon: const Icon(Icons.close_rounded,
-                      //               size: 18, color: Colors.red),
-                      //           onPressed: () {
-                      //             setStateDialog(() {
-                      //               passPhotoUrl = null;
-                      //             });
-                      //           },
-                      //         ),
-                      //     ],
-                      //   ),
-                      // ),
-                      // const SizedBox(height: 12),
+                      TextFormField(
+                        controller: passIdCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Truck Owner Pass ID *',
+                          prefixIcon: const Icon(
+                              Icons.confirmation_number_rounded,
+                              size: 18),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Pass ID enter karein'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: ownerNameCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Truck Owner / Transporter Name',
+                          prefixIcon:
+                              const Icon(Icons.business_rounded, size: 18),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: remarksCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Pass Remarks / Notes (Optional)',
+                          prefixIcon: const Icon(Icons.notes_rounded, size: 18),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: widget.isDark
-                              ? Colors.white10
-                              : const Color(0xFFF8FAFC),
+                          color:
+                              isDark ? Colors.white10 : const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                              color: widget.isDark
+                              color: isDark
                                   ? Colors.white24
                                   : Colors.grey.shade300),
                         ),
                         child: Row(
                           children: [
                             Icon(
-                              adminPhotoUrl != null
+                              passPhotoUrl != null
                                   ? Icons.check_circle_rounded
-                                  : Icons.add_a_photo_rounded,
-                              color: adminPhotoUrl != null
+                                  : Icons.picture_as_pdf_rounded,
+                              color: passPhotoUrl != null
                                   ? Colors.green
-                                  : AppColors.primary,
+                                  : const Color(0xFF10B981),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                adminPhotoUrl != null
-                                    ? 'Supplier Photo Attached ✅'
-                                    : 'Upload Supplier Pass Photo',
+                                passPhotoUrl != null
+                                    ? 'Custom Scan Document Attached ✅'
+                                    : 'Auto PDF Pass Enabled (Attach Custom Scan Optional)',
                                 style: const TextStyle(
                                     fontWeight: FontWeight.bold, fontSize: 12),
                               ),
@@ -1433,23 +1523,23 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                               onPressed: () async {
                                 final url =
                                     await ImagePickerHelper.pickImageAsBase64(
-                                        context, widget.isDark);
+                                        context, isDark);
                                 if (url != null) {
                                   setStateDialog(() {
-                                    adminPhotoUrl = url;
+                                    passPhotoUrl = url;
                                   });
                                 }
                               },
                               child: Text(
-                                  adminPhotoUrl != null ? 'Change' : 'Attach'),
+                                  passPhotoUrl != null ? 'Change' : 'Attach'),
                             ),
-                            if (adminPhotoUrl != null)
+                            if (passPhotoUrl != null)
                               IconButton(
                                 icon: const Icon(Icons.close_rounded,
                                     size: 18, color: Colors.red),
                                 onPressed: () {
                                   setStateDialog(() {
-                                    adminPhotoUrl = null;
+                                    passPhotoUrl = null;
                                   });
                                 },
                               ),
@@ -1468,50 +1558,77 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               ),
               ElevatedButton.icon(
                 onPressed: () async {
-                        if (formKey.currentState!.validate()) {
-                          Get.back();
-                          AppPopup.showLoading(
-                              message: 'Generating Pass & Activating Trip...');
-                          try {
-                            String cleanAdminPhoto = '';
-                            if (adminPhotoUrl != null && adminPhotoUrl!.isNotEmpty) {
-                              cleanAdminPhoto = await _firebaseService.uploadTruckOwnerPassPhoto(tripId, adminPhotoUrl);
-                            }
-                            final ownerPassData = <String, String>{
-                              'passId': passIdCtrl.text.trim(),
-                              'ownerName': ownerNameCtrl.text.trim(),
-                              'remarks': remarksCtrl.text.trim(),
-                              'generatedAt':
-                                  DateTime.now().toString().substring(0, 16),
-                              if (cleanAdminPhoto.isNotEmpty)
-                                'adminPhotoUrl': cleanAdminPhoto,
-                            };
-                            final err = await _firebaseService.approveLoad(
-                              tripId,
-                              truckOwnerPassId: passIdCtrl.text.trim(),
-                              truckOwnerPassUrl: cleanAdminPhoto.isNotEmpty ? cleanAdminPhoto : (passPhotoUrl ?? ''),
-                              truckOwnerPassData: ownerPassData,
-                            );
-                            AppPopup.hideLoading();
-                            if (err != null) {
-                              Get.snackbar('Alert', err,
-                                  snackPosition: SnackPosition.BOTTOM,
-                                  backgroundColor: Colors.orangeAccent);
-                            } else {
-                              Get.snackbar('Success',
-                                  'Truck Owner Pass uploaded & Trip activated! 🚛',
-                                  snackPosition: SnackPosition.BOTTOM,
-                                  backgroundColor: Colors.green,
-                                  colorText: Colors.white);
-                            }
-                          } catch (e) {
-                            AppPopup.hideLoading();
-                            Get.snackbar('Error', e.toString(),
-                                snackPosition: SnackPosition.BOTTOM,
-                                backgroundColor: Colors.redAccent);
-                          }
-                        }
-                      },
+                  if (formKey.currentState!.validate()) {
+                    Get.back();
+                    AppPopup.showLoading(
+                        message: 'Generating Pass PDF & Activating Trip...');
+                    try {
+                      String finalPassUrl = passPhotoUrl ?? '';
+                      if (finalPassUrl.isEmpty) {
+                        final fb = _firebaseService;
+                        final tripDoc = await fb.getTripData(tripId);
+                        final truckNo = (tripDoc?['truckNo'] ?? '').toString();
+                        final driverName = (tripDoc?['driverName'] ?? '').toString();
+                        final driverPhone = (tripDoc?['driverPhone'] ?? '').toString();
+                        final pickupLocation = (tripDoc?['pickupLocation'] ?? tripDoc?['vendorLocation'] ?? '').toString();
+                        final dropCity = (tripDoc?['dropCity'] ?? tripDoc?['dropLocation'] ?? '').toString();
+
+                        final pdfBase64 = await TruckOwnerPassPdfGenerator.generatePdfBase64(
+                          passId: passIdCtrl.text.trim(),
+                          ownerName: ownerNameCtrl.text.trim(),
+                          tripId: tripId,
+                          remarks: remarksCtrl.text.trim(),
+                          truckNo: truckNo,
+                          driverName: driverName,
+                          driverPhone: driverPhone,
+                          pickupLocation: pickupLocation,
+                          dropCity: dropCity,
+                        );
+
+                        finalPassUrl = await fb.uploadTruckOwnerPassPhoto(tripId, pdfBase64);
+                      } else {
+                        finalPassUrl = await _firebaseService
+                            .uploadTruckOwnerPassPhoto(tripId, finalPassUrl);
+                      }
+
+                      final ownerPassData = {
+                        'passId': passIdCtrl.text.trim(),
+                        'ownerName': ownerNameCtrl.text.trim(),
+                        'remarks': remarksCtrl.text.trim(),
+                        'passPhotoUrl': finalPassUrl,
+                        'passDocumentUrl': finalPassUrl,
+                        'passPdfUrl': finalPassUrl,
+                        'generatedAt':
+                            DateTime.now().toString().substring(0, 16),
+                        if (adminPhotoUrl != null && adminPhotoUrl!.isNotEmpty)
+                          'adminPhotoUrl': adminPhotoUrl,
+                      };
+                      final err = await _firebaseService.approveLoad(
+                        tripId,
+                        truckOwnerPassId: passIdCtrl.text.trim(),
+                        truckOwnerPassUrl: finalPassUrl,
+                        truckOwnerPassData: ownerPassData,
+                      );
+                      AppPopup.hideLoading();
+                      if (err != null) {
+                        Get.snackbar('Alert', err,
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: Colors.orangeAccent);
+                      } else {
+                        Get.snackbar('Success',
+                            'Truck Owner Pass PDF generated & Trip activated! 🚛',
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: Colors.green,
+                            colorText: Colors.white);
+                      }
+                    } catch (e) {
+                      AppPopup.hideLoading();
+                      Get.snackbar('Error', e.toString(),
+                          snackPosition: SnackPosition.BOTTOM,
+                          backgroundColor: Colors.redAccent);
+                    }
+                  }
+                },
                 icon: const Icon(Icons.check_circle_rounded, size: 16),
                 label: const Text('Save Pass & Approve'),
                 style: ElevatedButton.styleFrom(

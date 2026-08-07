@@ -440,6 +440,7 @@ class FirebaseService extends GetxService {
       if (data['status'] != 'ASSIGNED') return; // wrong stage
       await _db.collection('trips').doc(tripId).set({
         'status': 'EN_ROUTE_VENDOR',
+        'enRouteVendorAt': FieldValue.serverTimestamp(),
         'milestonesLog': FieldValue.arrayUnion([
           {
             'milestone': 1,
