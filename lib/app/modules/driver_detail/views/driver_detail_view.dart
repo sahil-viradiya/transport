@@ -44,10 +44,6 @@ class DriverDetailView extends GetView<DriverDetailController> {
                 const SizedBox(height: 16),
                 _documentsCard(p['documents'] as List, isDark),
               ],
-              if (controller.expenses.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                _expensesCard(isDark),
-              ],
             ],
           ),
         );
@@ -311,114 +307,6 @@ class DriverDetailView extends GetView<DriverDetailController> {
                     ],
                   ),
                 ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// This driver's expense claims — title, amount and approval status.
-  Widget _expensesCard(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: _deco(isDark),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const AppText('EXPENSES',
-              style: AppTextStyle.labelMedium,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textSecondary),
-          const SizedBox(height: 12),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: controller.expenses.length,
-            separatorBuilder: (_, __) => const Divider(height: 16),
-            itemBuilder: (context, i) {
-              final e = controller.expenses[i];
-              final status = (e['status'] ?? 'Pending').toString();
-              final color = status == 'Approved'
-                  ? AppColors.success
-                  : (status == 'Rejected'
-                      ? AppColors.error
-                      : AppColors.tertiaryDark);
-              return InkWell(
-                onTap: () {
-                  Navigator.of(context, rootNavigator: true).pushNamed(
-                    Routes.EXPENSE_DETAIL,
-                    arguments: {
-                      'id': e['id']?.toString() ?? '',
-                    },
-                  );
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(Icons.receipt_long_rounded,
-                            color: color, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            AppText((e['title'] ?? 'Expense').toString(),
-                                style: AppTextStyle.bodyMedium,
-                                fontWeight: FontWeight.bold,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis),
-                            if ((e['tripId'] ?? '').toString().isNotEmpty)
-                              AppText('Trip: ${e['tripId']}',
-                                  style: AppTextStyle.labelMedium,
-                                  color: AppColors.textSecondary),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              AppText((e['amount'] ?? '').toString(),
-                                  style: AppTextStyle.bodyMedium,
-                                  fontWeight: FontWeight.w700),
-                              const SizedBox(height: 2),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: color.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: AppText(status,
-                                    style: AppTextStyle.labelMedium,
-                                    color: color,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.chevron_right_rounded,
-                              color: AppColors.textSecondary),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
               );
             },
           ),

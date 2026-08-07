@@ -45,7 +45,6 @@ class AdminHomeView extends GetView<AdminHomeController> {
       _buildTrucksTab(context, isDark),
       _buildUsersTab(context, isDark),
       _buildVendorsTab(context, isDark),
-      _buildExpensesTab(context, isDark),
       _buildCustomersTab(context, isDark),
     ];
 
@@ -153,12 +152,6 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           color: AppColors.primary),
                       label: 'Customers',
                     ),
-                    NavigationDestination(
-                      icon: Icon(Icons.currency_rupee_rounded),
-                      selectedIcon: Icon(Icons.currency_rupee_rounded,
-                          color: AppColors.primary),
-                      label: 'Expenses',
-                    ),
                   ],
                 )),
       ),
@@ -173,11 +166,10 @@ class AdminHomeView extends GetView<AdminHomeController> {
     (Icons.people_rounded, 'Drivers', 3),
     (Icons.local_shipping_rounded, 'Trucks', 2),
     (Icons.storefront_rounded, 'Vendors', 4),
-    (Icons.apartment_rounded, 'Customers', 6),
-    (Icons.currency_rupee_rounded, 'Expenses', 5),
+    (Icons.apartment_rounded, 'Customers', 5),
   ];
 
-  static const _mobileNavOrder = [0, 1, 3, 2, 4, 6, 5];
+  static const _mobileNavOrder = [0, 1, 3, 2, 4, 5];
 
   static const _monthNames = [
     'Jan',
@@ -8209,76 +8201,12 @@ class AdminHomeView extends GetView<AdminHomeController> {
     );
   }
 
-  // Helper: Expenses listing with location, date/time and receipt photo preview
   Widget _buildTripExpensesPanel(BuildContext context, bool isDark,
       List<Map<String, dynamic>> expensesList) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.receipt_long_rounded,
-                  color: AppColors.secondary, size: 20),
-              SizedBox(width: 8),
-              AppText(
-                'TRIP EXPENSE CLAIMS',
-                style: AppTextStyle.labelLarge,
-                fontWeight: FontWeight.bold,
-              ),
-            ],
-          ),
-          const Divider(height: 24),
-          if (expensesList.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Column(
-                  children: [
-                    Icon(Icons.currency_rupee_rounded,
-                        size: 36, color: AppColors.textHint),
-                    SizedBox(height: 8),
-                    AppText('No expense claims recorded for this trip.',
-                        style: AppTextStyle.bodyMedium),
-                  ],
-                ),
-              ),
-            )
-          else
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: expensesList.length,
-              itemBuilder: (context, index) {
-                final exp = expensesList[index];
-                final title = exp['title'] ?? 'Expense';
-                final amt = exp['amount'] ?? '₹0';
-                final desc = exp['description'] ?? '';
-                final status = exp['status'] ?? 'Pending';
-                final receiptUrl = exp['receiptUrl'] ?? '';
-                final date = exp['date'] ?? '';
-                final expAddress = exp['locationName'] ?? '';
-                final expLat = exp['latitude'];
-                final expLng = exp['longitude'];
+    return const SizedBox.shrink();
+  }
 
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color:
-                        isDark ? const Color(0xFF0F172A) : Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: isDark ? Colors.white10 : Colors.grey.shade200),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+  /*
                     children: [
                       Row(
                         children: [
@@ -8513,6 +8441,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
       ),
     );
   }
+  */
 
   // Helper: Scanned Proof of Delivery (POD) details and remarks card
   Widget _buildPODDetailsPanel(
@@ -8980,6 +8909,10 @@ class AdminHomeView extends GetView<AdminHomeController> {
   }
 
   Widget _buildExpensesTab(BuildContext context, bool isDark) {
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildExpensesTabOld(BuildContext context, bool isDark) {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: RefreshIndicator(
