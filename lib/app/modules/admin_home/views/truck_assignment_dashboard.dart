@@ -45,6 +45,11 @@ class MockTruck {
   String? activeTripGatePassUrl;
   String? activeTripPodUrl;
   String? activeTripRemarks;
+  /// Driver's current duty status – used to detect return-to-station states.
+  /// Values: 'RETURNING_TO_STATION' | 'PARKING_PENDING' | 'STATION_VERIFIED' | others
+  String driverDutyStatus;
+  /// Parking confirmation data submitted by the driver (from users.parkingConfirmation)
+  Map<String, dynamic>? parkingConfirmation;
 
   MockTruck({
     required this.id,
@@ -63,6 +68,8 @@ class MockTruck {
     this.activeTripGatePassUrl,
     this.activeTripPodUrl,
     this.activeTripRemarks,
+    this.driverDutyStatus = '',
+    this.parkingConfirmation,
   });
 }
 
@@ -225,6 +232,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
 
         // Determine who driver is
         DriverInfo? selectedDriver;
+        String driverDutyStatusFromMap = '';
+        Map<String, dynamic>? parkingConfirmationFromMap;
         if (assignedTo.isNotEmpty) {
           final cleanAssigned = assignedTo.replaceAll(RegExp(r'\D'), '');
           final u = controller.users.firstWhereOrNull((u) {
@@ -239,6 +248,11 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           });
           if (u != null) {
             selectedDriver = _driverFromMap(u);
+            // Capture driver's return-to-station duty status while we have the map.
+            final rawDuty = (u['dutyStatus'] ?? '').toString().toUpperCase();
+            driverDutyStatusFromMap = rawDuty;
+            // Also capture the parking confirmation data if present
+            parkingConfirmationFromMap = u['parkingConfirmation'] as Map<String, dynamic>?;
           } else {
             final avatarUrl = controller.driverAvatarFor(assignedTo);
             final name = controller.driverNameFor(assignedTo);
@@ -252,6 +266,11 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           }
         } else if (_tempSelections.containsKey(truckNo)) {
           selectedDriver = _tempSelections[truckNo];
+        }
+
+        // Also try reading dutyStatus from the truck document itself (written by firebase_service.startReturnJourney)
+        if (driverDutyStatusFromMap.isEmpty) {
+          driverDutyStatusFromMap = (t['driverDutyStatus'] ?? '').toString().toUpperCase();
         }
 
         final hasLoadingPass = t['hasLoadingPass'] == true;
@@ -295,6 +314,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         final hasActiveTrip = assignedTo.isNotEmpty && activeTripDoc != null;
 
         return MockTruck(
+          driverDutyStatus: driverDutyStatusFromMap,
+          parkingConfirmation: parkingConfirmationFromMap,
           id: truckNo,
           truckNo: truckNo,
           name: model,
@@ -353,10 +374,15 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           dedupedTrucks.where((t) => t.status != 'Pending Acceptance').toList();
 
 
+      final bool hasParkingPendingCard = assignedTrucks.any(
+          (t) => t.driverDutyStatus.toUpperCase() == 'PARKING_PENDING');
       final bool hasExpandedAssignedCard = assignedTrucks.any(
           (t) => t.hasActiveTrip || t.hasLoadingPass || t.hasDestinationSetup);
-      final double assignedContainerHeight =
-          hasExpandedAssignedCard ? 540.0 : 275.0;
+      final double assignedContainerHeight = hasParkingPendingCard
+          ? 560.0
+          : hasExpandedAssignedCard
+              ? 540.0
+              : 275.0;
 
       // Check auto reset condition reactively
       _checkAutoReset(dbTrucks);
@@ -769,7 +795,10 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             _buildActiveTripStatusWidget(truck),
             const SizedBox(height: 10),
           ],
-          if (!(truck.hasActiveTrip && truck.hasDestinationSetup)) ...[
+          // Parking Verification Panel – full inline card with photo, time and actions
+          if (truck.driverDutyStatus.toUpperCase() == 'PARKING_PENDING') ...[
+            _buildParkingVerificationPanel(truck),
+          ] else if (!(truck.hasActiveTrip && truck.hasDestinationSetup)) ...[
             // Primary Interactive Button
             SizedBox(
               width: double.infinity,
@@ -1912,9 +1941,510 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     );
   }
 
+  /// Full verification panel shown on the admin truck card when driver has submitted
+  /// a parking confirmation (PARKING_PENDING state). Shows photo, arrival time, and
+  /// Approve / Reject action buttons.
+  Widget _buildParkingVerificationPanel(MockTruck truck) {
+    final pc = truck.parkingConfirmation;
+    final driverId = truck.selectedDriver?.phone ?? '';
+    final reqId = (pc?['id'] ?? '').toString();
+
+    // Parse arrival time
+    String formattedDate = '';
+    String formattedTime = '';
+    final arrivalRaw = (pc?['arrivalTime'] ?? '').toString();
+    if (arrivalRaw.isNotEmpty) {
+      try {
+        final dt = DateTime.parse(arrivalRaw).toLocal();
+        formattedDate =
+            '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+        final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+        final min = dt.minute.toString().padLeft(2, '0');
+        final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+        formattedTime = '$hour:$min $ampm';
+      } catch (_) {}
+    }
+
+    final photoUrl = (pc?['truckPhotoUrl'] ?? '').toString();
+    final address = (pc?['address'] ?? '').toString();
+    final distanceKm = (pc?['distanceKm'] ?? '').toString();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: widget.isDark
+            ? const Color(0xFF1C1A14).withValues(alpha: 0.7)
+            : const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+            color: const Color(0xFFF97316).withValues(alpha: 0.55), width: 1.5),
+      ),
+      padding: const EdgeInsets.all(10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row
+          Row(
+            children: [
+              const Icon(Icons.local_parking_rounded,
+                  size: 13, color: Color(0xFFF97316)),
+              const SizedBox(width: 5),
+              Text(
+                'Parking Verification Request',
+                style: TextStyle(
+                  color: widget.isDark
+                      ? const Color(0xFFFDBA74)
+                      : const Color(0xFF9A3412),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Photo + Meta row
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Truck photo – tap to view fullscreen
+              GestureDetector(
+                onTap: photoUrl.isNotEmpty
+                    ? () {
+                        showDialog(
+                          context: context,
+                          barrierColor: Colors.black87,
+                          builder: (_) => Dialog(
+                            backgroundColor: Colors.transparent,
+                            insetPadding: EdgeInsets.zero,
+                            child: Stack(
+                              children: [
+                                // Dismiss on tap outside
+                                GestureDetector(
+                                  onTap: () => Navigator.pop(context),
+                                  child: Container(
+                                      color: Colors.transparent,
+                                      width: double.infinity,
+                                      height: double.infinity),
+                                ),
+                                // Zoomable image
+                                Center(
+                                  child: InteractiveViewer(
+                                    minScale: 0.5,
+                                    maxScale: 5.0,
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: CachedNetworkImage(
+                                        imageUrl: photoUrl,
+                                        fit: BoxFit.contain,
+                                        placeholder: (_, __) => const SizedBox(
+                                          width: 200,
+                                          height: 200,
+                                          child: Center(
+                                              child:
+                                                  CircularProgressIndicator()),
+                                        ),
+                                        errorWidget: (_, __, ___) =>
+                                            const Icon(Icons.broken_image,
+                                                size: 64, color: Colors.grey),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                // Close button
+                                Positioned(
+                                  top: 40,
+                                  right: 16,
+                                  child: GestureDetector(
+                                    onTap: () => Navigator.pop(context),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black54,
+                                        borderRadius:
+                                            BorderRadius.circular(20),
+                                      ),
+                                      child: const Icon(Icons.close_rounded,
+                                          color: Colors.white, size: 20),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                    : null,
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: photoUrl.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: photoUrl,
+                              width: 72,
+                              height: 72,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => Container(
+                                width: 72,
+                                height: 72,
+                                color: widget.isDark
+                                    ? Colors.white10
+                                    : Colors.grey.shade200,
+                                child: const Icon(Icons.local_shipping_rounded,
+                                    size: 28, color: Colors.grey),
+                              ),
+                              errorWidget: (_, __, ___) => Container(
+                                width: 72,
+                                height: 72,
+                                color: widget.isDark
+                                    ? Colors.white10
+                                    : Colors.grey.shade200,
+                                child: const Icon(Icons.broken_image_rounded,
+                                    size: 24, color: Colors.grey),
+                              ),
+                            )
+                          : Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: widget.isDark
+                                    ? Colors.white10
+                                    : Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Icon(Icons.photo_camera_rounded,
+                                  size: 28, color: Colors.grey),
+                            ),
+                    ),
+                    // Zoom hint overlay (only when photo is present)
+                    if (photoUrl.isNotEmpty)
+                      Positioned(
+                        bottom: 3,
+                        right: 3,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Icon(Icons.zoom_in_rounded,
+                              size: 12, color: Colors.white),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Meta info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (formattedDate.isNotEmpty) ...[
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today_rounded,
+                              size: 11,
+                              color: widget.isDark
+                                  ? Colors.white54
+                                  : Colors.grey.shade600),
+                          const SizedBox(width: 4),
+                          Text(
+                            formattedDate,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: widget.isDark
+                                  ? Colors.white
+                                  : Colors.grey.shade900,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(Icons.access_time_rounded,
+                              size: 11,
+                              color: widget.isDark
+                                  ? Colors.white54
+                                  : Colors.grey.shade600),
+                          const SizedBox(width: 4),
+                          Text(
+                            formattedTime,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFF97316),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (distanceKm.isNotEmpty && distanceKm != '0.0') ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(Icons.social_distance_rounded,
+                              size: 11,
+                              color: widget.isDark
+                                  ? Colors.white38
+                                  : Colors.grey.shade500),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${double.tryParse(distanceKm)?.toStringAsFixed(2) ?? distanceKm} km from station',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: widget.isDark
+                                  ? Colors.white60
+                                  : Colors.grey.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (address.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.location_on_rounded,
+                              size: 11,
+                              color: widget.isDark
+                                  ? Colors.white38
+                                  : Colors.grey.shade500),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              address,
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: widget.isDark
+                                    ? Colors.white54
+                                    : Colors.grey.shade600,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Action buttons
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('Approve Parking?'),
+                        content: Text(
+                            'Approve parking confirmation for ${truck.selectedDriver?.name ?? 'driver'}?'),
+                        actions: [
+                          TextButton(
+                              onPressed: () =>
+                                  Navigator.pop(context, false),
+                              child: const Text('Cancel')),
+                          ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      const Color(0xFF10B981)),
+                              onPressed: () =>
+                                  Navigator.pop(context, true),
+                              child: const Text('Approve',
+                                  style:
+                                      TextStyle(color: Colors.white))),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      await _firebaseService.approveParkingConfirmation(
+                        driverId,
+                        reqId,
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.check_circle_rounded, size: 13),
+                  label: const Text('Approve',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 11)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final reasonCtrl = TextEditingController();
+                    final reason = await showDialog<String>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('Reject Parking'),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Enter rejection reason:'),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: reasonCtrl,
+                              decoration: const InputDecoration(
+                                hintText: 'e.g. Wrong parking spot',
+                                border: OutlineInputBorder(),
+                              ),
+                              maxLines: 2,
+                            ),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(
+                              onPressed: () =>
+                                  Navigator.pop(context, null),
+                              child: const Text('Cancel')),
+                          ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      const Color(0xFFEF4444)),
+                              onPressed: () => Navigator.pop(
+                                  context,
+                                  reasonCtrl.text.trim().isNotEmpty
+                                      ? reasonCtrl.text.trim()
+                                      : 'Rejected by admin'),
+                              child: const Text('Reject',
+                                  style:
+                                      TextStyle(color: Colors.white))),
+                        ],
+                      ),
+                    );
+                    if (reason != null) {
+                      await _firebaseService.rejectParkingConfirmation(
+                        driverId,
+                        reqId,
+                        reason,
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.cancel_rounded, size: 13),
+                  label: const Text('Reject',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 11)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEF4444),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Returns a badge widget when the assigned driver is heading back to the
+  /// transport station. In that state no loading pass should be generated.
+  Widget? _buildReturnToStationBadge(MockTruck truck) {
+    final duty = truck.driverDutyStatus.toUpperCase();
+    if (duty == 'RETURNING_TO_STATION') {
+      return Container(
+        decoration: BoxDecoration(
+          color: widget.isDark
+              ? const Color(0xFF1E3A5F).withValues(alpha: 0.6)
+              : const Color(0xFFEFF6FF),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+              color: const Color(0xFF3B82F6).withValues(alpha: 0.5)),
+        ),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('🚛', style: TextStyle(fontSize: 14)),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                'Returning to Station',
+                style: TextStyle(
+                  color: widget.isDark
+                      ? const Color(0xFF93C5FD)
+                      : const Color(0xFF1D4ED8),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (duty == 'PARKING_PENDING') {
+      // Full panel is rendered separately in _buildInteractiveCard
+      // Return a lightweight placeholder so the SizedBox(height:36) is skipped there
+      return const SizedBox.shrink();
+    } else if (duty == 'STATION_VERIFIED') {
+      return Container(
+        decoration: BoxDecoration(
+          color: widget.isDark
+              ? const Color(0xFF064E3B).withValues(alpha: 0.4)
+              : const Color(0xFFECFDF5),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+              color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+        ),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.verified_rounded,
+                size: 14, color: Color(0xFF10B981)),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                'Station Verified ✓',
+                style: TextStyle(
+                  color: widget.isDark
+                      ? const Color(0xFF6EE7B7)
+                      : const Color(0xFF065F46),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return null;
+  }
+
   Widget _buildInteractiveButton(MockTruck truck) {
     final state = truck.status;
     final hasDriver = truck.selectedDriver != null;
+
+    // If driver is on their return journey, suppress all loading-pass actions.
+    final returnBadge = _buildReturnToStationBadge(truck);
+    if (returnBadge != null) return returnBadge;
 
     if (state == 'Problem') {
       return ElevatedButton.icon(

@@ -136,4 +136,13 @@ const Map<String, String> enUS = {
   'No Trip': 'No Trip',
   'Abhi koi trip assigned nahi.': 'No trip is assigned right now.',
   'Please check-in first to access features': 'Please check-in first to access features',
+  'return_to_station': 'Return to Transport Station',
+  'start_return_journey': 'Start Return Journey',
+  'returning_to_station': 'Returning to Station',
+  'submit_parking_confirmation': 'Submit Parking Confirmation',
+  'parking_confirmation_pending': 'Parking Confirmation Pending',
+  'station_verified': 'Station Verified',
+  'parking_photo_required': 'Truck Photo is mandatory for parking confirmation.',
+  'clock_out_locked_parking': 'Parking verification required from admin before clocking out.',
 };
+

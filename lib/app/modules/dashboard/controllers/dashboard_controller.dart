@@ -12,8 +12,11 @@ import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/app/data/services/location_service.dart';
 import 'package:transport/app/data/services/clock_in_service.dart';
 import 'package:transport/app/routes/app_pages.dart';
+import 'package:geolocator/geolocator.dart';
+import '../views/widgets/parking_confirmation_dialog.dart';
 import '../../trips/controllers/trips_controller.dart';
 import '../../inspection/views/inspection_view.dart';
+
 
 class DashboardController extends GetxController {
   final _session = Get.find<SessionService>();
@@ -185,7 +188,12 @@ class DashboardController extends GetxController {
           if (url.toString().isNotEmpty) avatarUrl.value = url;
           final isAvail = (data['availability'] == 'available') ||
               (data['checkedIn'] == true);
-          dutyStatus.value = isAvail ? 'available' : 'off_duty';
+          dutyStatus.value = data['dutyStatus'] ?? (isAvail ? 'available' : 'off_duty');
+          returnJourneyStatus.value = data['returnJourneyStatus'] ?? 'none';
+          canClockOut.value = data['canClockOut'] == true;
+          if (data['parkingConfirmation'] is Map) {
+            parkingConfirmation.value = Map<String, dynamic>.from(data['parkingConfirmation']);
+          }
           checkInAddress.value = data['checkInAddress'] ?? '';
         }
       });
@@ -199,6 +207,123 @@ class DashboardController extends GetxController {
       });
     } catch (_) {}
   }
+
+  final RxString returnJourneyStatus = 'none'.obs; // 'none' | 'in_transit' | 'parking_requested' | 'verified' | 'rejected'
+  final Rxn<Map<String, dynamic>> parkingConfirmation = Rxn<Map<String, dynamic>>();
+  final RxBool canClockOut = false.obs;
+
+  bool get hasCompletedAllTrips {
+    try {
+      if (!Get.isRegistered<TripsController>()) return false;
+      final tc = Get.find<TripsController>();
+      if (tc.allTrips.isEmpty) return false;
+      return tc.allTrips.every((t) => t.status == 'DELIVERED' || t.status == 'REJECTED');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> startReturnJourney() async {
+    AppPopup.showConfirmation(
+      title: 'Return to Transport Station?',
+      description: 'Finished all trips? Confirm to start your return journey back to the station.',
+      confirmText: 'Start Return',
+      onConfirm: () async {
+        AppPopup.showLoading(message: 'Updating status...');
+        try {
+          final fb = Get.find<FirebaseService>();
+          await fb.startReturnJourney(
+            key: _session.ownerKey,
+            driverName: driverName.value,
+          );
+          returnJourneyStatus.value = 'in_transit';
+          AppPopup.hideLoading();
+          AppSnackBar.showSuccess(
+            title: 'Journey Started 🚛',
+            message: 'Your status is set to Returning to Station. Admin has been notified.',
+          );
+        } catch (e) {
+          AppPopup.hideLoading();
+          AppSnackBar.showError(title: 'Error', message: e.toString());
+        }
+      },
+    );
+  }
+
+  Future<void> openParkingConfirmationDialog(BuildContext context) async {
+    AppPopup.showLoading(message: 'Capturing live GPS location...');
+    try {
+      final loc = Get.find<LocationService>();
+      final pos = await loc.getCurrentPosition();
+      final address = await loc.getAddressFromCoordinates(pos.latitude, pos.longitude);
+      
+      final distanceMeters = Geolocator.distanceBetween(
+        pos.latitude,
+        pos.longitude,
+        LocationService.fallbackLatitude,
+        LocationService.fallbackLongitude,
+      );
+      final distanceKm = distanceMeters / 1000.0;
+
+      AppPopup.hideLoading();
+
+      await ParkingConfirmationDialog.show(
+        context: context,
+        driverName: driverName.value,
+        driverId: _session.ownerKey,
+        vehicleNo: vehicleNo.value.isNotEmpty ? vehicleNo.value : (myTruckNo.isNotEmpty ? myTruckNo : 'GJ-01-AX-9988'),
+        address: address,
+        distanceKm: distanceKm,
+        onSubmit: (bytes) async {
+          await _submitParkingConfirmation(
+            photoBytes: bytes,
+            latitude: pos.latitude,
+            longitude: pos.longitude,
+            address: address,
+            distanceKm: distanceKm,
+          );
+        },
+      );
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'GPS Error', message: 'Could not fetch location: $e');
+    }
+  }
+
+  Future<void> _submitParkingConfirmation({
+    required Uint8List photoBytes,
+    required double latitude,
+    required double longitude,
+    required String address,
+    required double distanceKm,
+  }) async {
+    AppPopup.showLoading(message: 'Submitting parking request...');
+    try {
+      final fb = Get.find<FirebaseService>();
+      final vNo = vehicleNo.value.isNotEmpty ? vehicleNo.value : (myTruckNo.isNotEmpty ? myTruckNo : 'GJ-01-AX-9988');
+      await fb.submitParkingConfirmation(
+        driverId: _session.ownerKey,
+        driverName: driverName.value,
+        vehicleNo: vNo,
+        photoBytes: photoBytes,
+        latitude: latitude,
+        longitude: longitude,
+        address: address,
+        distanceKm: distanceKm,
+      );
+      returnJourneyStatus.value = 'parking_requested';
+      AppPopup.hideLoading();
+      AppSnackBar.showSuccess(
+        title: 'Parking Request Submitted 🅿️',
+        message: 'Admin notification sent. Waiting for station verification.',
+      );
+    } catch (e) {
+      AppPopup.hideLoading();
+      AppSnackBar.showError(title: 'Error', message: e.toString());
+      rethrow;
+    }
+  }
+
 
   @override
   void onClose() {
@@ -473,8 +598,19 @@ class DashboardController extends GetxController {
 
   /// Driver goes off duty.
   void checkOut() {
+    if ((hasCompletedAllTrips || returnJourneyStatus.value != 'none') &&
+        dutyStatus.value != 'STATION_VERIFIED' &&
+        !canClockOut.value) {
+      AppSnackBar.showWarning(
+        title: 'Clock Out Locked 🔒',
+        message: 'Parking verification required from admin before clocking out.',
+      );
+      return;
+    }
+
     AppPopup.showConfirmation(
       title: 'Clock Out / End Shift?',
+
       description: 'Are you sure you want to clock out? You will need to clock in again to resume driver activities.',
       confirmText: 'Clock Out',
       onConfirm: () async {

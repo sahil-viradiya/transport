@@ -19,6 +19,8 @@ class NotificationDetailController extends GetxController {
   final Rxn<Map<String, dynamic>> expense = Rxn<Map<String, dynamic>>();
   final Rxn<Map<String, dynamic>> truck = Rxn<Map<String, dynamic>>();
 
+  final Rxn<Map<String, dynamic>> parkingRequest = Rxn<Map<String, dynamic>>();
+
   String get type => note['type']?.toString() ?? 'info';
   String get tripId => note['tripId']?.toString() ?? '';
   String get refId => note['refId']?.toString() ?? '';
@@ -43,11 +45,14 @@ class NotificationDetailController extends GetxController {
       if (refId.isNotEmpty && type.startsWith('truck')) {
         truck.value = await _fb.getTruck(refId);
       }
+      if (refId.isNotEmpty && type == 'parking_confirmation_request') {
+        parkingRequest.value = await _fb.getParkingConfirmation(refId);
+      }
     } catch (_) {}
     isLoading.value = false;
   }
 
-  /// '' = no action; otherwise 'load' | 'delivery' | 'expense' | 'assign'.
+  /// '' = no action; otherwise 'load' | 'delivery' | 'expense' | 'assign' | 'parking'.
   String get availableAction {
     if (note['actioned'] == true) return ''; // already handled once
     switch (type) {
@@ -59,6 +64,9 @@ class NotificationDetailController extends GetxController {
         return expense.value?['status'] == 'Pending' ? 'expense' : '';
       case 'trip_assigned':
         return trip.value?['status'] == 'PENDING' ? 'assign' : '';
+      case 'parking_confirmation_request':
+        final pStatus = parkingRequest.value?['status'] ?? 'PENDING';
+        return pStatus == 'PENDING' ? 'parking' : '';
       default:
         return '';
     }
@@ -89,6 +97,10 @@ class NotificationDetailController extends GetxController {
           break;
         case 'assign':
           await _fb.acceptTrip(tripId, driverName: name);
+          break;
+        case 'parking':
+          final dId = parkingRequest.value?['driverId'] ?? refId.split('_').first;
+          await _fb.approveParkingConfirmation(dId, refId, adminName: name);
           break;
       }
       await _markRead();
@@ -154,6 +166,10 @@ class NotificationDetailController extends GetxController {
         case 'assign':
           await _fb.rejectTrip(tripId, reason: reason, driverName: name);
           break;
+        case 'parking':
+          final dId = parkingRequest.value?['driverId'] ?? refId.split('_').first;
+          await _fb.rejectParkingConfirmation(dId, refId, reason, adminName: name);
+          break;
       }
       await _markRead();
       AppPopup.hideLoading();
@@ -166,6 +182,7 @@ class NotificationDetailController extends GetxController {
       isActing.value = false;
     }
   }
+
 
   Future<void> _markRead() async {
     final id = note['id']?.toString() ?? '';

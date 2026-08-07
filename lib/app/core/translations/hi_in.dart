@@ -136,4 +136,13 @@ const Map<String, String> hiIN = {
   'No Trip': 'कोई ट्रिप नहीं',
   'Abhi koi trip assigned nahi.': 'अभी कोई ट्रिप असाइन नहीं है।',
   'Please check-in first to access features': 'सुविधाओं का उपयोग करने के लिए कृपया पहले चेक-इन करें',
+  'return_to_station': 'ट्रांसपोर्ट स्टेशन पर वापस लौटें',
+  'start_return_journey': 'वापसी यात्रा शुरू करें',
+  'returning_to_station': 'स्टेशन वापस लौट रहे हैं',
+  'submit_parking_confirmation': 'पार्किंग पुष्टि सबमिट करें',
+  'parking_confirmation_pending': 'पार्किंग पुष्टि लंबित है',
+  'station_verified': 'स्टेशन सत्यापित ✅',
+  'parking_photo_required': 'पार्किंग पुष्टि के लिए ट्रक की फोटो अनिवार्य है।',
+  'clock_out_locked_parking': 'क्लॉक आउट करने से पहले एडमिन द्वारा पार्किंग सत्यापन आवश्यक है।',
 };
+

@@ -90,8 +90,10 @@ class DashboardView extends GetView<DashboardController> {
                   _buildMyTruckCard(),
                   _buildTruckAcceptanceAlert(),
                   const SizedBox(height: 12),
+                  _buildReturnToStationCard(context),
                   _buildTodayTiles(context),
                   const SizedBox(height: 16),
+
                   _buildActionGrid(context, home),
                   const SizedBox(height: 16),
                   _buildTripProgressCard(context),
@@ -653,8 +655,228 @@ class DashboardView extends GetView<DashboardController> {
     });
   }
 
+  Widget _buildReturnToStationCard(BuildContext context) {
+    return Obx(() {
+      final isClocked = controller.dutyStatus.value != 'off_duty';
+      if (!isClocked) return const SizedBox.shrink();
+
+      final hasCompletedAll = controller.hasCompletedAllTrips;
+      final status = controller.returnJourneyStatus.value;
+      final duty = controller.dutyStatus.value;
+
+      if (hasCompletedAll && status == 'none') {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [
+                AppColors.primary,
+                AppColors.primaryDark,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.task_alt_rounded, color: Colors.white, size: 24),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: AppText(
+                      'All Trips Completed! 🎉',
+                      style: AppTextStyle.titleLarge,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const AppText(
+                'Aapne aaj ki sabhi trips puri kar li hain. Station wapas lautne ke liye niche button dabayein.',
+                style: AppTextStyle.bodyMedium,
+                color: Colors.white70,
+              ),
+              const SizedBox(height: 14),
+              ElevatedButton.icon(
+                onPressed: controller.startReturnJourney,
+                icon: const Icon(Icons.directions_bus_rounded, color: AppColors.primaryDark),
+                label: const Text('Return to Transport Station',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.primaryDark,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      if (status == 'in_transit' || status == 'rejected' || duty == 'RETURNING_TO_STATION') {
+        final isRejected = status == 'rejected';
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isRejected
+                ? AppColors.error.withValues(alpha: 0.1)
+                : AppColors.info.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+                color: isRejected ? AppColors.error : AppColors.info,
+                width: 1.5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    isRejected
+                        ? Icons.cancel_rounded
+                        : Icons.directions_bus_rounded,
+                    color: isRejected ? AppColors.error : AppColors.info,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: AppText(
+                      isRejected
+                          ? 'Parking Confirmation Rejected'
+                          : 'Returning to Station 🚛',
+                      style: AppTextStyle.titleLarge,
+                      fontWeight: FontWeight.bold,
+                      color: isRejected ? AppColors.error : AppColors.info,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              AppText(
+                isRejected
+                    ? 'Reason: ${controller.parkingConfirmation.value?['rejectionReason'] ?? 'Details incorrect'}. Kripya dobara truck photo submit karein.'
+                    : 'Aap transport station ke raste mein hain. Pahuche par parking confirmation request submit karein.',
+                style: AppTextStyle.bodyMedium,
+              ),
+              const SizedBox(height: 14),
+              ElevatedButton.icon(
+                onPressed: () =>
+                    controller.openParkingConfirmationDialog(context),
+                icon: const Icon(Icons.local_parking_rounded),
+                label: Text(
+                    isRejected
+                        ? 'Re-submit Parking Confirmation'
+                        : 'Submit Parking Confirmation',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      isRejected ? AppColors.error : AppColors.info,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      if (status == 'parking_requested' || duty == 'PARKING_PENDING') {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.warning.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.warning, width: 1.5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.hourglass_top_rounded,
+                      color: AppColors.warning, size: 24),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: AppText(
+                      'Parking Verification Pending ⏳',
+                      style: AppTextStyle.titleLarge,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.warning,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const AppText(
+                'Aapka parking request admin verification ke liye bhej diya gaya hai. Admin approval ke baad aap Clock Out kar payenge.',
+                style: AppTextStyle.bodyMedium,
+              ),
+            ],
+          ),
+        );
+      }
+
+      if (status == 'verified' || duty == 'STATION_VERIFIED') {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.success.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.success, width: 1.5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.verified_rounded,
+                      color: AppColors.success, size: 24),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: AppText(
+                      'Station Verified ✅',
+                      style: AppTextStyle.titleLarge,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.success,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const AppText(
+                'Admin ne aapka parking approve kar diya hai. Aapka workday safaltapoorvak pura ho gaya hai. Aap ab Clock Out kar sakte hain.',
+                style: AppTextStyle.bodyMedium,
+              ),
+            ],
+          ),
+        );
+      }
+
+      return const SizedBox.shrink();
+    });
+  }
+
   // ---- Duty / Check-in card (kept from before) ----
   Widget _buildDutyCard(BuildContext context) {
+
     return Obx(() {
       final onDuty = controller.isOnDuty;
       final accent = onDuty ? AppColors.success : AppColors.textSecondary;

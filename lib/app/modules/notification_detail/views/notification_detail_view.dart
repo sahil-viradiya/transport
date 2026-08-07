@@ -7,6 +7,7 @@ import '../../../../widgets/feedback_views.dart';
 import '../../../../widgets/app_card.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_url.dart';
+import '../../../core/utils/app_image_helper.dart';
 
 class NotificationDetailView extends GetView<NotificationDetailController> {
   const NotificationDetailView({super.key});
@@ -38,6 +39,8 @@ class NotificationDetailView extends GetView<NotificationDetailController> {
                 _podProofCard(controller.trip.value!, isDark),
               if (controller.expense.value != null) _expenseCard(isDark),
               if (controller.truck.value != null) _truckCard(isDark),
+              if (controller.parkingRequest.value != null)
+                _parkingConfirmationCard(controller.parkingRequest.value!, isDark),
               const SizedBox(height: 20),
               _actionSection(),
             ],
@@ -46,6 +49,7 @@ class NotificationDetailView extends GetView<NotificationDetailController> {
       }),
     );
   }
+
 
   Widget _card(bool isDark, Widget child) => AppCard(child: child);
 
@@ -403,6 +407,99 @@ class NotificationDetailView extends GetView<NotificationDetailController> {
     );
   }
 
+  Widget _parkingConfirmationCard(Map<String, dynamic> p, bool isDark) {
+    final driverName = (p['driverName'] ?? 'Driver').toString();
+    final driverId = (p['driverId'] ?? '').toString();
+    final vehicleNo = (p['vehicleNo'] ?? '').toString();
+    final address = (p['address'] ?? '').toString();
+    final timeStr = (p['arrivalTime'] ?? '').toString();
+    final photoUrl = (p['truckPhotoUrl'] ?? '').toString();
+    final distanceKm = (p['distanceKm'] as num?)?.toDouble() ?? 0.0;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: _card(
+        isDark,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.local_parking_rounded, color: AppColors.primary, size: 22),
+                const SizedBox(width: 8),
+                const AppText('Parking Request Details', style: AppTextStyle.bodyLarge, fontWeight: FontWeight.w700),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: AppText(
+                    p['status']?.toString() ?? 'PENDING',
+                    style: AppTextStyle.labelMedium,
+                    color: AppColors.warning,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _infoRow('Driver', '$driverName ($driverId)'),
+            _infoRow('Truck No', vehicleNo),
+            _infoRow('Arrival Time', timeStr),
+            _infoRow('Arrival Location', address),
+            _infoRow('Station Distance', '${distanceKm.toStringAsFixed(2)} km away'),
+            if (photoUrl.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              const AppText('Truck Parking Photo:', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: photoUrl.startsWith('data:image/')
+                    ? Image.memory(
+                        AppImageHelper.decodeBase64(photoUrl)!,
+                        height: 200,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      )
+                    : Image.network(
+                        corsSafeImageUrl(photoUrl),
+                        height: 200,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 120,
+                          color: Colors.grey.shade300,
+                          child: const Center(child: Icon(Icons.broken_image_rounded)),
+                        ),
+                      ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: AppText(label, style: AppTextStyle.labelMedium, color: AppColors.textSecondary),
+          ),
+          Expanded(
+            child: AppText(value, style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
   (IconData, Color) _style(String type) {
     switch (type) {
       case 'trip_assigned':
@@ -411,20 +508,25 @@ class NotificationDetailView extends GetView<NotificationDetailController> {
         return (Icons.inventory_2_rounded, AppColors.tertiaryDark);
       case 'delivery_request':
         return (Icons.where_to_vote_rounded, AppColors.primary);
+      case 'parking_confirmation_request':
+        return (Icons.local_parking_rounded, AppColors.primary);
       case 'expense_submitted':
         return (Icons.receipt_long_rounded, AppColors.tertiaryDark);
       case 'trip_accepted':
       case 'trip_activated':
       case 'delivery_approved':
       case 'expense_approved':
+      case 'parking_approved':
         return (Icons.check_circle_rounded, AppColors.success);
       case 'trip_rejected':
       case 'load_rejected':
       case 'delivery_rejected':
       case 'expense_rejected':
+      case 'parking_rejected':
         return (Icons.cancel_rounded, AppColors.error);
       default:
         return (Icons.notifications_rounded, AppColors.tertiaryDark);
     }
   }
 }
+

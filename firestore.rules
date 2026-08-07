@@ -200,5 +200,32 @@ service cloud.firestore {
       allow write:
           if isAdmin();
     }
+
+    // =========================
+    // PARKING CONFIRMATIONS
+    // =========================
+    // Drivers submit parking confirmations; admins approve/reject them.
+    match /parking_confirmations/{reqId} {
+      // Driver can read their own request; admin can read all
+      allow read:
+          if isSignedIn() && (
+            (resource != null && isPhoneMatch(resource.data.driverId)) ||
+            isAdmin()
+          );
+
+      // Driver creates their own parking confirmation request
+      allow create:
+          if isSignedIn() && (
+            isPhoneMatch(request.resource.data.driverId) ||
+            isAdmin()
+          );
+
+      // Admin updates status (approve/reject); driver cannot update
+      allow update:
+          if isSignedIn() && isAdmin();
+
+      allow delete:
+          if isAdmin();
+    }
   }
 }

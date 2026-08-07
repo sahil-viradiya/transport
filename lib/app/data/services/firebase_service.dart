@@ -1824,6 +1824,223 @@ class FirebaseService extends GetxService {
     } catch (_) {}
   }
 
+  Future<String> uploadTruckParkingPhoto(String driverId, Uint8List? bytes) async {
+    if (bytes == null || bytes.isEmpty) return '';
+    final id = driverId.isEmpty ? ownerKey : driverId;
+    final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    if (useMockStorage) return base64String;
+    try {
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final ref = _storage
+          .ref()
+          .child('parking_photos')
+          .child(id)
+          .child('parking_$ts.jpg');
+      final task =
+          await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+      final downloadUrl = await task.ref.getDownloadURL();
+      if (downloadUrl.isNotEmpty) return downloadUrl;
+    } catch (e) {
+      _warnStorage('Parking Photo', e);
+    }
+    return base64String;
+  }
+
+  Future<void> startReturnJourney({String? key, String? driverName}) async {
+    try {
+      final id = (key == null || key.isEmpty) ? ownerKey : key;
+      final normId = SessionService.normalizePhone(id);
+      final name = driverName ?? 'Driver';
+
+      final data = <String, dynamic>{
+        'dutyStatus': 'RETURNING_TO_STATION',
+        'returnJourneyStatus': 'in_transit',
+        'returnJourneyStartedAt': FieldValue.serverTimestamp(),
+        'canClockOut': false,
+        'lastDutyChange': FieldValue.serverTimestamp(),
+      };
+
+      await _write('startReturnJourney', () async {
+        await _ownerDoc(id).set(data, SetOptions(merge: true));
+        await _db.collection('users').doc(id).set(data, SetOptions(merge: true));
+        if (normId.isNotEmpty && normId != id) {
+          await _db.collection('users').doc(normId).set(data, SetOptions(merge: true));
+          await _db.collection('drivers').doc(normId).set(data, SetOptions(merge: true));
+        }
+
+        await createNotification(
+          toPhone: 'admin',
+          title: 'Driver Returning to Station 🚛',
+          body: '$name completed all trips and is returning to transport station.',
+          type: 'return_journey_started',
+          refId: id,
+        );
+      });
+    } catch (e) {
+      debugPrint('[FirebaseService] startReturnJourney error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> submitParkingConfirmation({
+    required String driverId,
+    required String driverName,
+    required String vehicleNo,
+    required Uint8List photoBytes,
+    required double latitude,
+    required double longitude,
+    required String address,
+    required double distanceKm,
+  }) async {
+    try {
+      final id = driverId.isEmpty ? ownerKey : driverId;
+      final normId = SessionService.normalizePhone(id);
+      final photoUrl = await uploadTruckParkingPhoto(id, photoBytes);
+      final reqId = '${id}_${DateTime.now().millisecondsSinceEpoch}';
+
+      final parkingData = <String, dynamic>{
+        'id': reqId,
+        'driverId': id,
+        'driverName': driverName,
+        'vehicleNo': vehicleNo,
+        'truckPhotoUrl': photoUrl,
+        'latitude': latitude,
+        'longitude': longitude,
+        'address': address,
+        'distanceKm': distanceKm,
+        'arrivalTime': DateTime.now().toIso8601String(),
+        'status': 'PENDING',
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      await _write('submitParkingConfirmation', () async {
+        await _db.collection('parking_confirmations').doc(reqId).set(parkingData);
+
+        final updateData = <String, dynamic>{
+          'dutyStatus': 'PARKING_PENDING',
+          'returnJourneyStatus': 'parking_requested',
+          'parkingConfirmation': parkingData,
+          'canClockOut': false,
+          'lastDutyChange': FieldValue.serverTimestamp(),
+        };
+
+        await _ownerDoc(id).set(updateData, SetOptions(merge: true));
+        await _db.collection('users').doc(id).set(updateData, SetOptions(merge: true));
+        if (normId.isNotEmpty && normId != id) {
+          await _db.collection('users').doc(normId).set(updateData, SetOptions(merge: true));
+          await _db.collection('drivers').doc(normId).set(updateData, SetOptions(merge: true));
+        }
+
+        await createNotification(
+          toPhone: 'admin',
+          title: 'Parking Confirmation Request 🅿️',
+          body: '$driverName submitted parking confirmation request for truck $vehicleNo.',
+          type: 'parking_confirmation_request',
+          refId: reqId,
+        );
+      });
+    } catch (e) {
+      debugPrint('[FirebaseService] submitParkingConfirmation error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> approveParkingConfirmation(String driverId, String requestId, {String? adminName}) async {
+    try {
+      final id = driverId.isEmpty ? ownerKey : driverId;
+      final normId = SessionService.normalizePhone(id);
+      final admin = adminName ?? 'Admin';
+
+      await _write('approveParkingConfirmation', () async {
+        await _db.collection('parking_confirmations').doc(requestId).set({
+          'status': 'APPROVED',
+          'approvedBy': admin,
+          'approvedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        final updateData = <String, dynamic>{
+          'dutyStatus': 'STATION_VERIFIED',
+          'returnJourneyStatus': 'verified',
+          'canClockOut': true,
+          'parkingConfirmation.status': 'APPROVED',
+          'lastDutyChange': FieldValue.serverTimestamp(),
+        };
+
+        await _ownerDoc(id).set(updateData, SetOptions(merge: true));
+        await _db.collection('users').doc(id).set(updateData, SetOptions(merge: true));
+        if (normId.isNotEmpty && normId != id) {
+          await _db.collection('users').doc(normId).set(updateData, SetOptions(merge: true));
+          await _db.collection('drivers').doc(normId).set(updateData, SetOptions(merge: true));
+        }
+
+        await createNotification(
+          toPhone: id,
+          title: 'Parking Confirmation Approved ✅',
+          body: 'Your truck parking at the transport station has been verified. You can now clock out.',
+          type: 'parking_approved',
+          refId: requestId,
+        );
+      });
+    } catch (e) {
+      debugPrint('[FirebaseService] approveParkingConfirmation error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> rejectParkingConfirmation(String driverId, String requestId, String reason, {String? adminName}) async {
+    try {
+      final id = driverId.isEmpty ? ownerKey : driverId;
+      final normId = SessionService.normalizePhone(id);
+      final admin = adminName ?? 'Admin';
+
+      await _write('rejectParkingConfirmation', () async {
+        await _db.collection('parking_confirmations').doc(requestId).set({
+          'status': 'REJECTED',
+          'rejectionReason': reason,
+          'rejectedBy': admin,
+          'rejectedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        final updateData = <String, dynamic>{
+          'dutyStatus': 'RETURNING_TO_STATION',
+          'returnJourneyStatus': 'rejected',
+          'canClockOut': false,
+          'parkingConfirmation.status': 'REJECTED',
+          'parkingConfirmation.rejectionReason': reason,
+          'lastDutyChange': FieldValue.serverTimestamp(),
+        };
+
+        await _ownerDoc(id).set(updateData, SetOptions(merge: true));
+        await _db.collection('users').doc(id).set(updateData, SetOptions(merge: true));
+        if (normId.isNotEmpty && normId != id) {
+          await _db.collection('users').doc(normId).set(updateData, SetOptions(merge: true));
+          await _db.collection('drivers').doc(normId).set(updateData, SetOptions(merge: true));
+        }
+
+        await createNotification(
+          toPhone: id,
+          title: 'Parking Confirmation Rejected ❌',
+          body: 'Reason: $reason. Please re-submit parking confirmation photo.',
+          type: 'parking_rejected',
+          refId: requestId,
+        );
+      });
+    } catch (e) {
+      debugPrint('[FirebaseService] rejectParkingConfirmation error: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getParkingConfirmation(String requestId) async {
+    try {
+      final doc = await _db.collection('parking_confirmations').doc(requestId).get();
+      return doc.data();
+    } catch (_) {
+      return null;
+    }
+  }
+
+
   Future<void> updateEmergencyContact(
       String name, String relation, String phone,
       [String? key]) async {

@@ -141,13 +141,21 @@ class NotificationsController extends GetxController {
         return (Icons.receipt_long_rounded, AppColors.warning);
       case 'load_request':
       case 'delivery_request':
-        return (Icons.pending_actions_rounded, AppColors.tertiaryDark);
+      case 'parking_confirmation_request':
+        return (Icons.local_parking_rounded, AppColors.tertiaryDark);
+      case 'return_journey_started':
+        return (Icons.directions_bus_rounded, AppColors.info);
+      case 'parking_approved':
+        return (Icons.verified_rounded, AppColors.success);
+      case 'parking_rejected':
+        return (Icons.cancel_rounded, AppColors.error);
       case 'trip_activated':
       case 'delivery_approved':
       case 'expense_approved':
       case 'truck_ready':
       case 'inspection_approved':
         return (Icons.task_alt_rounded, AppColors.success);
+
       case 'check_in':
         return (Icons.login_rounded, AppColors.success);
       case 'check_out':

@@ -95,28 +95,40 @@ class DriverDetailView extends GetView<DriverDetailController> {
                     const SizedBox(height: 2),
                     AppText(phone, style: AppTextStyle.bodyMedium),
                     const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: (available
-                                ? AppColors.success
-                                : AppColors.textSecondary)
-                            .withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: AppText(available ? 'Available' : 'Off Duty',
+                    Builder(builder: (_) {
+                      final duty = (u['dutyStatus'] ?? '').toString();
+                      String statusText = available ? 'Available' : 'Off Duty';
+                      Color badgeColor = available ? AppColors.success : AppColors.textSecondary;
+                      if (duty == 'RETURNING_TO_STATION') {
+                        statusText = 'Returning to Station 🚛';
+                        badgeColor = AppColors.info;
+                      } else if (duty == 'PARKING_PENDING') {
+                        statusText = 'Parking Pending ⏳';
+                        badgeColor = AppColors.warning;
+                      } else if (duty == 'STATION_VERIFIED') {
+                        statusText = 'Station Verified ✅';
+                        badgeColor = AppColors.success;
+                      }
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: badgeColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: AppText(
+                          statusText,
                           style: AppTextStyle.labelMedium,
-                          color: available
-                              ? AppColors.success
-                              : AppColors.textSecondary,
-                          fontWeight: FontWeight.bold),
-                    ),
+                          color: badgeColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      );
+                    }),
                   ],
                 ),
               ),
             ],
           ),
+
           if (available && checkInAddr.isNotEmpty) ...[
             const Divider(height: 24),
             Row(
