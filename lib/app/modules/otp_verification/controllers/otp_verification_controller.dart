@@ -10,6 +10,7 @@ import 'package:transport/app/routes/app_pages.dart';
 import 'package:transport/app/core/utils/app_logger.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/app/data/services/clock_in_service.dart';
+import 'package:transport/app/data/services/push_service.dart';
 
 class OtpVerificationController extends GetxController {
   final _session = Get.find<SessionService>();
@@ -164,6 +165,10 @@ class OtpVerificationController extends GetxController {
         role: role,
         avatarUrl: avatarUrl,
       );
+
+      if (Get.isRegistered<PushService>()) {
+        Get.find<PushService>().registerForUser();
+      }
 
       // 4. Navigate directly to Dashboard or Onboarding / Clock In
       if (role == 'admin') {

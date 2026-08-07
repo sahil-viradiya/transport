@@ -1198,8 +1198,11 @@ class FirebaseService extends GetxService {
     final normAdminPhone = SessionService.normalizePhone(adminPhone);
 
     Query<Map<String, dynamic>> query = _db.collection('notifications');
-    if (!isAdmin && p.isNotEmpty) {
-      query = query.where('toPhone', isEqualTo: p);
+    if (!isAdmin && (p.isNotEmpty || rawP.isNotEmpty)) {
+      final variants = SessionService.getPhoneVariants(phone).take(10).toList();
+      if (variants.isNotEmpty) {
+        query = query.where('toPhone', whereIn: variants);
+      }
     }
 
     return query.snapshots().handleError((e) {
@@ -1290,7 +1293,7 @@ class FirebaseService extends GetxService {
       await _db
           .collection('notifications')
           .doc(id)
-          .set({'read': true}, SetOptions(merge: true));
+          .update({'read': true});
     } catch (_) {}
   }
 
@@ -1301,42 +1304,53 @@ class FirebaseService extends GetxService {
       await _db
           .collection('notifications')
           .doc(id)
-          .set({'actioned': true, 'read': true}, SetOptions(merge: true));
+          .update({'actioned': true, 'read': true});
     } catch (_) {}
   }
 
   Future<void> markAllNotificationsRead(String phone) async {
-    final rawP = phone.trim();
     final p = SessionService.normalizePhone(phone);
     final session = Get.find<SessionService>();
-    final isAdmin = session.isAdmin || rawP == 'admin' || p == 'admin';
+    final isAdmin = session.isAdmin || phone.trim() == 'admin' || p == 'admin';
     final adminPhone = session.ownerKey.trim();
     final normAdminPhone = SessionService.normalizePhone(adminPhone);
 
     try {
       final snap = await _db
           .collection('notifications')
-          .where('read', isEqualTo: false)
           .get();
 
-      final docsToMark = snap.docs.where((doc) {
-        final toP = (doc.data()['toPhone'] ?? '').toString().trim();
-        if (toP.isEmpty) return false;
+      final batch = _db.batch();
+      int count = 0;
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        if (data['read'] == true) continue;
+
+        final toP = (data['toPhone'] ?? '').toString().trim();
+        if (toP.isEmpty) continue;
         final normToP = SessionService.normalizePhone(toP);
 
+        bool matches = false;
         if (isAdmin) {
-          return toP.toLowerCase() == 'admin' ||
+          matches = toP.toLowerCase() == 'admin' ||
               (adminPhone.isNotEmpty && toP == adminPhone) ||
               (normAdminPhone.isNotEmpty && normToP == normAdminPhone) ||
-              toP == rawP ||
+              toP == phone.trim() ||
               (p.isNotEmpty && normToP == p);
         } else {
-          return toP.toLowerCase() != 'admin' &&
-              (toP == rawP || (p.isNotEmpty && normToP == p));
+          matches = toP.toLowerCase() != 'admin' &&
+              (toP == phone.trim() || (p.isNotEmpty && normToP == p));
         }
-      }).map((doc) => doc.reference);
 
-      await _setInBatches(docsToMark, {'read': true});
+        if (matches) {
+          batch.update(doc.reference, {'read': true});
+          count++;
+        }
+      }
+
+      if (count > 0) {
+        await batch.commit();
+      }
     } catch (_) {}
   }
 

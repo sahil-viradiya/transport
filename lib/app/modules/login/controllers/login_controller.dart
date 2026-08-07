@@ -6,6 +6,7 @@ import 'package:transport/widgets/dialogs/app_popup.dart';
 import 'package:transport/app/routes/app_pages.dart';
 import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
+import 'package:transport/app/data/services/push_service.dart';
 import 'package:transport/app/data/services/clock_in_service.dart';
 
 import 'package:transport/app/core/config/app_config.dart';
@@ -201,6 +202,10 @@ class LoginController extends GetxController {
           role: role,
           avatarUrl: avatarUrl,
         );
+
+        if (Get.isRegistered<PushService>()) {
+          Get.find<PushService>().registerForUser();
+        }
 
         if (role == 'admin') {
           Get.offAllNamed(Routes.ADMIN_HOME);

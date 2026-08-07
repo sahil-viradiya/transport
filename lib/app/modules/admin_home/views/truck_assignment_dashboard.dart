@@ -532,6 +532,30 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
 
   Widget _buildInteractiveCard(MockTruck truck) {
     final state = truck.status;
+    final adminController = Get.find<AdminHomeController>();
+    String cleanTruckStr(String val) =>
+        val.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    final driverPhone = truck.selectedDriver?.phone ?? '';
+
+    final hasMatchingTrip = adminController.trips.any((trip) {
+      final tripTruck = (trip['truckNo'] ?? '').toString();
+      final tripDriver = (trip['driverPhone'] ?? '').toString();
+      final tripStatus = (trip['status'] ?? '').toString();
+      final matchesTruck =
+          cleanTruckStr(tripTruck) == cleanTruckStr(truck.truckNo);
+      final matchesDriver = driverPhone.isNotEmpty &&
+          SessionService.normalizePhone(tripDriver) ==
+              SessionService.normalizePhone(driverPhone);
+      return (matchesTruck || matchesDriver) &&
+          tripStatus != 'DELIVERED' &&
+          tripStatus != 'REJECTED';
+    });
+
+    final bool isFirstTripCreated = truck.hasActiveTrip ||
+        truck.hasLoadingPass ||
+        truck.hasDestinationSetup ||
+        hasMatchingTrip;
+
     return Container(
       width: 290,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -751,7 +775,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               child: _buildInteractiveButton(truck),
             ),
           ],
-          if (truck.selectedDriver != null && widget.onOpenTripForm != null) ...[
+          if (truck.selectedDriver != null &&
+              widget.onOpenTripForm != null &&
+              isFirstTripCreated) ...[
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
@@ -765,14 +791,20 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF2563EB),
-                  backgroundColor: widget.isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
-                  side: BorderSide(color: widget.isDark ? const Color(0xFF3B82F6) : const Color(0xFFBFDBFE)),
+                  backgroundColor: widget.isDark
+                      ? const Color(0xFF1E293B)
+                      : const Color(0xFFEFF6FF),
+                  side: BorderSide(
+                      color: widget.isDark
+                          ? const Color(0xFF3B82F6)
+                          : const Color(0xFFBFDBFE)),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                 ),
-                icon: const Icon(Icons.add_circle_outline_rounded, size: 16, color: Color(0xFF2563EB)),
+                icon: const Icon(Icons.add_circle_outline_rounded,
+                    size: 16, color: Color(0xFF2563EB)),
                 label: const Text(
                   '+ Add 2nd Trip',
                   style: TextStyle(
@@ -2385,7 +2417,20 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         .toSet()
         .toList();
     final itemsList = vendors
-        .map((v) => (v['itemName'] ?? '').toString())
+        .expand((v) {
+          if (v['items'] is List && (v['items'] as List).isNotEmpty) {
+            return (v['items'] as List)
+                .map((e) => e.toString().trim())
+                .where((s) => s.isNotEmpty);
+          }
+          final single = (v['itemName'] ?? '').toString().trim();
+          if (single.isNotEmpty) {
+            return single.contains(',')
+                ? single.split(',').map((e) => e.trim()).where((s) => s.isNotEmpty)
+                : [single];
+          }
+          return <String>[];
+        })
         .where((item) => item.isNotEmpty)
         .toSet()
         .toList();
@@ -2446,172 +2491,312 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           child: Form(
             key: formKey,
             child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const AppText(
-                    'Details enter/search karein. Save karne par driver ko notification chali jayegi.',
-                    style: AppTextStyle.labelMedium,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Vendor Name Autocomplete
-                  Autocomplete<String>(
-                    initialValue: TextEditingValue(text: vendorNameCtrl.text),
-                    optionsBuilder: (TextEditingValue textEditingValue) {
-                      if (textEditingValue.text.isEmpty) {
-                        return vendorsList;
-                      }
-                      return vendorsList.where((String option) {
-                        return option
-                            .toLowerCase()
-                            .contains(textEditingValue.text.toLowerCase());
-                      });
-                    },
-                    fieldViewBuilder: (context, textEditingController,
-                        focusNode, onFieldSubmitted) {
-                      textEditingController.addListener(() {
-                        vendorNameCtrl.text = textEditingController.text;
-                      });
-                      return TextFormField(
-                        controller: textEditingController,
-                        focusNode: focusNode,
-                        decoration: InputDecoration(
-                          labelText: 'Vendor Name',
-                          labelStyle: const TextStyle(fontSize: 12),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          prefixIcon:
-                              const Icon(Icons.business_rounded, size: 18),
-                        ),
-                        validator: (value) =>
-                            value == null || value.trim().isEmpty
-                                ? 'Enter vendor name'
-                                : null,
-                      );
-                    },
-                    onSelected: (String selection) {
-                      vendorNameCtrl.text = selection;
-                      final matched = vendors.firstWhereOrNull(
-                          (v) => (v['name'] ?? '').toString() == selection);
-                      if (matched != null) {
-                        final site = (matched['siteName'] ?? '').toString();
-                        final item = (matched['itemName'] ?? '').toString();
-                        vendorSiteCtrl.text = site;
-                        itemNameCtrl.text = item;
-                        if (siteFieldController != null) {
-                          siteFieldController!.text = site;
-                        }
-                        if (itemFieldController != null) {
-                          itemFieldController!.text = item;
+              child: StatefulBuilder(
+                builder: (passCtx, setPassState) {
+                  final selectedVendorName = vendorNameCtrl.text.trim();
+                  final matchedVendor = selectedVendorName.isEmpty
+                      ? null
+                      : vendors.firstWhereOrNull((v) =>
+                          (v['name'] ?? '').toString().trim().toLowerCase() ==
+                          selectedVendorName.toLowerCase());
+                  final vendorItems = <String>[];
+                  if (matchedVendor != null) {
+                    if (matchedVendor['items'] is List &&
+                        (matchedVendor['items'] as List).isNotEmpty) {
+                      vendorItems.addAll((matchedVendor['items'] as List)
+                          .map((e) => e.toString().trim())
+                          .where((s) => s.isNotEmpty));
+                    } else {
+                      final single =
+                          (matchedVendor['itemName'] ?? '').toString().trim();
+                      if (single.isNotEmpty) {
+                        if (single.contains(',')) {
+                          vendorItems.addAll(single
+                              .split(',')
+                              .map((e) => e.trim())
+                              .where((s) => s.isNotEmpty));
+                        } else {
+                          vendorItems.add(single);
                         }
                       }
-                    },
-                  ),
-                  const SizedBox(height: 14),
+                    }
+                  }
 
-                  // Vendor Site Autocomplete
-                  Autocomplete<String>(
-                    initialValue: TextEditingValue(text: vendorSiteCtrl.text),
-                    optionsBuilder: (TextEditingValue textEditingValue) {
-                      if (textEditingValue.text.isEmpty) {
-                        return sitesList;
-                      }
-                      return sitesList.where((String option) {
-                        return option
-                            .toLowerCase()
-                            .contains(textEditingValue.text.toLowerCase());
-                      });
-                    },
-                    fieldViewBuilder: (context, textEditingController,
-                        focusNode, onFieldSubmitted) {
-                      siteFieldController = textEditingController;
-                      textEditingController.addListener(() {
-                        vendorSiteCtrl.text = textEditingController.text;
-                      });
-                      return TextFormField(
-                        controller: textEditingController,
-                        focusNode: focusNode,
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const AppText(
+                        'Details enter/search karein. Save karne par driver ko notification chali jayegi.',
+                        style: AppTextStyle.labelMedium,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Vendor Name Autocomplete
+                      Autocomplete<String>(
+                        initialValue:
+                            TextEditingValue(text: vendorNameCtrl.text),
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          if (textEditingValue.text.isEmpty) {
+                            return vendorsList;
+                          }
+                          return vendorsList.where((String option) {
+                            return option
+                                .toLowerCase()
+                                .contains(textEditingValue.text.toLowerCase());
+                          });
+                        },
+                        fieldViewBuilder: (context, textEditingController,
+                            focusNode, onFieldSubmitted) {
+                          textEditingController.addListener(() {
+                            setPassState(() {
+                              vendorNameCtrl.text = textEditingController.text;
+                            });
+                          });
+                          return TextFormField(
+                            controller: textEditingController,
+                            focusNode: focusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Vendor Name',
+                              labelStyle: const TextStyle(fontSize: 12),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                              prefixIcon: const Icon(Icons.business_rounded,
+                                  size: 18),
+                            ),
+                            validator: (value) =>
+                                value == null || value.trim().isEmpty
+                                    ? 'Enter vendor name'
+                                    : null,
+                          );
+                        },
+                        onSelected: (String selection) {
+                          setPassState(() {
+                            vendorNameCtrl.text = selection;
+                            final matched = vendors.firstWhereOrNull((v) =>
+                                (v['name'] ?? '')
+                                    .toString()
+                                    .trim()
+                                    .toLowerCase() ==
+                                selection.trim().toLowerCase());
+                            if (matched != null) {
+                              final site =
+                                  (matched['siteName'] ?? '').toString();
+                              final vItems = <String>[];
+                              if (matched['items'] is List &&
+                                  (matched['items'] as List).isNotEmpty) {
+                                vItems.addAll((matched['items'] as List)
+                                    .map((e) => e.toString().trim())
+                                    .where((s) => s.isNotEmpty));
+                              } else {
+                                final single = (matched['itemName'] ?? '')
+                                    .toString()
+                                    .trim();
+                                if (single.isNotEmpty) {
+                                  if (single.contains(',')) {
+                                    vItems.addAll(single
+                                        .split(',')
+                                        .map((e) => e.trim())
+                                        .where((s) => s.isNotEmpty));
+                                  } else {
+                                    vItems.add(single);
+                                  }
+                                }
+                              }
+
+                              String item = '';
+                              if (vItems.length == 1) {
+                                item = vItems.first;
+                              }
+
+                              vendorSiteCtrl.text = site;
+                              itemNameCtrl.text = item;
+                              if (siteFieldController != null) {
+                                siteFieldController!.text = site;
+                              }
+                              if (itemFieldController != null) {
+                                itemFieldController!.text = item;
+                              }
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Vendor Site Autocomplete
+                      Autocomplete<String>(
+                        initialValue:
+                            TextEditingValue(text: vendorSiteCtrl.text),
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          if (textEditingValue.text.isEmpty) {
+                            return sitesList;
+                          }
+                          return sitesList.where((String option) {
+                            return option
+                                .toLowerCase()
+                                .contains(textEditingValue.text.toLowerCase());
+                          });
+                        },
+                        fieldViewBuilder: (context, textEditingController,
+                            focusNode, onFieldSubmitted) {
+                          siteFieldController = textEditingController;
+                          textEditingController.addListener(() {
+                            vendorSiteCtrl.text = textEditingController.text;
+                          });
+                          return TextFormField(
+                            controller: textEditingController,
+                            focusNode: focusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Vendor Site',
+                              labelStyle: const TextStyle(fontSize: 12),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                              prefixIcon: const Icon(Icons.location_on_rounded,
+                                  size: 18),
+                            ),
+                            validator: (value) =>
+                                value == null || value.trim().isEmpty
+                                    ? 'Enter vendor site'
+                                    : null,
+                          );
+                        },
+                        onSelected: (String selection) {
+                          vendorSiteCtrl.text = selection;
+                        },
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Item Name Autocomplete with vendor item chips
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Autocomplete<String>(
+                            initialValue:
+                                TextEditingValue(text: itemNameCtrl.text),
+                            optionsBuilder:
+                                (TextEditingValue textEditingValue) {
+                              final availableList = matchedVendor != null
+                                  ? vendorItems
+                                  : itemsList;
+
+                              if (textEditingValue.text.isEmpty) {
+                                return availableList;
+                              }
+                              return availableList.where((String option) {
+                                return option.toLowerCase().contains(
+                                    textEditingValue.text.toLowerCase());
+                              });
+                            },
+                            fieldViewBuilder: (context, textEditingController,
+                                focusNode, onFieldSubmitted) {
+                              itemFieldController = textEditingController;
+                              textEditingController.addListener(() {
+                                itemNameCtrl.text = textEditingController.text;
+                              });
+                              return TextFormField(
+                                controller: textEditingController,
+                                focusNode: focusNode,
+                                decoration: InputDecoration(
+                                  labelText: 'Item Name',
+                                  labelStyle: const TextStyle(fontSize: 12),
+                                  border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10)),
+                                  prefixIcon: const Icon(Icons.category_rounded,
+                                      size: 18),
+                                ),
+                                validator: (value) =>
+                                    value == null || value.trim().isEmpty
+                                        ? 'Enter item name'
+                                        : null,
+                              );
+                            },
+                            onSelected: (String selection) {
+                              setPassState(() {
+                                itemNameCtrl.text = selection;
+                                if (itemFieldController != null) {
+                                  itemFieldController!.text = selection;
+                                }
+                              });
+                            },
+                          ),
+                          if (vendorItems.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  Text(
+                                    vendorItems.length > 1
+                                        ? 'Select Item: '
+                                        : 'Vendor Item: ',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade600,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                  ...vendorItems.map((item) {
+                                    final isSelected = itemNameCtrl.text
+                                            .trim()
+                                            .toLowerCase() ==
+                                        item.toLowerCase();
+                                    return Padding(
+                                      padding: const EdgeInsets.only(right: 6),
+                                      child: ChoiceChip(
+                                        label: Text(
+                                          item,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: isSelected
+                                                ? FontWeight.bold
+                                                : FontWeight.normal,
+                                          ),
+                                        ),
+                                        selected: isSelected,
+                                        onSelected: (selected) {
+                                          if (selected) {
+                                            setPassState(() {
+                                              itemNameCtrl.text = item;
+                                              if (itemFieldController != null) {
+                                                itemFieldController!.text =
+                                                    item;
+                                              }
+                                            });
+                                          }
+                                        },
+                                        selectedColor: const Color(0xFFDBEAFE),
+                                        backgroundColor: widget.isDark
+                                            ? Colors.white10
+                                            : const Color(0xFFF1F5F9),
+                                      ),
+                                    );
+                                  }),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Royalty / Owner Name Text Field
+                      TextFormField(
+                        controller: royaltyNameCtrl,
                         decoration: InputDecoration(
-                          labelText: 'Vendor Site',
+                          labelText: 'Royalty / Owner Name',
                           labelStyle: const TextStyle(fontSize: 12),
                           border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10)),
                           prefixIcon:
-                              const Icon(Icons.location_on_rounded, size: 18),
+                              const Icon(Icons.person_outline_rounded, size: 18),
                         ),
-                        validator: (value) =>
-                            value == null || value.trim().isEmpty
-                                ? 'Enter vendor site'
-                                : null,
-                      );
-                    },
-                    onSelected: (String selection) {
-                      vendorSiteCtrl.text = selection;
-                    },
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Item Name Autocomplete
-                  Autocomplete<String>(
-                    initialValue: TextEditingValue(text: itemNameCtrl.text),
-                    optionsBuilder: (TextEditingValue textEditingValue) {
-                      if (textEditingValue.text.isEmpty) {
-                        return itemsList;
-                      }
-                      return itemsList.where((String option) {
-                        return option
-                            .toLowerCase()
-                            .contains(textEditingValue.text.toLowerCase());
-                      });
-                    },
-                    fieldViewBuilder: (context, textEditingController,
-                        focusNode, onFieldSubmitted) {
-                      itemFieldController = textEditingController;
-                      textEditingController.addListener(() {
-                        itemNameCtrl.text = textEditingController.text;
-                      });
-                      return TextFormField(
-                        controller: textEditingController,
-                        focusNode: focusNode,
-                        decoration: InputDecoration(
-                          labelText: 'Item Name',
-                          labelStyle: const TextStyle(fontSize: 12),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          prefixIcon:
-                              const Icon(Icons.category_rounded, size: 18),
-                        ),
-                        validator: (value) =>
-                            value == null || value.trim().isEmpty
-                                ? 'Enter item name'
-                                : null,
-                      );
-                    },
-                    onSelected: (String selection) {
-                      itemNameCtrl.text = selection;
-                    },
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Royalty / Owner Name Text Field
-                  TextFormField(
-                    controller: royaltyNameCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Royalty / Owner Name',
-                      labelStyle: const TextStyle(fontSize: 12),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      prefixIcon:
-                          const Icon(Icons.person_outline_rounded, size: 18),
-                    ),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Enter royalty / owner name'
-                        : null,
-                  ),
-                ],
+                        validator: (value) => value == null || value.trim().isEmpty
+                            ? 'Enter royalty / owner name'
+                            : null,
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ),

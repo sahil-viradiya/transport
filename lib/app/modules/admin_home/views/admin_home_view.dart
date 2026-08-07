@@ -23,6 +23,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/app/presentation/widgets/desktop_admin_scaffold.dart';
+import 'package:transport/app/core/utils/truck_owner_pass_pdf_generator.dart';
 import 'admin_trip_details_view.dart';
 import 'truck_assignment_dashboard.dart';
 
@@ -4448,7 +4449,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 400,
-              mainAxisExtent: 140,
+              mainAxisExtent: 165,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
             ),
@@ -4479,7 +4480,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
       (v['city'] ?? '').toString(),
       (v['district'] ?? '').toString()
     ].where((s) => s.isNotEmpty).join(', ');
-    final itemName = (v['itemName'] ?? '').toString();
+    final items = _extractVendorItems(v);
     final vendorId = (v['id'] ?? '').toString();
     final displayId =
         'V-${vendorId.length >= 4 ? vendorId.substring(vendorId.length - 4) : "100"}';
@@ -4649,30 +4650,64 @@ class AdminHomeView extends GetView<AdminHomeController> {
                   ],
                 ),
               ),
-              if (itemName.isNotEmpty) ...[
+              if (items.isNotEmpty) ...[
                 const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF3B82F6).withValues(alpha: 0.15)
-                        : const Color(0xFFDBEAFE),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.inventory_2_rounded,
-                          size: 12, color: Color(0xFF2563EB)),
-                      const SizedBox(width: 4),
-                      AppText(
-                        itemName,
-                        style: AppTextStyle.labelMedium,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF2563EB),
-                      ),
-                    ],
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 170),
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: items.take(2).map((item) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF3B82F6).withValues(alpha: 0.15)
+                              : const Color(0xFFDBEAFE),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.inventory_2_rounded,
+                                size: 11, color: Color(0xFF2563EB)),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: AppText(
+                                item,
+                                style: AppTextStyle.labelMedium,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF2563EB),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList()
+                      ..addAll(items.length > 2
+                          ? [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? Colors.white10
+                                      : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: AppText(
+                                  '+${items.length - 2}',
+                                  style: AppTextStyle.labelMedium,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ]
+                          : []),
                   ),
                 ),
               ],
@@ -5679,8 +5714,12 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                       (v['city'] ?? '').toString();
                                   pickupDistrictCtrl.text =
                                       (v['district'] ?? '').toString();
-                                  materialCtrl.text =
-                                      (v['itemName'] ?? '').toString();
+                                  final items = _extractVendorItems(v);
+                                  if (items.length == 1) {
+                                    materialCtrl.text = items.first;
+                                  } else {
+                                    materialCtrl.clear();
+                                  }
                                   if (v['latitude'] != null) {
                                     pickupLatCtrl.text =
                                         v['latitude'].toString();
@@ -5801,15 +5840,74 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           ),
                           const SizedBox(height: 16),
                           // --- Material / per-trip details (vendor set above) ---
-                          TextFormField(
-                            controller: materialCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Material Name',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.category_rounded),
-                            ),
-                            validator: (v) =>
-                                v!.isEmpty ? 'Field required' : null,
+                          StatefulBuilder(
+                            builder: (ctx, setMatState) {
+                              final v = controller.vendors.firstWhereOrNull(
+                                  (e) => e['id'] == selectedVendorId);
+                              final items = _extractVendorItems(v);
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextFormField(
+                                    controller: materialCtrl,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Material Name',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.category_rounded),
+                                    ),
+                                    validator: (v) =>
+                                        v!.isEmpty ? 'Field required' : null,
+                                  ),
+                                  if (items.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: Row(
+                                        children: [
+                                          const AppText('Vendor Items: ',
+                                              style: AppTextStyle.labelMedium,
+                                              color: AppColors.textHint),
+                                          ...items.map((item) {
+                                            final isSelected =
+                                                materialCtrl.text
+                                                        .trim()
+                                                        .toLowerCase() ==
+                                                    item.toLowerCase();
+                                            return Padding(
+                                              padding: const EdgeInsets.only(
+                                                  right: 6),
+                                              child: ChoiceChip(
+                                                label: Text(item,
+                                                    style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight: isSelected
+                                                            ? FontWeight.bold
+                                                            : FontWeight.normal)),
+                                                selected: isSelected,
+                                                onSelected: (selected) {
+                                                  if (selected) {
+                                                    setMatState(() {
+                                                      materialCtrl.text = item;
+                                                    });
+                                                  }
+                                                },
+                                                selectedColor: isDark
+                                                    ? const Color(0xFF3B82F6)
+                                                        .withValues(alpha: 0.3)
+                                                    : const Color(0xFFDBEAFE),
+                                                backgroundColor: isDark
+                                                    ? Colors.white10
+                                                    : const Color(0xFFF1F5F9),
+                                              ),
+                                            );
+                                          }),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              );
+                            },
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
@@ -6000,7 +6098,29 @@ class AdminHomeView extends GetView<AdminHomeController> {
     );
   }
 
-  // 1b. ADD / EDIT VENDOR DIALOG
+  static List<String> _extractVendorItems(Map<String, dynamic>? v) {
+    if (v == null) return [];
+    if (v['items'] is List) {
+      final list = (v['items'] as List)
+          .map((e) => e.toString().trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      if (list.isNotEmpty) return list;
+    }
+    final itemName = (v['itemName'] ?? '').toString().trim();
+    if (itemName.isNotEmpty) {
+      if (itemName.contains(',')) {
+        return itemName
+            .split(',')
+            .map((e) => e.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
+      }
+      return [itemName];
+    }
+    return [];
+  }
+
   /// Create/edit a predefined vendor (minimal location details). Once saved,
   /// admins just pick it in the trip form and its pickup info auto-fills.
   void _showVendorFormDialog(BuildContext context, bool isDark,
@@ -6009,8 +6129,6 @@ class AdminHomeView extends GetView<AdminHomeController> {
     final nameCtrl = TextEditingController(text: editVendor?['name'] ?? '');
     final siteNameCtrl =
         TextEditingController(text: editVendor?['siteName'] ?? '');
-    final itemNameCtrl =
-        TextEditingController(text: editVendor?['itemName'] ?? '');
     final phoneCtrl = TextEditingController(text: editVendor?['phone'] ?? '');
     final locCtrl = TextEditingController(
         text: (editVendor?['pickupLocation'] ?? editVendor?['location'] ?? '')
@@ -6018,6 +6136,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
     final cityCtrl = TextEditingController(text: editVendor?['city'] ?? '');
     final districtCtrl =
         TextEditingController(text: editVendor?['district'] ?? '');
+
+    final List<String> vendorItems = _extractVendorItems(editVendor);
+    final addItemCtrl = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -6084,15 +6205,96 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                 v!.trim().isEmpty ? 'Field required' : null,
                           ),
                           const SizedBox(height: 16),
-                          TextFormField(
-                            controller: itemNameCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Item Name',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.category_rounded),
-                            ),
-                            validator: (v) =>
-                                v!.trim().isEmpty ? 'Field required' : null,
+                          StatefulBuilder(
+                            builder: (itemCtx, setItemState) {
+                              void addItem() {
+                                final text = addItemCtrl.text.trim();
+                                if (text.isNotEmpty) {
+                                  if (!vendorItems.contains(text)) {
+                                    setItemState(() {
+                                      vendorItems.add(text);
+                                      addItemCtrl.clear();
+                                    });
+                                  } else {
+                                    addItemCtrl.clear();
+                                  }
+                                }
+                              }
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: addItemCtrl,
+                                          decoration: InputDecoration(
+                                            labelText:
+                                                'Items / Materials Available',
+                                            hintText:
+                                                'e.g. Fly Ash, Cement, Coal',
+                                            border: const OutlineInputBorder(),
+                                            prefixIcon: const Icon(
+                                                Icons.category_rounded),
+                                            suffixIcon: IconButton(
+                                              icon: const Icon(
+                                                  Icons.add_circle_rounded,
+                                                  color: AppColors.primary),
+                                              onPressed: addItem,
+                                            ),
+                                          ),
+                                          onFieldSubmitted: (_) => addItem(),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  if (vendorItems.isEmpty)
+                                    const Padding(
+                                      padding: EdgeInsets.only(
+                                          left: 4, bottom: 4),
+                                      child: AppText(
+                                        'Multiple items add kar sakte hain (Enter key ya + icon se add karein)',
+                                        style: AppTextStyle.labelMedium,
+                                        color: AppColors.textHint,
+                                      ),
+                                    )
+                                  else
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 6,
+                                      children: vendorItems.map((item) {
+                                        return InputChip(
+                                          avatar: const Icon(
+                                              Icons.inventory_2_rounded,
+                                              size: 14,
+                                              color: Color(0xFF2563EB)),
+                                          label: Text(item,
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: isDark
+                                                      ? Colors.white
+                                                      : Colors.black87)),
+                                          backgroundColor: isDark
+                                              ? const Color(0xFF334155)
+                                              : const Color(0xFFEFF6FF),
+                                          deleteIcon: const Icon(
+                                              Icons.cancel_rounded,
+                                              size: 16,
+                                              color: Colors.redAccent),
+                                          onDeleted: () {
+                                            setItemState(() {
+                                              vendorItems.remove(item);
+                                            });
+                                          },
+                                        );
+                                      }).toList(),
+                                    ),
+                                ],
+                              );
+                            },
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
@@ -6162,12 +6364,27 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                 ),
                                 onPressed: () {
                                   if (!formKey.currentState!.validate()) return;
+                                  final finalItems =
+                                      List<String>.from(vendorItems);
+                                  final pendingText = addItemCtrl.text.trim();
+                                  if (pendingText.isNotEmpty &&
+                                      !finalItems.contains(pendingText)) {
+                                    finalItems.add(pendingText);
+                                  }
+                                  if (finalItems.isEmpty) {
+                                    AppSnackBar.showError(
+                                        title: 'Error',
+                                        message:
+                                            'Vendor me kam se kam 1 item add karein');
+                                    return;
+                                  }
                                   final data = <String, dynamic>{
                                     if (editVendor?['id'] != null)
                                       'id': editVendor!['id'],
                                     'name': nameCtrl.text.trim(),
                                     'siteName': siteNameCtrl.text.trim(),
-                                    'itemName': itemNameCtrl.text.trim(),
+                                    'items': finalItems,
+                                    'itemName': finalItems.join(', '),
                                     'phone': phoneCtrl.text.trim(),
                                     'pickupLocation': locCtrl.text.trim(),
                                     'location': locCtrl.text.trim(),
@@ -9600,7 +9817,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text(
-                        'Driver ne loading proof upload kar diya hai. Ab naya Truck Owner Pass banayein aur upload karein. Iske baad hi driver ko Step 4 customer details dikhenge.',
+                        'Pass details fill karein. Photo upload ki jarurat nahi hai — Save & Approve karne par official Truck Owner Pass PDF automatically generate hoke driver ko mil jayegi.',
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                       const SizedBox(height: 16),
@@ -9656,17 +9873,17 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             Icon(
                               passPhotoUrl != null
                                   ? Icons.check_circle_rounded
-                                  : Icons.upload_file_rounded,
+                                  : Icons.picture_as_pdf_rounded,
                               color: passPhotoUrl != null
                                   ? Colors.green
-                                  : Colors.blue,
+                                  : const Color(0xFF10B981),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 passPhotoUrl != null
-                                    ? 'Truck Owner Pass Attached ✅'
-                                    : 'Upload Truck Owner Pass Document',
+                                    ? 'Custom Scan Document Attached ✅'
+                                    : 'Auto PDF Pass Enabled (Attach Custom Scan Optional)',
                                 style: const TextStyle(
                                     fontWeight: FontWeight.bold, fontSize: 12),
                               ),
@@ -9713,10 +9930,32 @@ class AdminHomeView extends GetView<AdminHomeController> {
                   if (formKey.currentState!.validate()) {
                     Get.back();
                     AppPopup.showLoading(
-                        message: 'Generating Pass & Activating Trip...');
+                        message: 'Generating Pass PDF & Activating Trip...');
                     try {
                       String finalPassUrl = passPhotoUrl ?? '';
-                      if (finalPassUrl.isNotEmpty) {
+                      if (finalPassUrl.isEmpty) {
+                        final fb = Get.find<FirebaseService>();
+                        final tripDoc = await fb.getTripData(tripId);
+                        final truckNo = (tripDoc?['truckNo'] ?? '').toString();
+                        final driverName = (tripDoc?['driverName'] ?? '').toString();
+                        final driverPhone = (tripDoc?['driverPhone'] ?? '').toString();
+                        final pickupLocation = (tripDoc?['pickupLocation'] ?? tripDoc?['vendorLocation'] ?? '').toString();
+                        final dropCity = (tripDoc?['dropCity'] ?? tripDoc?['dropLocation'] ?? '').toString();
+
+                        final pdfBase64 = await TruckOwnerPassPdfGenerator.generatePdfBase64(
+                          passId: passIdCtrl.text.trim(),
+                          ownerName: ownerNameCtrl.text.trim(),
+                          tripId: tripId,
+                          remarks: remarksCtrl.text.trim(),
+                          truckNo: truckNo,
+                          driverName: driverName,
+                          driverPhone: driverPhone,
+                          pickupLocation: pickupLocation,
+                          dropCity: dropCity,
+                        );
+
+                        finalPassUrl = await fb.uploadTruckOwnerPassPhoto(tripId, pdfBase64);
+                      } else {
                         finalPassUrl = await Get.find<FirebaseService>()
                             .uploadTruckOwnerPassPhoto(tripId, finalPassUrl);
                       }
@@ -9725,10 +9964,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                         'passId': passIdCtrl.text.trim(),
                         'ownerName': ownerNameCtrl.text.trim(),
                         'remarks': remarksCtrl.text.trim(),
-                        if (finalPassUrl.isNotEmpty)
-                          'passPhotoUrl': finalPassUrl,
-                        if (finalPassUrl.isNotEmpty)
-                          'passDocumentUrl': finalPassUrl,
+                        'passPhotoUrl': finalPassUrl,
+                        'passDocumentUrl': finalPassUrl,
+                        'passPdfUrl': finalPassUrl,
                         'generatedAt':
                             DateTime.now().toString().substring(0, 16),
                         if (adminPhotoUrl != null && adminPhotoUrl!.isNotEmpty)
@@ -9746,7 +9984,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             backgroundColor: Colors.orangeAccent);
                       } else {
                         Get.snackbar('Success',
-                            'Truck Owner Pass uploaded & Trip activated! 🚛',
+                            'Truck Owner Pass PDF generated & Trip activated! 🚛',
                             snackPosition: SnackPosition.BOTTOM,
                             backgroundColor: Colors.green,
                             colorText: Colors.white);

@@ -308,11 +308,20 @@ class PushService extends GetxService {
     try {
       final phone = Get.find<SessionService>().ownerKey;
       if (phone.isEmpty) return;
+
+      final permissionGranted = await requestNotificationPermission();
+      debugPrint('🔔 [PushService] Permission status: $permissionGranted for phone: $phone');
+
       final token = await FirebaseMessaging.instance.getToken(
         vapidKey: kIsWeb && webVapidKey.isNotEmpty ? webVapidKey : null,
       );
-      if (token != null) await _saveToken(token);
-    } catch (_) {}
+      if (token != null && token.isNotEmpty) {
+        debugPrint('🔑 [PushService] FCM Token fetched for $phone: $token');
+        await _saveToken(token);
+      }
+    } catch (e) {
+      debugPrint('🚨 [PushService] registerForUser error: $e');
+    }
   }
 
   Future<void> _saveToken(String token) async {
@@ -320,6 +329,8 @@ class PushService extends GetxService {
       final phone = Get.find<SessionService>().ownerKey;
       if (phone.isEmpty) return;
       await Get.find<FirebaseService>().saveFcmToken(phone, token);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('🚨 [PushService] _saveToken error: $e');
+    }
   }
 }

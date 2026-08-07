@@ -15,6 +15,7 @@ import 'package:transport/app/core/utils/image_picker_helper.dart';
 
 import 'package:transport/app/core/utils/document_viewer_helper.dart';
 import 'package:transport/app/core/utils/app_image_helper.dart';
+import 'package:transport/app/core/utils/truck_owner_pass_pdf_generator.dart';
 
 class AdminTripDetailsView extends GetView<AdminHomeController> {
   const AdminTripDetailsView({super.key});
@@ -1803,7 +1804,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text(
-                        'Driver ne loading proof upload kar diya hai. Ab naya Truck Owner Pass banayein aur upload karein. Iske baad hi driver ko Step 4 customer details dikhenge.',
+                        'Pass details fill karein. Photo upload ki jarurat nahi hai — Save & Approve karne par official Truck Owner Pass PDF automatically generate hoke driver ko mil jayegi.',
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                       const SizedBox(height: 16),
@@ -1849,13 +1850,15 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                         child: Row(
                           children: [
                             Icon(
-                              passPhotoUrl != null ? Icons.check_circle_rounded : Icons.upload_file_rounded,
-                              color: passPhotoUrl != null ? Colors.green : Colors.blue,
+                              passPhotoUrl != null ? Icons.check_circle_rounded : Icons.picture_as_pdf_rounded,
+                              color: passPhotoUrl != null ? Colors.green : const Color(0xFF10B981),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                passPhotoUrl != null ? 'Truck Owner Pass Attached ✅' : 'Upload Truck Owner Pass Document',
+                                passPhotoUrl != null
+                                    ? 'Custom Scan Document Attached ✅'
+                                    : 'Auto PDF Pass Enabled (Attach Custom Scan Optional)',
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                               ),
                             ),
@@ -1896,10 +1899,33 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                 onPressed: () async {
                   if (formKey.currentState!.validate()) {
                     Get.back();
-                    AppPopup.showLoading(message: 'Generating Pass & Activating Trip...');
+                    AppPopup.showLoading(message: 'Generating Pass PDF & Activating Trip...');
                     try {
                       String finalPassUrl = passPhotoUrl ?? '';
-                      if (finalPassUrl.isNotEmpty) {
+                      if (finalPassUrl.isEmpty) {
+                        // Automatically generate official PDF Truck Owner Pass
+                        final fb = Get.find<FirebaseService>();
+                        final tripDoc = await fb.getTripData(tripId);
+                        final truckNo = (tripDoc?['truckNo'] ?? '').toString();
+                        final driverName = (tripDoc?['driverName'] ?? '').toString();
+                        final driverPhone = (tripDoc?['driverPhone'] ?? '').toString();
+                        final pickupLocation = (tripDoc?['pickupLocation'] ?? tripDoc?['vendorLocation'] ?? '').toString();
+                        final dropCity = (tripDoc?['dropCity'] ?? tripDoc?['dropLocation'] ?? '').toString();
+
+                        final pdfBase64 = await TruckOwnerPassPdfGenerator.generatePdfBase64(
+                          passId: passIdCtrl.text.trim(),
+                          ownerName: ownerNameCtrl.text.trim(),
+                          tripId: tripId,
+                          remarks: remarksCtrl.text.trim(),
+                          truckNo: truckNo,
+                          driverName: driverName,
+                          driverPhone: driverPhone,
+                          pickupLocation: pickupLocation,
+                          dropCity: dropCity,
+                        );
+
+                        finalPassUrl = await fb.uploadTruckOwnerPassPhoto(tripId, pdfBase64);
+                      } else {
                         finalPassUrl = await Get.find<FirebaseService>()
                             .uploadTruckOwnerPassPhoto(tripId, finalPassUrl);
                       }
@@ -1908,10 +1934,9 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                         'passId': passIdCtrl.text.trim(), 
                         'ownerName': ownerNameCtrl.text.trim(),
                         'remarks': remarksCtrl.text.trim(),
-                        if (finalPassUrl.isNotEmpty)
-                          'passPhotoUrl': finalPassUrl,
-                        if (finalPassUrl.isNotEmpty)
-                          'passDocumentUrl': finalPassUrl,
+                        'passPhotoUrl': finalPassUrl,
+                        'passDocumentUrl': finalPassUrl,
+                        'passPdfUrl': finalPassUrl,
                         'generatedAt': DateTime.now().toString().substring(0, 16),
                       };
                       final err = await Get.find<FirebaseService>().approveLoad(
@@ -1923,7 +1948,7 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                       if (err != null) {
                         Get.snackbar('Alert', err, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.orangeAccent);
                       } else {
-                        Get.snackbar('Success', 'Truck Owner Pass uploaded & Trip activated! 🚛', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
+                        Get.snackbar('Success', 'Truck Owner Pass PDF generated & Trip activated! 🚛', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
                       }
                     } catch (e) {
                       Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent);
