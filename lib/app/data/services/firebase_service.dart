@@ -1489,16 +1489,26 @@ class FirebaseService extends GetxService {
     final data = <String, dynamic>{
       'availability': 'available',
       'checkedIn': true,
+      'isClockedIn': true,
+      'dutyStatus': 'ON_DUTY',
+      'returnJourneyStatus': 'none',
+      'canClockOut': false,
+      'stationVerifiedAt': null,
+      'stationVerifiedAtIso': null,
+      'parkingConfirmation': null,
       'lastCheckInAt': FieldValue.serverTimestamp(),
+      'lastDutyChange': FieldValue.serverTimestamp(),
       'checkInLatitude': latitude,
       'checkInLongitude': longitude,
       'checkInAddress': address,
     };
     try {
+      await _ownerDoc(p).set(data, SetOptions(merge: true));
       await _db.collection('users').doc(p).set(data, SetOptions(merge: true));
       await _db.collection('drivers').doc(p).set(data, SetOptions(merge: true));
 
       if (pNorm.isNotEmpty && pNorm != p) {
+        await _ownerDoc(pNorm).set(data, SetOptions(merge: true));
         await _db.collection('users').doc(pNorm).set(data, SetOptions(merge: true));
         await _db.collection('drivers').doc(pNorm).set(data, SetOptions(merge: true));
       }
@@ -1513,7 +1523,7 @@ class FirebaseService extends GetxService {
   }
 
   /// Driver goes off duty: marked Off Duty; admins notified.
-  Future<void> checkOut(String phone, {String? driverName}) async {
+  Future<void> checkOut(String phone, {String? driverName, bool isAutoClockOut = false}) async {
     final p = phone.trim();
     if (p.isEmpty) return;
     final pNorm = SessionService.normalizePhone(p);
@@ -1521,22 +1531,56 @@ class FirebaseService extends GetxService {
     final data = <String, dynamic>{
       'availability': 'off_duty',
       'checkedIn': false,
+      'isClockedIn': false,
+      'dutyStatus': 'OFF_DUTY',
+      'returnJourneyStatus': 'none',
+      'canClockOut': false,
+      'stationVerifiedAt': null,
+      'stationVerifiedAtIso': null,
+      'parkingConfirmation': null,
       'lastCheckOutAt': FieldValue.serverTimestamp(),
+      'lastDutyChange': FieldValue.serverTimestamp(),
+      if (isAutoClockOut) 'autoClockOut': true,
+      if (isAutoClockOut) 'autoClockOutAt': FieldValue.serverTimestamp(),
     };
     try {
+      await _ownerDoc(p).set(data, SetOptions(merge: true));
       await _db.collection('users').doc(p).set(data, SetOptions(merge: true));
       await _db.collection('drivers').doc(p).set(data, SetOptions(merge: true));
 
       if (pNorm.isNotEmpty && pNorm != p) {
+        await _ownerDoc(pNorm).set(data, SetOptions(merge: true));
         await _db.collection('users').doc(pNorm).set(data, SetOptions(merge: true));
         await _db.collection('drivers').doc(pNorm).set(data, SetOptions(merge: true));
       }
 
       await notifyAdmins(
-        title: 'Driver Off Duty 🔴',
-        body: '${driverName ?? p} checked out.',
-        type: 'check_out',
+        title: isAutoClockOut ? 'Driver Auto Clocked Out ⏰' : 'Driver Off Duty 🔴',
+        body: isAutoClockOut
+            ? '${driverName ?? p} was automatically clocked out after 3 hours of station parking verification.'
+            : '${driverName ?? p} checked out.',
+        type: isAutoClockOut ? 'auto_clock_out' : 'check_out',
       );
+
+      // Unassign any truck assigned to this driver at shift end
+      try {
+        final truckSnaps = await _db
+            .collection('trucks')
+            .where('assignedTo', isEqualTo: p)
+            .get();
+        for (final doc in truckSnaps.docs) {
+          await unassignTruck(doc.id);
+        }
+        if (pNorm.isNotEmpty && pNorm != p) {
+          final normSnaps = await _db
+              .collection('trucks')
+              .where('assignedTo', isEqualTo: pNorm)
+              .get();
+          for (final doc in normSnaps.docs) {
+            await unassignTruck(doc.id);
+          }
+        }
+      } catch (_) {}
     } catch (_) {}
   }
 
@@ -1806,18 +1850,25 @@ class FirebaseService extends GetxService {
         'availability': isClockedIn ? 'available' : 'off_duty',
         'dutyStatus': isClockedIn ? 'ON_DUTY' : 'OFF_DUTY',
         'lastDutyChange': FieldValue.serverTimestamp(),
+        'returnJourneyStatus': 'none',
+        'canClockOut': false,
+        'stationVerifiedAt': null,
+        'stationVerifiedAtIso': null,
       };
       if (isClockedIn) {
         if (clockInTime != null) data['lastClockInTime'] = clockInTime.toIso8601String();
         if (vehicleNumber != null) data['vehicleNumber'] = vehicleNumber;
         if (location != null) data['clockInLocation'] = location;
+        data['parkingConfirmation'] = null;
       } else {
         if (clockOutTime != null) data['lastClockOutTime'] = clockOutTime.toIso8601String();
+        data['parkingConfirmation'] = null;
       }
 
       await _ownerDoc(id).set(data, SetOptions(merge: true));
       await _db.collection('users').doc(id).set(data, SetOptions(merge: true));
       if (normId.isNotEmpty && normId != id) {
+        await _ownerDoc(normId).set(data, SetOptions(merge: true));
         await _db.collection('users').doc(normId).set(data, SetOptions(merge: true));
         await _db.collection('drivers').doc(normId).set(data, SetOptions(merge: true));
       }
@@ -1864,6 +1915,7 @@ class FirebaseService extends GetxService {
         await _ownerDoc(id).set(data, SetOptions(merge: true));
         await _db.collection('users').doc(id).set(data, SetOptions(merge: true));
         if (normId.isNotEmpty && normId != id) {
+          await _ownerDoc(normId).set(data, SetOptions(merge: true));
           await _db.collection('users').doc(normId).set(data, SetOptions(merge: true));
           await _db.collection('drivers').doc(normId).set(data, SetOptions(merge: true));
         }
@@ -1873,7 +1925,6 @@ class FirebaseService extends GetxService {
           title: 'Driver Returning to Station 🚛',
           body: '$name completed all trips and is returning to transport station.',
           type: 'return_journey_started',
-          refId: id,
         );
       });
     } catch (e) {
@@ -1883,34 +1934,48 @@ class FirebaseService extends GetxService {
   }
 
   Future<void> submitParkingConfirmation({
-    required String driverId,
-    required String driverName,
-    required String vehicleNo,
-    required Uint8List photoBytes,
+    String? photoUrl,
     required double latitude,
     required double longitude,
-    required String address,
-    required double distanceKm,
+    String? address,
+    String? locationAddress,
+    required String vehicleNo,
+    required String driverName,
+    String? notes,
+    String? driverId,
+    String? driverPhone,
+    Uint8List? photoBytes,
+    double? distanceKm,
   }) async {
     try {
-      final id = driverId.isEmpty ? ownerKey : driverId;
+      final id = (driverId != null && driverId.isNotEmpty)
+          ? driverId
+          : ((driverPhone != null && driverPhone.isNotEmpty) ? driverPhone : ownerKey);
       final normId = SessionService.normalizePhone(id);
-      final photoUrl = await uploadTruckParkingPhoto(id, photoBytes);
-      final reqId = '${id}_${DateTime.now().millisecondsSinceEpoch}';
+      final reqId = 'park_${DateTime.now().millisecondsSinceEpoch}';
+
+      String effectivePhotoUrl = photoUrl ?? '';
+      if (effectivePhotoUrl.isEmpty && photoBytes != null && photoBytes.isNotEmpty) {
+        effectivePhotoUrl = await uploadTruckParkingPhoto(id, photoBytes);
+      }
+
+      final addr = (address != null && address.isNotEmpty) ? address : (locationAddress ?? '');
 
       final parkingData = <String, dynamic>{
-        'id': reqId,
+        'requestId': reqId,
         'driverId': id,
         'driverName': driverName,
         'vehicleNo': vehicleNo,
-        'truckPhotoUrl': photoUrl,
+        'photoUrl': effectivePhotoUrl,
+        'truckPhotoUrl': effectivePhotoUrl,
         'latitude': latitude,
         'longitude': longitude,
-        'address': address,
-        'distanceKm': distanceKm,
-        'arrivalTime': DateTime.now().toIso8601String(),
+        'address': addr,
+        'locationAddress': addr,
+        'distanceKm': distanceKm ?? 0.0,
+        'notes': notes ?? '',
         'status': 'PENDING',
-        'createdAt': FieldValue.serverTimestamp(),
+        'submittedAt': FieldValue.serverTimestamp(),
       };
 
       await _write('submitParkingConfirmation', () async {
@@ -1927,6 +1992,7 @@ class FirebaseService extends GetxService {
         await _ownerDoc(id).set(updateData, SetOptions(merge: true));
         await _db.collection('users').doc(id).set(updateData, SetOptions(merge: true));
         if (normId.isNotEmpty && normId != id) {
+          await _ownerDoc(normId).set(updateData, SetOptions(merge: true));
           await _db.collection('users').doc(normId).set(updateData, SetOptions(merge: true));
           await _db.collection('drivers').doc(normId).set(updateData, SetOptions(merge: true));
         }
@@ -1950,25 +2016,31 @@ class FirebaseService extends GetxService {
       final id = driverId.isEmpty ? ownerKey : driverId;
       final normId = SessionService.normalizePhone(id);
       final admin = adminName ?? 'Admin';
+      final nowIso = DateTime.now().toIso8601String();
 
       await _write('approveParkingConfirmation', () async {
         await _db.collection('parking_confirmations').doc(requestId).set({
           'status': 'APPROVED',
           'approvedBy': admin,
           'approvedAt': FieldValue.serverTimestamp(),
+          'approvedAtIso': nowIso,
         }, SetOptions(merge: true));
 
         final updateData = <String, dynamic>{
           'dutyStatus': 'STATION_VERIFIED',
           'returnJourneyStatus': 'verified',
           'canClockOut': true,
+          'stationVerifiedAt': FieldValue.serverTimestamp(),
+          'stationVerifiedAtIso': nowIso,
           'parkingConfirmation.status': 'APPROVED',
+          'parkingConfirmation.approvedAtIso': nowIso,
           'lastDutyChange': FieldValue.serverTimestamp(),
         };
 
         await _ownerDoc(id).set(updateData, SetOptions(merge: true));
         await _db.collection('users').doc(id).set(updateData, SetOptions(merge: true));
         if (normId.isNotEmpty && normId != id) {
+          await _ownerDoc(normId).set(updateData, SetOptions(merge: true));
           await _db.collection('users').doc(normId).set(updateData, SetOptions(merge: true));
           await _db.collection('drivers').doc(normId).set(updateData, SetOptions(merge: true));
         }
@@ -1976,7 +2048,7 @@ class FirebaseService extends GetxService {
         await createNotification(
           toPhone: id,
           title: 'Parking Confirmation Approved ✅',
-          body: 'Your truck parking at the transport station has been verified. You can now clock out.',
+          body: 'Your truck parking at the transport station has been verified. You can now clock out. Auto clock-out after 3 hours.',
           type: 'parking_approved',
           refId: requestId,
         );
@@ -2831,7 +2903,7 @@ class FirebaseService extends GetxService {
     }
   }
 
-  /// Live: the truck currently assigned to this driver (null if none).
+  /// Live: the truck currently assigned to this driver today (null if none).
   Stream<Map<String, dynamic>?> watchTruckForDriver(String phone) {
     final p = SessionService.normalizePhone(phone);
     if (p.isEmpty) return Stream.value(null);
@@ -2843,6 +2915,32 @@ class FirebaseService extends GetxService {
       if (s.docs.isEmpty) return null;
       final m = s.docs.first.data();
       m['id'] = s.docs.first.id;
+
+      // Verify assignment date: must be assigned today (morning duty allocation)
+      final assignedAt = m['assignedAt'];
+      if (assignedAt is Timestamp) {
+        final assignedDate = assignedAt.toDate();
+        final now = DateTime.now();
+        final isToday = assignedDate.year == now.year &&
+            assignedDate.month == now.month &&
+            assignedDate.day == now.day;
+        if (!isToday) {
+          // Assignment is from a previous day and has expired
+          return null;
+        }
+      } else if (assignedAt is String) {
+        final parsed = DateTime.tryParse(assignedAt);
+        if (parsed != null) {
+          final now = DateTime.now();
+          final isToday = parsed.year == now.year &&
+              parsed.month == now.month &&
+              parsed.day == now.day;
+          if (!isToday) {
+            return null;
+          }
+        }
+      }
+
       return m;
     });
   }

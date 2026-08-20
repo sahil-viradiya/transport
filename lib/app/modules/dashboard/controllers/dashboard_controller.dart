@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:transport/app/data/services/auth_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:transport/app/data/services/session_service.dart';
@@ -45,10 +46,10 @@ class DashboardController extends GetxController {
   // Profile details matching reference layout (Left Screen)
   final RxString driverName = 'Rajesh Kumar'.obs;
   final RxString driverPhone = '+91 9876543210'.obs;
-  final RxString vehicleNo = 'MH-12-AB-1234'.obs;
-  final RxString vehicleModel = 'Tata Signa 5530.S'.obs;
+  final RxString vehicleNo = ''.obs;
+  final RxString vehicleModel = ''.obs;
   final RxString avatarUrl = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop'.obs;
-  final RxInt todayTripsCount = 4.obs;
+  final RxInt todayTripsCount = 0.obs;
 
   // Duty / check-in state
   final RxString dutyStatus = 'off_duty'.obs; // 'available' | 'off_duty'
@@ -195,9 +196,25 @@ class DashboardController extends GetxController {
             parkingConfirmation.value = Map<String, dynamic>.from(data['parkingConfirmation']);
           }
           checkInAddress.value = data['checkInAddress'] ?? '';
+
+          if (data['stationVerifiedAt'] is Timestamp) {
+            stationVerifiedAt.value = (data['stationVerifiedAt'] as Timestamp).toDate();
+          } else if (data['stationVerifiedAtIso'] != null) {
+            stationVerifiedAt.value = DateTime.tryParse(data['stationVerifiedAtIso'].toString());
+          } else if (data['parkingConfirmation'] is Map && data['parkingConfirmation']['approvedAtIso'] != null) {
+            stationVerifiedAt.value = DateTime.tryParse(data['parkingConfirmation']['approvedAtIso'].toString());
+          } else if (data['lastDutyChange'] is Timestamp &&
+              (dutyStatus.value == 'STATION_VERIFIED' || returnJourneyStatus.value == 'verified')) {
+            stationVerifiedAt.value = (data['lastDutyChange'] as Timestamp).toDate();
+          } else {
+            stationVerifiedAt.value = null;
+          }
+          _checkAutoClockOutCondition();
         }
       });
     } catch (_) {}
+
+    _startAutoClockOutTimer();
 
     // Listen to allTrips in TripsController to reactively refresh profile statistics
     try {
@@ -211,13 +228,100 @@ class DashboardController extends GetxController {
   final RxString returnJourneyStatus = 'none'.obs; // 'none' | 'in_transit' | 'parking_requested' | 'verified' | 'rejected'
   final Rxn<Map<String, dynamic>> parkingConfirmation = Rxn<Map<String, dynamic>>();
   final RxBool canClockOut = false.obs;
+  final Rxn<DateTime> stationVerifiedAt = Rxn<DateTime>();
+  final RxString autoClockOutRemainingText = ''.obs;
+  Timer? _autoClockOutTimer;
+
+  void _startAutoClockOutTimer() {
+    _autoClockOutTimer?.cancel();
+    _checkAutoClockOutCondition();
+    _autoClockOutTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _checkAutoClockOutCondition();
+    });
+  }
+
+  void _checkAutoClockOutCondition() {
+    final isVerified = returnJourneyStatus.value == 'verified' || dutyStatus.value == 'STATION_VERIFIED';
+    final isOffDuty = dutyStatus.value == 'off_duty' || dutyStatus.value == 'OFF_DUTY';
+    if (!isVerified || isOffDuty) {
+      autoClockOutRemainingText.value = '';
+      return;
+    }
+
+    final verifiedTime = stationVerifiedAt.value;
+    if (verifiedTime == null) {
+      autoClockOutRemainingText.value = '03h 00m';
+      return;
+    }
+
+    final now = DateTime.now();
+    final elapsed = now.difference(verifiedTime);
+    const maxDuration = Duration(hours: 3);
+
+    if (elapsed >= maxDuration) {
+      // 3 hours passed! Trigger auto clock out immediately
+      _performAutoClockOut();
+    } else {
+      final remaining = maxDuration - elapsed;
+      final hours = remaining.inHours;
+      final mins = remaining.inMinutes.remainder(60);
+      autoClockOutRemainingText.value =
+          '${hours.toString().padLeft(2, '0')}h ${mins.toString().padLeft(2, '0')}m';
+    }
+  }
+
+  Future<void> _performAutoClockOut() async {
+    if (isCheckingDuty.value) return;
+    isCheckingDuty.value = true;
+    _autoClockOutTimer?.cancel();
+
+    try {
+      final fb = Get.find<FirebaseService>();
+      await fb.checkOut(_session.ownerKey, driverName: driverName.value, isAutoClockOut: true);
+      if (Get.isRegistered<ClockInService>()) {
+        await Get.find<ClockInService>().clockOut();
+      }
+      dutyStatus.value = 'off_duty';
+      returnJourneyStatus.value = 'none';
+      canClockOut.value = false;
+      stationVerifiedAt.value = null;
+
+      AppSnackBar.showInfo(
+        title: 'Auto Clock Out ⏰',
+        message: 'Truck station par pahunchne ke 3 ghante baad aapka workday automatically complete ho gaya hai aur shift clock out ho chuki hai.',
+      );
+      Get.offAllNamed(Routes.CLOCK_IN);
+    } catch (e) {
+      debugPrint('[DashboardController] Auto clock out error: $e');
+    } finally {
+      isCheckingDuty.value = false;
+    }
+  }
 
   bool get hasCompletedAllTrips {
     try {
+      // Must have an active assigned truck from admin
+      if (myTruck.value == null) return false;
       if (!Get.isRegistered<TripsController>()) return false;
       final tc = Get.find<TripsController>();
       if (tc.allTrips.isEmpty) return false;
-      return tc.allTrips.every((t) => t.status == 'DELIVERED' || t.status == 'REJECTED');
+
+      final todayStr = DateTime.now().toString().split(' ')[0];
+      final currentTruck = myTruckNo.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+
+      // Only evaluate today's trips or trips for the currently assigned truck
+      final todayTrips = tc.allTrips.where((t) {
+        final cleanTripTruck = t.truckNo.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+        final isToday = t.date == todayStr;
+        final matchesCurrentTruck = currentTruck.isNotEmpty && cleanTripTruck == currentTruck;
+        return isToday || (matchesCurrentTruck && t.isActive);
+      }).toList();
+
+      // If no trips were assigned today for this truck/shift -> cannot have completed all trips
+      if (todayTrips.isEmpty) return false;
+
+      // Must have at least one trip completed, and all today's trips must be DELIVERED or REJECTED
+      return todayTrips.every((t) => t.status == 'DELIVERED' || t.status == 'REJECTED');
     } catch (_) {
       return false;
     }
@@ -327,6 +431,7 @@ class DashboardController extends GetxController {
 
   @override
   void onClose() {
+    _autoClockOutTimer?.cancel();
     _userSub?.cancel();
     _truckSub?.cancel();
     super.onClose();
@@ -503,43 +608,28 @@ class DashboardController extends GetxController {
 
       // 2. Owner-scoped trips: count + active/latest truck number
       final driverTrips = await firebaseService.getTripsForOwner(phone);
+      final todayStr = DateTime.now().toString().split(' ')[0];
 
-      todayTripsCount.value = driverTrips.length;
+      todayTripsCount.value = driverTrips.where((t) => t.date == todayStr).length;
 
-      final activeOrLatestTrip = driverTrips.firstWhere(
-        (t) => t.isActive,
-        orElse: () => driverTrips.isNotEmpty ? driverTrips.first : TripItemModel(
-          id: '',
-          truckNo: '',
-          status: '',
-          pickupCity: '',
-          pickupLocation: '',
-          dropCity: '',
-          dropLocation: '',
-          date: '',
-          tabType: '',
-          isActive: false,
-        ),
-      );
-
-      if (activeOrLatestTrip.id.isNotEmpty) {
-        final truckNoVal = activeOrLatestTrip.truckNo;
+      final activeTrip = driverTrips.firstWhereOrNull((t) => t.isActive);
+      if (activeTrip != null) {
+        final truckNoVal = activeTrip.truckNo;
         vehicleNo.value = truckNoVal;
 
-        // Lookup truck details (owner-scoped) to get truck model info
         final allTrucks = await firebaseService.getTrucksForOwner(_session.ownerKey);
-        final truck = allTrucks.firstWhere(
-          (t) => t['truckNo'] == truckNoVal,
-          orElse: () => <String, dynamic>{},
-        );
-        if (truck.isNotEmpty) {
-          vehicleModel.value = truck['model'] ?? 'Tata Signa 5530.S';
+        final truck = allTrucks.firstWhereOrNull((t) => t['truckNo'] == truckNoVal);
+        if (truck != null) {
+          vehicleModel.value = (truck['model'] ?? '').toString();
         } else {
-          vehicleModel.value = 'N/A';
+          vehicleModel.value = '';
         }
+      } else if (myTruck.value != null && (myTruck.value!['truckNo'] ?? '').toString().isNotEmpty) {
+        vehicleNo.value = myTruck.value!['truckNo'].toString();
+        vehicleModel.value = (myTruck.value!['model'] ?? '').toString();
       } else {
-        vehicleNo.value = 'No Truck Assigned';
-        vehicleModel.value = 'N/A';
+        vehicleNo.value = '';
+        vehicleModel.value = '';
       }
     } catch (_) {}
   }

@@ -250,17 +250,17 @@ class DashboardView extends GetView<DashboardController> {
   Widget _buildMyTruckCard() {
     return Obx(() {
       final truck = controller.myTruck.value;
-      final truckNo =
-          (truck?['truckNo'] ?? controller.vehicleNo.value).toString();
-      final model =
-          (truck?['model'] ?? controller.vehicleModel.value).toString();
+      final truckNo = (truck?['truckNo'] ?? controller.vehicleNo.value).toString().trim();
+      final model = (truck?['model'] ?? controller.vehicleModel.value).toString().trim();
+      final hasTruck = truck != null && truckNo.isNotEmpty;
+
       return Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
+          gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: AppColors.saffronGradient,
+            colors: hasTruck ? AppColors.saffronGradient : [const Color(0xFF334155), const Color(0xFF1E293B)],
           ),
           borderRadius: BorderRadius.circular(18),
         ),
@@ -274,16 +274,15 @@ class DashboardView extends GetView<DashboardController> {
                       style: AppTextStyle.labelMedium,
                       color: Colors.white.withValues(alpha: 0.9)),
                   const SizedBox(height: 4),
-                  AppText(truckNo.isEmpty ? 'Not assigned yet' : truckNo,
+                  AppText(hasTruck ? truckNo : 'No Truck Assigned',
                       style: AppTextStyle.headlineSmall,
                       color: Colors.white,
                       fontWeight: FontWeight.w800,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis),
-                  if (model.isNotEmpty)
-                    AppText(model,
-                        style: AppTextStyle.labelMedium,
-                        color: Colors.white.withValues(alpha: 0.85)),
+                  AppText(hasTruck ? (model.isNotEmpty ? model : 'Ready for Duty') : 'Waiting for Admin Allocation',
+                      style: AppTextStyle.labelMedium,
+                      color: Colors.white.withValues(alpha: 0.85)),
                 ],
               ),
             ),
@@ -862,8 +861,48 @@ class DashboardView extends GetView<DashboardController> {
               ),
               const SizedBox(height: 6),
               const AppText(
-                'Admin ne aapka parking approve kar diya hai. Aapka workday safaltapoorvak pura ho gaya hai. Aap ab Clock Out kar sakte hain.',
+                'Admin ne aapka parking approve kar diya hai. Aapka workday safaltapoorvak pura ho gaya hai.',
                 style: AppTextStyle.bodyMedium,
+              ),
+              const SizedBox(height: 10),
+              Obx(() {
+                final remaining = controller.autoClockOutRemainingText.value;
+                if (remaining.isEmpty) return const SizedBox.shrink();
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.timer_outlined, size: 18, color: AppColors.success),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: AppText(
+                          'Auto Clock Out in: $remaining (3h Limit)',
+                          style: AppTextStyle.labelMedium,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.success,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              ElevatedButton.icon(
+                onPressed: controller.checkOut,
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('Clock Out Now',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
               ),
             ],
           ),

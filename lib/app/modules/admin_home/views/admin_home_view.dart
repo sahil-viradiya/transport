@@ -1985,7 +1985,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
             child: _tripsHeader(context, isDark),
           ),
           Padding(
@@ -1996,6 +1996,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: controller.loadData,
+              color: AppColors.primary,
               child: Obx(() {
                 final pageTrips = controller.pagedTrips;
                 if (controller.filteredTrips.isEmpty) {
@@ -2008,7 +2009,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                         child: Column(
                           children: [
                             Icon(Icons.alt_route_rounded,
-                                size: 60, color: AppColors.textHint),
+                                size: 56, color: AppColors.textHint),
                             SizedBox(height: 12),
                             AppText('No trips match your filters.',
                                 style: AppTextStyle.bodyLarge),
@@ -2019,19 +2020,28 @@ class AdminHomeView extends GetView<AdminHomeController> {
                   );
                 }
 
-                // Size the grid from the space this list ACTUALLY has, not the
-                // screen width — the sidebar + max-width cap make the content
-                // column much narrower than the window, which previously
-                // produced cells too small for a trip card (overflow).
                 return LayoutBuilder(builder: (context, cons) {
                   const hPad = 20.0;
                   const spacing = 16.0;
                   final avail = cons.maxWidth - hPad * 2;
-                  // Keep every card at least ~300px wide, else drop a column.
-                  var crossAxisCount =
-                      ((avail + spacing) / (300 + spacing)).floor();
-                  if (crossAxisCount < 1) crossAxisCount = 1;
-                  if (crossAxisCount > 3) crossAxisCount = 3;
+
+                  // Breakpoints: >=900px -> 3 cols, 580-899px -> 2 cols, <580px -> 1 col
+                  int crossAxisCount;
+                  if (avail >= 900) {
+                    crossAxisCount = 3;
+                  } else if (avail >= 580) {
+                    crossAxisCount = 2;
+                  } else {
+                    crossAxisCount = 1;
+                  }
+
+                  final hasPendingActions = pageTrips.any((t) {
+                    final s = (t['status'] ?? '').toString();
+                    return s == 'LOAD_REQUESTED' ||
+                        s == 'DELIVERY_REQUESTED' ||
+                        s == 'LOAD_REJECTED' ||
+                        s == 'DELIVERY_REJECTED';
+                  });
 
                   return ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
@@ -2044,15 +2054,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           crossAxisCount: crossAxisCount,
                           crossAxisSpacing: spacing,
                           mainAxisSpacing: spacing,
-                          mainAxisExtent: pageTrips.any((t) {
-                            final s = (t['status'] ?? '').toString();
-                            return s == 'LOAD_REQUESTED' ||
-                                s == 'DELIVERY_REQUESTED' ||
-                                s == 'LOAD_REJECTED' ||
-                                s == 'DELIVERY_REJECTED';
-                          })
-                              ? 520
-                              : 440,
+                          mainAxisExtent: hasPendingActions ? 395 : 305,
                         ),
                         itemCount: pageTrips.length,
                         itemBuilder: (context, idx) {
@@ -2060,7 +2062,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           return FadeSlideIn(
                             key: ValueKey('trip-${t['id']}'),
                             delay: Duration(
-                                milliseconds: (idx * 45).clamp(0, 360)),
+                                milliseconds: (idx * 40).clamp(0, 320)),
                             child: _tripCard(context, isDark, t),
                           );
                         },
@@ -2079,76 +2081,136 @@ class AdminHomeView extends GetView<AdminHomeController> {
   }
 
   Widget _tripsHeader(BuildContext context, bool isDark) {
-    return Row(
-      children: [
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AppText('Trips',
-                  style: AppTextStyle.headlineMedium,
-                  fontWeight: FontWeight.w800),
-              SizedBox(height: 2),
-              AppText('Manage all your trips and track deliveries',
-                  style: AppTextStyle.labelMedium,
-                  color: AppColors.textSecondary),
-            ],
-          ),
-        ),
-        // ── Delete All Trips ─────────────────────────────────────────────
-        Obx(() {
-          if (controller.trips.isEmpty) return const SizedBox.shrink();
-          return Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: OutlinedButton.icon(
-              onPressed: controller.deleteAllTrips,
-              icon: const Icon(Icons.delete_sweep_rounded,
-                  size: 16, color: Colors.red),
-              label: const Text('Delete All',
-                  style: TextStyle(
-                      color: Colors.red, fontWeight: FontWeight.w600)),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.red, width: 1.5),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 600;
+
+        final titleCol = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Trips',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                letterSpacing: -0.5,
               ),
             ),
+            const SizedBox(height: 2),
+            Text(
+              'Manage all your trips and track deliveries',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+                color: isDark ? Colors.white60 : const Color(0xFF64748B),
+              ),
+            ),
+          ],
+        );
+
+        final actionButtons = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Delete All Trips ─────────────────────────────────────────────
+            Obx(() {
+              if (controller.trips.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: OutlinedButton.icon(
+                  onPressed: controller.deleteAllTrips,
+                  icon: const Icon(Icons.delete_sweep_rounded,
+                      size: 16, color: Color(0xFFDC2626)),
+                  label: const Text(
+                    'Delete All',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFFDC2626),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(
+                      color: isDark
+                          ? const Color(0xFF7F1D1D)
+                          : const Color(0xFFFCA5A5),
+                      width: 1.2,
+                    ),
+                    backgroundColor: isDark
+                        ? const Color(0xFF450A0A).withValues(alpha: 0.3)
+                        : const Color(0xFFFEF2F2),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    minimumSize: const Size(0, 38),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              );
+            }),
+            // ── New Trip ─────────────────────────────────────────────────────
+            ElevatedButton.icon(
+              onPressed: () => _assignTripGuarded(context, isDark),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text(
+                'New Trip',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                minimumSize: const Size(0, 38),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        );
+
+        if (isNarrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              titleCol,
+              const SizedBox(height: 12),
+              actionButtons,
+            ],
           );
-        }),
-        // ── New Trip ─────────────────────────────────────────────────────
-        ElevatedButton.icon(
-          onPressed: () => _assignTripGuarded(context, isDark),
-          icon: const Icon(Icons.add_rounded, size: 18),
-          label: const Text('New Trip'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        ),
-      ],
+        }
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: titleCol),
+            actionButtons,
+          ],
+        );
+      },
     );
   }
 
   Widget _tripsToolbar(BuildContext context, bool isDark) {
-    final borderColor = isDark ? Colors.white24 : Colors.grey.shade300;
+    final borderColor = isDark ? Colors.white12 : const Color(0xFFE2E8F0);
 
     return Wrap(
       spacing: 12,
-      runSpacing: 12,
+      runSpacing: 10,
       alignment: WrapAlignment.spaceBetween,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         // Tab segments (All | Today | En Route | Pending | Completed | Cancelled)
         Container(
-          padding: const EdgeInsets.all(4),
+          padding: const EdgeInsets.all(3),
           decoration: BoxDecoration(
-            color: isDark ? Colors.black26 : Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(10),
+            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -2180,18 +2242,30 @@ class AdminHomeView extends GetView<AdminHomeController> {
           children: [
             // Search Input
             SizedBox(
-              width: 170,
+              width: 180,
               height: 38,
               child: TextField(
                 controller: controller.tripSearchController,
                 onChanged: controller.setTripSearch,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
                 decoration: InputDecoration(
                   hintText: 'Search trips...',
-                  prefixIcon: const Icon(Icons.search_rounded, size: 16),
+                  hintStyle: const TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFF94A3B8),
+                  ),
+                  prefixIcon: const Icon(Icons.search_rounded,
+                      size: 16, color: Color(0xFF94A3B8)),
+                  prefixIconConstraints:
+                      const BoxConstraints(minWidth: 32, minHeight: 32),
                   filled: true,
                   fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide(color: borderColor),
@@ -2199,6 +2273,11 @@ class AdminHomeView extends GetView<AdminHomeController> {
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide(color: borderColor),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide:
+                        const BorderSide(color: AppColors.primary, width: 1.5),
                   ),
                 ),
               ),
@@ -2230,17 +2309,18 @@ class AdminHomeView extends GetView<AdminHomeController> {
                     isDense: true,
                     icon: Icon(
                       Icons.arrow_drop_down_rounded,
+                      size: 20,
                       color: isFiltered
                           ? AppColors.primary
-                          : (isDark ? Colors.white70 : Colors.black54),
+                          : (isDark ? Colors.white70 : const Color(0xFF64748B)),
                     ),
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 12.5,
                       fontWeight:
-                          isFiltered ? FontWeight.bold : FontWeight.w500,
+                          isFiltered ? FontWeight.w600 : FontWeight.w500,
                       color: isFiltered
                           ? AppColors.primary
-                          : (isDark ? Colors.white : Colors.black87),
+                          : (isDark ? Colors.white : const Color(0xFF1E293B)),
                     ),
                     dropdownColor:
                         isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -2257,7 +2337,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                               size: 14,
                               color: driver == displaySelected
                                   ? AppColors.primary
-                                  : Colors.grey,
+                                  : const Color(0xFF94A3B8),
                             ),
                             const SizedBox(width: 6),
                             Text(driver),
@@ -2276,6 +2356,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
             // Date Filter
             Obx(() {
               final d = controller.tripDateFilter.value;
+              final isFiltered = d != null;
               final label = d == null
                   ? 'All Dates'
                   : '${d.day} ${_monthNames[d.month - 1]}, ${d.year}';
@@ -2289,29 +2370,57 @@ class AdminHomeView extends GetView<AdminHomeController> {
                   );
                   if (picked != null) controller.setTripDateFilter(picked);
                 },
-                icon: const Icon(Icons.calendar_today_rounded, size: 14),
-                label: AppText(label, style: AppTextStyle.labelMedium),
+                icon: Icon(
+                  Icons.calendar_today_outlined,
+                  size: 13,
+                  color: isFiltered
+                      ? AppColors.primary
+                      : (isDark ? Colors.white70 : const Color(0xFF64748B)),
+                ),
+                label: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: isFiltered ? FontWeight.w600 : FontWeight.w500,
+                    color: isFiltered
+                        ? AppColors.primary
+                        : (isDark ? Colors.white : const Color(0xFF1E293B)),
+                  ),
+                ),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: isDark ? Colors.white : Colors.black87,
-                  side: BorderSide(color: borderColor),
+                  backgroundColor:
+                      isDark ? const Color(0xFF1E293B) : Colors.white,
+                  side: BorderSide(
+                    color: isFiltered ? AppColors.primary : borderColor,
+                    width: isFiltered ? 1.5 : 1,
+                  ),
+                  minimumSize: const Size(0, 38),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8)),
                 ),
               );
             }),
 
-            // Clear / Filter Action
-            IconButton(
-              onPressed: controller.clearTripFilters,
-              icon: const Icon(Icons.tune_rounded, size: 18),
-              tooltip: 'Reset Filters',
-              style: IconButton.styleFrom(
-                side: BorderSide(color: borderColor),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.all(10),
+            // Reset Filter Action
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: borderColor),
+              ),
+              child: IconButton(
+                onPressed: controller.clearTripFilters,
+                icon: Icon(
+                  Icons.tune_rounded,
+                  size: 17,
+                  color: isDark ? Colors.white70 : const Color(0xFF64748B),
+                ),
+                tooltip: 'Reset Filters',
+                padding: EdgeInsets.zero,
               ),
             ),
           ],
@@ -2323,39 +2432,36 @@ class AdminHomeView extends GetView<AdminHomeController> {
   Widget _tripMockupFilterChip(String filterVal, String displayLabel) {
     return Obx(() {
       final selected = controller.tripStatusFilter.value == filterVal;
+      final isDark = Theme.of(Get.context!).brightness == Brightness.dark;
       return GestureDetector(
         onTap: () => controller.setTripFilter(filterVal),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
           decoration: BoxDecoration(
             color: selected
-                ? (Theme.of(Get.context!).brightness == Brightness.dark
-                    ? AppColors.primary
-                    : Colors.white)
+                ? (isDark ? AppColors.primary : Colors.white)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow:
-                selected && Theme.of(Get.context!).brightness != Brightness.dark
-                    ? [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        )
-                      ]
-                    : null,
+            borderRadius: BorderRadius.circular(6),
+            boxShadow: selected && !isDark
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1.5),
+                    )
+                  ]
+                : null,
           ),
-          child: AppText(
+          child: Text(
             displayLabel,
-            style: AppTextStyle.labelMedium,
-            color: selected
-                ? (Theme.of(Get.context!).brightness == Brightness.dark
-                    ? Colors.white
-                    : Colors.black87)
-                : (Theme.of(Get.context!).brightness == Brightness.dark
-                    ? Colors.white60
-                    : Colors.black54),
-            fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              color: selected
+                  ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                  : (isDark ? Colors.white60 : const Color(0xFF64748B)),
+            ),
           ),
         ),
       );
@@ -2381,10 +2487,6 @@ class AdminHomeView extends GetView<AdminHomeController> {
         return ('LOAD REQUEST', amberBg, amber);
       case 'LOAD_REJECTED':
         return ('LOAD REJECTED', redBg, red);
-      case 'DELIVERY_REQUESTED':
-        return ('DELIVERY', blueBg, blue);
-      case 'DELIVERY_REJECTED':
-        return ('DELIVERY REJECTED', redBg, red);
       case 'DELIVERED':
         return ('COMPLETED', greenBg, green);
       case 'REJECTED':
@@ -2411,7 +2513,6 @@ class AdminHomeView extends GetView<AdminHomeController> {
         : (date.isNotEmpty ? '$date 08:00 AM' : '-');
     final driverPhone = (trip['driverPhone'] ?? '').toString();
     final driver = controller.driverNameFor(driverPhone);
-    // final driverAvatar = controller.driverAvatarFor(trip['driverImage']);
     final material = (trip['materialName'] ?? 'General Cargo').toString();
     final pickupCity = (trip['pickupCity'] ?? '').toString();
     final pickupLocation = (trip['pickupLocation'] ?? '').toString();
@@ -2437,82 +2538,112 @@ class AdminHomeView extends GetView<AdminHomeController> {
       }
     }
     final seqLabel = controller.tripSequenceLabel(trip);
+
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isDark ? Colors.white10 : Colors.grey.shade200,
-          width: 1.5,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : const Color(0xFFE2E8F0),
+          width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header: Driver Details & Status
+          // ── Header: Driver Avatar + Details & Status Badge ───────────────
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.grey.shade200,
+                radius: 17,
+                backgroundColor: isDark
+                    ? const Color(0xFF334155)
+                    : const Color(0xFFE2E8F0),
                 child: ClipOval(
                   child: CachedNetworkImage(
                     imageUrl: corsSafeImageUrl(avatarUrl.isNotEmpty
                         ? avatarUrl
                         : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'),
                     fit: BoxFit.cover,
-                    width: 36,
-                    height: 36,
-                    errorWidget: (_, __, ___) =>
-                        const Icon(Icons.person_rounded, size: 18),
+                    width: 34,
+                    height: 34,
+                    errorWidget: (_, __, ___) => Icon(
+                      Icons.person_rounded,
+                      size: 18,
+                      color: isDark ? Colors.white70 : const Color(0xFF64748B),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    AppText(driver.isNotEmpty ? driver : '',
-                        style: AppTextStyle.bodyLarge,
-                        fontWeight: FontWeight.bold,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
+                    Text(
+                      driver.isNotEmpty ? driver : 'Unassigned',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     const SizedBox(height: 2),
                     Row(
                       children: [
-                        const Icon(Icons.local_shipping_outlined,
-                            size: 12, color: Colors.grey),
+                        const Icon(
+                          Icons.local_shipping_outlined,
+                          size: 13,
+                          color: Color(0xFF94A3B8),
+                        ),
                         const SizedBox(width: 4),
                         Flexible(
-                          child: AppText(truckNo,
-                              style: AppTextStyle.labelMedium,
-                              color: Colors.grey,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
+                          child: Text(
+                            truckNo,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: isDark
+                                  ? Colors.white70
+                                  : const Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         if (seqLabel.isNotEmpty) ...[
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 1.5),
                             decoration: BoxDecoration(
-                              color: seqLabel.contains('Queued') ? Colors.amber.shade100 : Colors.blue.shade100,
+                              color: seqLabel.contains('Queued')
+                                  ? const Color(0xFFFEF3C7)
+                                  : const Color(0xFFDBEAFE),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               seqLabel,
                               style: TextStyle(
                                 fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: seqLabel.contains('Queued') ? Colors.amber.shade900 : Colors.blue.shade900,
+                                fontWeight: FontWeight.w700,
+                                color: seqLabel.contains('Queued')
+                                    ? const Color(0xFFB45309)
+                                    : const Color(0xFF1D4ED8),
                               ),
                             ),
                           ),
@@ -2525,119 +2656,176 @@ class AdminHomeView extends GetView<AdminHomeController> {
               const SizedBox(width: 8),
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                 decoration: BoxDecoration(
                   color: statusBg,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   statusLabel.toUpperCase(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: statusFg),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                    color: statusFg,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
-          // Route Timeline Box
+          // ── Vertical Route Timeline Box ──────────────────────────────────
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: isDark ? Colors.black26 : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.2)
+                  : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                  color: isDark ? Colors.white10 : Colors.grey.shade100),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : const Color(0xFFF1F5F9),
+                width: 1,
+              ),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Dotted line track
-                Column(
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: const BoxDecoration(
-                        color: Colors.blue,
-                        shape: BoxShape.circle,
+                // Vertical timeline line track
+                Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF2563EB),
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
-                    Container(
-                      width: 1.5,
-                      height: 48,
-                      color: Colors.grey.shade300,
-                    ),
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade400,
-                        shape: BoxShape.circle,
+                      Container(
+                        width: 1.5,
+                        height: 26,
+                        color: isDark
+                            ? Colors.white24
+                            : const Color(0xFFCBD5E1),
                       ),
-                    ),
-                  ],
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? Colors.white38
+                              : const Color(0xFF94A3B8),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Pickup Details
-                      AppText('PICKUP • $date',
-                          style: AppTextStyle.labelMedium,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.bold),
-                      const SizedBox(height: 2),
-                      AppText(
-                          pickupCity.isNotEmpty
-                              ? '$pickupCity, $pickupLocation'
-                              : 'Rajkot Main Depot',
-                          style: AppTextStyle.bodyMedium,
-                          fontWeight: FontWeight.bold,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 14),
-                      // Dropoff Details
-                      const AppText('DROP-OFF • EST. TIME TBD',
-                          style: AppTextStyle.labelMedium,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.bold),
-                      const SizedBox(height: 2),
-                      AppText(
-                          dropCity.isNotEmpty
-                              ? '$dropCity, $dropLocation'
-                              : 'Destination pending',
-                          style: AppTextStyle.bodyMedium,
-                          fontWeight: FontWeight.bold,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          color: dropCity.isNotEmpty ? null : Colors.grey),
+                      // Pickup Section
+                      Text(
+                        'PICKUP • ${date.isNotEmpty ? date : 'TODAY'}',
+                        style: const TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF94A3B8),
+                          letterSpacing: 0.4,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        pickupCity.isNotEmpty
+                            ? (pickupLocation.isNotEmpty
+                                ? '$pickupCity, $pickupLocation'
+                                : pickupCity)
+                            : 'Rajkot Main Depot',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color:
+                              isDark ? Colors.white : const Color(0xFF1E293B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      // Dropoff Section
+                      const Text(
+                        'DROP-OFF • EST. TIME TBD',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF94A3B8),
+                          letterSpacing: 0.4,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        dropCity.isNotEmpty
+                            ? (dropLocation.isNotEmpty
+                                ? '$dropCity, $dropLocation'
+                                : dropCity)
+                            : 'Destination pending',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: dropCity.isNotEmpty
+                              ? (isDark ? Colors.white : const Color(0xFF1E293B))
+                              : const Color(0xFF94A3B8),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
-          // Key Value Matrix Grid
+          // ── Key-Value Information Matrix (2x2) ───────────────────────────
           Row(
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const AppText('TRIP ID',
-                        style: AppTextStyle.labelMedium, color: Colors.grey),
-                    const SizedBox(height: 2),
-                    AppText('#$tripId',
-                        style: AppTextStyle.bodyMedium,
-                        fontWeight: FontWeight.bold),
+                    const Text(
+                      'TRIP ID',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF94A3B8),
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      '#$tripId',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
@@ -2645,32 +2833,58 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const AppText('MATERIAL',
-                        style: AppTextStyle.labelMedium, color: Colors.grey),
-                    const SizedBox(height: 2),
-                    AppText(material,
-                        style: AppTextStyle.bodyMedium,
-                        fontWeight: FontWeight.bold,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
+                    const Text(
+                      'MATERIAL',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF94A3B8),
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      material,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Row(
             children: [
               const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AppText('DISTANCE / ETA',
-                        style: AppTextStyle.labelMedium, color: Colors.grey),
-                    SizedBox(height: 2),
-                    AppText('Est. N/A',
-                        style: AppTextStyle.bodyMedium,
-                        fontWeight: FontWeight.bold),
+                    Text(
+                      'DISTANCE / ETA',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF94A3B8),
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                    SizedBox(height: 1),
+                    Text(
+                      'Est. N/A',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
@@ -2678,26 +2892,38 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const AppText('PASS GENERATED',
-                        style: AppTextStyle.labelMedium, color: Colors.grey),
-                    const SizedBox(height: 2),
-                    AppText(passGenValue,
-                        style: AppTextStyle.bodyMedium,
-                        fontWeight: FontWeight.bold,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
+                    const Text(
+                      'PASS GENERATED',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF94A3B8),
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      passGenValue,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
             ],
           ),
 
-          // New: Verification Photos & Approve/Reject actions in Trip Card (matching dashboard card)
+          // Verification Photos & Direct Approve/Reject actions (for pending states)
           if (status == 'LOAD_REQUESTED' ||
               status == 'DELIVERY_REQUESTED' ||
               status == 'LOAD_REJECTED' ||
               status == 'DELIVERY_REJECTED') ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Row(
               children: [
                 if (status == 'LOAD_REQUESTED' ||
@@ -2720,45 +2946,47 @@ class AdminHomeView extends GetView<AdminHomeController> {
               ],
             ),
             if (status == 'LOAD_REJECTED') ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.red.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
                 ),
-                child: AppText(
+                child: Text(
                   'Rejected: ${trip['loadRejectReason'] ?? 'None'}',
-                  style: AppTextStyle.labelMedium,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFFDC2626),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFDC2626),
+                  ),
                 ),
               ),
             ],
             if (status == 'DELIVERY_REJECTED') ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.red.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
                 ),
-                child: AppText(
+                child: Text(
                   'Rejected: ${trip['deliveryRejectReason'] ?? 'None'}',
-                  style: AppTextStyle.labelMedium,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFFDC2626),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFDC2626),
+                  ),
                 ),
               ),
             ],
             if (status == 'LOAD_REQUESTED') ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   Expanded(
@@ -2772,9 +3000,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFFDC2626),
                         side: const BorderSide(color: Color(0xFFDC2626)),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(6)),
                       ),
                     ),
                   ),
@@ -2789,9 +3017,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF10B981),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(6)),
                         elevation: 0,
                       ),
                     ),
@@ -2800,7 +3028,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
               ),
             ],
             if (status == 'DELIVERY_REQUESTED') ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   Expanded(
@@ -2814,9 +3042,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFFDC2626),
                         side: const BorderSide(color: Color(0xFFDC2626)),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(6)),
                       ),
                     ),
                   ),
@@ -2831,9 +3059,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF10B981),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(6)),
                         elevation: 0,
                       ),
                     ),
@@ -2843,48 +3071,63 @@ class AdminHomeView extends GetView<AdminHomeController> {
             ],
           ],
 
-          const SizedBox(height: 12),
-          const Divider(),
+          const Spacer(),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color:
+                isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+          ),
           const SizedBox(height: 4),
 
-          // Footer — must survive narrow cards, so the label shrinks/ellipsises
-          // rather than overflowing the row.
+          // ── Bottom Action Area: View Details + Edit + Options ─────────────
           Row(
             children: [
               Flexible(
-                child: TextButton(
-                  onPressed: () => Get.to(() => const AdminTripDetailsView(),
+                child: InkWell(
+                  onTap: () => Get.to(() => const AdminTripDetailsView(),
                       arguments: {'tripId': tripId}),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: const Size(0, 36),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text('View Details',
+                  borderRadius: BorderRadius.circular(6),
+                  child: const Padding(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'View Details',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary)),
-                      ),
-                      SizedBox(width: 4),
-                      Icon(Icons.arrow_forward_rounded,
-                          size: 14, color: AppColors.primary),
-                    ],
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
               const Spacer(),
               IconButton(
-                icon: const Icon(Icons.edit_rounded,
-                    size: 16, color: Colors.grey),
+                icon: const Icon(
+                  Icons.edit_outlined,
+                  size: 16,
+                  color: Color(0xFF64748B),
+                ),
                 padding: const EdgeInsets.all(6),
                 constraints: const BoxConstraints(),
                 visualDensity: VisualDensity.compact,
+                tooltip: 'Edit Trip',
                 onPressed: () =>
                     _showTripFormDialog(context, isDark, editModeTrip: trip),
               ),
@@ -2901,7 +3144,10 @@ class AdminHomeView extends GetView<AdminHomeController> {
     final needsDest = (trip['dropCity'] ?? '').toString().trim().isEmpty &&
         trip['status'] != 'DELIVERED';
     return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert_rounded, color: AppColors.textSecondary),
+      icon: const Icon(Icons.more_vert_rounded,
+          size: 18, color: Color(0xFF64748B)),
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(),
       onSelected: (v) {
         switch (v) {
           case 'view':
@@ -2977,19 +3223,24 @@ class AdminHomeView extends GetView<AdminHomeController> {
           child: GestureDetector(
             onTap: () => controller.goToTripPage(i),
             child: Container(
-              // width: 34,
-              // height: 34,
+              width: 32,
+              height: 32,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: selected ? AppColors.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                    color: selected ? AppColors.primary : AppColors.border),
+                    color: selected
+                        ? AppColors.primary
+                        : (isDark ? Colors.white12 : const Color(0xFFE2E8F0))),
               ),
-              child: AppText('${i + 1}',
-                  style: AppTextStyle.labelLarge,
-                  color: selected ? Colors.white : AppColors.textSecondary,
-                  fontWeight: FontWeight.bold),
+              child: Text('${i + 1}',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: selected
+                          ? Colors.white
+                          : (isDark ? Colors.white70 : const Color(0xFF64748B)),
+                      fontWeight: FontWeight.bold)),
             ),
           ),
         ));
@@ -2999,16 +3250,19 @@ class AdminHomeView extends GetView<AdminHomeController> {
         return GestureDetector(
           onTap: enabled ? onTap : null,
           child: Container(
-            width: 34,
-            height: 34,
+            width: 32,
+            height: 32,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                  color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
             ),
             child: Icon(icon,
-                size: 18,
-                color: enabled ? AppColors.textSecondary : AppColors.textHint),
+                size: 16,
+                color: enabled
+                    ? (isDark ? Colors.white70 : const Color(0xFF64748B))
+                    : AppColors.textHint),
           ),
         );
       }
@@ -3018,31 +3272,40 @@ class AdminHomeView extends GetView<AdminHomeController> {
         crossAxisAlignment: WrapCrossAlignment.center,
         runSpacing: 10,
         children: [
-          AppText('Showing $start to $end of $total trips',
-              style: AppTextStyle.labelMedium, color: AppColors.textSecondary),
+          Text(
+            'Showing $start to $end of $total trips',
+            style: TextStyle(
+              fontSize: 12.5,
+              color: isDark ? Colors.white60 : const Color(0xFF64748B),
+            ),
+          ),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               navBtn(Icons.chevron_left_rounded, page > 0,
                   () => controller.goToTripPage(page - 1)),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               ...pageButtons,
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               navBtn(Icons.chevron_right_rounded, page < pageCount - 1,
                   () => controller.goToTripPage(page + 1)),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                      color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<int>(
                     value: per,
                     items: const [10, 20, 50]
                         .map((n) => DropdownMenuItem(
-                            value: n, child: Text('$n / page')))
+                            value: n,
+                            child: Text('$n / page',
+                                style: const TextStyle(fontSize: 12))))
                         .toList(),
                     onChanged: (v) {
                       if (v != null) controller.setTripsPerPage(v);
@@ -3058,8 +3321,6 @@ class AdminHomeView extends GetView<AdminHomeController> {
   }
 
   // --- TAB 3: TRUCKS MANAGEMENT ---
-  /// Morning duty allocation strip on each truck card: who it's assigned to,
-  /// the driver's inspection verdict, and an Assign/Reassign action.
   Widget _buildStatsCards(BuildContext context, bool isDark) {
     final totalVehicles = controller.trucks.length;
     final activeDeployments =
@@ -3076,49 +3337,66 @@ class AdminHomeView extends GetView<AdminHomeController> {
       required String value,
       required IconData icon,
       required Color iconColor,
-      Color? cardBg,
+      Widget? leadingIconBadge,
       String? badgeText,
       Color? badgeColor,
+      Color? badgeBg,
     }) {
       return Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: cardBg ?? (isDark ? const Color(0xFF1E293B) : Colors.white),
-          borderRadius: BorderRadius.circular(16),
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isDark ? Colors.white10 : Colors.grey.shade200,
-            width: 1.5,
+            color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                if (leadingIconBadge != null) ...[
+                  leadingIconBadge,
+                  const SizedBox(width: 8),
+                ],
                 Expanded(
-                  child: AppText(title,
-                      style: AppTextStyle.labelMedium,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF94A3B8),
+                      letterSpacing: 0.5,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                const SizedBox(width: 8),
-                Icon(icon, color: iconColor, size: 20),
+                Icon(icon, color: iconColor, size: 16),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             Row(
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                Flexible(
-                  child: AppText(value,
-                      style: AppTextStyle.headlineMedium,
-                      fontWeight: FontWeight.w800,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    letterSpacing: -0.5,
+                  ),
                 ),
                 if (badgeText != null) ...[
                   const SizedBox(width: 8),
@@ -3126,16 +3404,17 @@ class AdminHomeView extends GetView<AdminHomeController> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color:
-                          (badgeColor ?? Colors.green).withValues(alpha: 0.1),
+                      color: badgeBg ??
+                          (badgeColor ?? const Color(0xFF16A34A))
+                              .withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       badgeText,
                       style: TextStyle(
                         fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: badgeColor ?? Colors.green,
+                        fontWeight: FontWeight.w700,
+                        color: badgeColor ?? const Color(0xFF16A34A),
                       ),
                     ),
                   ),
@@ -3147,43 +3426,57 @@ class AdminHomeView extends GetView<AdminHomeController> {
       );
     }
 
-    // Responsive: four across on desktop, but they reflow to 2-up / 1-up on
-    // narrow widths instead of being squeezed into unreadable slivers.
     return LayoutBuilder(builder: (context, cons) {
-      const spacing = 16.0;
-      var perRow = ((cons.maxWidth + spacing) / (200 + spacing)).floor();
-      if (perRow < 1) perRow = 1;
-      if (perRow > 4) perRow = 4;
+      const spacing = 12.0;
+      int perRow = 4;
+      if (cons.maxWidth < 560) {
+        perRow = 1;
+      } else if (cons.maxWidth < 880) {
+        perRow = 2;
+      }
       final cardWidth = (cons.maxWidth - spacing * (perRow - 1)) / perRow;
 
       final cards = [
         statCard(
           title: 'TOTAL VEHICLES',
           value: '$totalVehicles',
-          icon: Icons.local_shipping_outlined,
-          iconColor: Colors.grey,
+          icon: Icons.local_shipping_rounded,
+          iconColor: const Color(0xFF16A34A),
+          leadingIconBadge: Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: const Color(0xFFDCFCE7),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            alignment: Alignment.center,
+            child: const Icon(Icons.local_shipping_rounded,
+                color: Color(0xFF16A34A), size: 14),
+          ),
           badgeText: '↑ 2.4%',
-          badgeColor: Colors.green,
+          badgeColor: const Color(0xFF15803D),
+          badgeBg: const Color(0xFFDCFCE7),
         ),
         statCard(
           title: 'ACTIVE DEPLOYMENTS',
           value: '$activeDeployments / $totalVehicles',
           icon: Icons.directions_car_filled_rounded,
-          iconColor: Colors.green,
+          iconColor: const Color(0xFF16A34A),
         ),
         statCard(
           title: 'IDLE UNITS',
           value: '$idleUnits',
           icon: Icons.pause_circle_filled_rounded,
-          iconColor: Colors.blueGrey,
+          iconColor: const Color(0xFF64748B),
         ),
         statCard(
           title: 'MAINTENANCE REQ',
           value: '$maintenanceReq',
           icon: Icons.build_circle_rounded,
-          iconColor: Colors.red,
-          badgeText: '! Critical: 1',
-          badgeColor: Colors.red,
+          iconColor: const Color(0xFFDC2626),
+          badgeText: '! Critical',
+          badgeColor: const Color(0xFFDC2626),
+          badgeBg: const Color(0xFFFEE2E2),
         ),
       ];
 
@@ -3205,6 +3498,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
     final inspection = (truck['inspectionStatus'] ?? '').toString();
     final issue = (truck['inspectionIssue'] ?? '').toString();
     final status = (truck['status'] ?? 'Idle').toString();
+    final truckType = (truck['type'] ?? '').toString();
 
     final isEnRoute = status == 'En Route';
     final hasProblem = inspection == 'problem';
@@ -3220,83 +3514,60 @@ class AdminHomeView extends GetView<AdminHomeController> {
     }
 
     Color statusBg = const Color(0xFFF1F5F9);
-    Color statusFg = Colors.grey.shade600;
+    Color statusFg = const Color(0xFF475569);
     String statusLabel = '• IDLE';
 
     if (isEnRoute) {
-      statusBg = const Color(0xFFE3FCEF);
-      statusFg = const Color(0xFF006644);
+      statusBg = const Color(0xFFDCFCE7);
+      statusFg = const Color(0xFF15803D);
       statusLabel = '• EN ROUTE';
     } else if (hasProblem || needsReview) {
-      statusBg = const Color(0xFFFFECE6);
-      statusFg = const Color(0xFFBF2600);
+      statusBg = const Color(0xFFFEE2E2);
+      statusFg = const Color(0xFFDC2626);
       statusLabel = '• INSPECTION';
     }
 
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: hasProblem
-              ? Colors.redAccent.withValues(alpha: 0.5)
-              : (isDark ? Colors.white10 : Colors.grey.shade200),
-          width: 1.5,
+              ? const Color(0xFFFCA5A5)
+              : (isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
         ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // Row 1: Vehicle No + Status
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AppText(
-                      truckNo,
-                      style: AppTextStyle.bodyLarge,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF1E40AF),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if ((truck['type'] ?? '').toString().isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF334155)
-                              : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          (truck['type'] ?? '').toString(),
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white70 : Colors.black87,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                child: Text(
+                  truckNo,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1D4ED8),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                 decoration: BoxDecoration(
                   color: statusBg,
                   borderRadius: BorderRadius.circular(6),
@@ -3304,68 +3575,104 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 child: Text(
                   statusLabel,
                   style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
                     color: statusFg,
+                    letterSpacing: 0.3,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          AppText(
+
+          // Row 2: Type badge (e.g. 4W, 12W, 6W)
+          if (truckType.isNotEmpty)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  truckType,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white70 : const Color(0xFF475569),
+                  ),
+                ),
+              ),
+            )
+          else
+            const SizedBox(height: 2),
+
+          // Row 3: Model Title
+          Text(
             model,
-            style: AppTextStyle.headlineSmall,
-            fontWeight: FontWeight.w800,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+              letterSpacing: -0.3,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 14),
+
+          // Row 4: Operator Name / Unassigned
           Row(
             children: [
               Icon(
-                assignedTo.isEmpty
-                    ? Icons.person_off_rounded
-                    : Icons.person_rounded,
-                size: 16,
-                color: Colors.grey,
+                Icons.person_rounded,
+                size: 14,
+                color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   assignedTo.isEmpty ? 'Unassigned' : 'Op. $driverName',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 12.5,
                     color: assignedTo.isEmpty
-                        ? Colors.grey
-                        : (isDark ? Colors.white : Colors.black87),
+                        ? const Color(0xFF94A3B8)
+                        : (isDark ? Colors.white70 : const Color(0xFF334155)),
                     fontStyle: assignedTo.isEmpty
                         ? FontStyle.italic
                         : FontStyle.normal,
+                    fontWeight: assignedTo.isEmpty
+                        ? FontWeight.normal
+                        : FontWeight.w600,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
-          // const SizedBox(height: 14),
+
           if (hasProblem) ...[
-            const SizedBox(height: 14),
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: const Color(0xFFFEF2F2),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: const Color(0xFFFCA5A5)),
               ),
               child: Row(
                 children: [
                   const Icon(Icons.warning_amber_rounded,
-                      color: Colors.red, size: 16),
-                  const SizedBox(width: 8),
+                      color: Color(0xFFDC2626), size: 13),
+                  const SizedBox(width: 5),
                   Expanded(
-                    child: AppText(
-                      issue.isNotEmpty ? issue : 'Engine Diagnostics Required',
-                      style: AppTextStyle.labelMedium,
-                      color: Colors.red.shade700,
-                      fontWeight: FontWeight.bold,
+                    child: Text(
+                      issue.isNotEmpty ? issue : 'Diagnostics Required',
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        color: Color(0xFF991B1B),
+                        fontWeight: FontWeight.bold,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -3374,28 +3681,51 @@ class AdminHomeView extends GetView<AdminHomeController> {
               ),
             ),
           ],
-          // const Spacer(),
-          const Divider(height: 20),
+
+          Divider(height: 1, color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
+
+          // Bottom Action row: Edit, Delete, Assign / Reassign
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.edit_rounded,
-                    size: 16, color: Colors.grey),
+                icon: const Icon(Icons.edit_outlined, size: 15),
+                color: const Color(0xFF64748B),
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Edit Vehicle',
                 onPressed: () =>
                     _showTruckFormDialog(context, isDark, editModeTruck: truck),
               ),
+              const SizedBox(width: 4),
               IconButton(
-                icon: const Icon(Icons.delete_outline_rounded,
-                    size: 16, color: Colors.grey),
+                icon: const Icon(Icons.delete_outline_rounded, size: 15),
+                color: const Color(0xFF64748B),
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Delete Vehicle',
                 onPressed: () => controller.deleteTruck(truckNo),
               ),
               const Spacer(),
-              TextButton(
-                onPressed: () => _showAssignTruckDialog(context, truck),
-                child: Text(
-                  assignedTo.isEmpty ? 'ASSIGN' : 'REASSIGN',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, color: AppColors.primary),
+              InkWell(
+                onTap: () => _showAssignTruckDialog(context, truck),
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    assignedTo.isEmpty ? 'ASSIGN' : 'REASSIGN',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF15803D),
+                      letterSpacing: 0.4,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -3493,129 +3823,190 @@ class AdminHomeView extends GetView<AdminHomeController> {
             );
           }
 
-          // Size from the real available width (not the screen) — the sidebar
-          // and max-width cap make this column much narrower than the window.
           return LayoutBuilder(builder: (context, cons) {
             const hPad = 20.0;
-            const spacing = 16.0;
+            const spacing = 14.0;
             final avail = cons.maxWidth - hPad * 2;
-            var crossAxisCount = ((avail + spacing) / (280 + spacing)).floor();
-            if (crossAxisCount < 1) crossAxisCount = 1;
-            if (crossAxisCount > 4) crossAxisCount = 4;
+            int crossAxisCount = 3;
+            if (avail < 560) {
+              crossAxisCount = 1;
+            } else if (avail < 880) {
+              crossAxisCount = 2;
+            }
 
             return ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(hPad, 20, hPad, 100),
+              padding: const EdgeInsets.fromLTRB(hPad, 16, hPad, 100),
               children: [
-                // Header title section. The title + both action buttons can't fit
-                // side-by-side on a phone, so they stack there instead of
-                // overflowing.
-                Builder(builder: (context) {
-                  const title = Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                // Header section
+                LayoutBuilder(builder: (context, headerCons) {
+                  final isNarrow = headerCons.maxWidth < 640;
+
+                  final titleSection = Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      AppText(
-                        'Fleet Tracker Overview',
-                        style: AppTextStyle.headlineMedium,
-                        fontWeight: FontWeight.w800,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.local_shipping_rounded,
+                          color: Color(0xFF16A34A),
+                          size: 20,
+                        ),
                       ),
-                      SizedBox(height: 4),
-                      AppText(
-                        'Real-time status and deployment metrics for all ground units.',
-                        style: AppTextStyle.labelMedium,
-                        color: AppColors.textSecondary,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Fleet Tracker Overview',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                letterSpacing: -0.3,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Real-time status and deployment metrics for all ground units.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   );
 
-                  final actions = Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
+                  final actionButtons = Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       OutlinedButton.icon(
                         onPressed: () {},
-                        icon: const Icon(Icons.filter_list_rounded, size: 16),
-                        label: const AppText('Filter',
-                            style: AppTextStyle.labelMedium),
+                        icon: const Icon(Icons.filter_list_rounded, size: 15),
+                        label: const Text('Filter', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor:
-                              isDark ? Colors.white : Colors.black87,
+                          foregroundColor: isDark ? Colors.white70 : const Color(0xFF334155),
                           side: BorderSide(
-                              color: isDark
-                                  ? Colors.white24
-                                  : Colors.grey.shade300),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 12),
+                            color: isDark ? Colors.white24 : const Color(0xFFCBD5E1),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 10),
                       ElevatedButton.icon(
                         onPressed: () => _showTruckFormDialog(context, isDark),
-                        icon: const Icon(Icons.add_rounded, size: 16),
-                        label: const Text('Register Vehicle'),
+                        icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                        label: const Text('Register Vehicle', style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: const Color(0xFF16A34A),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 14),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          elevation: 0,
                         ),
                       ),
                     ],
                   );
 
-                  if (avail < 640) {
+                  if (isNarrow) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [title, const SizedBox(height: 12), actions],
+                      children: [
+                        titleSection,
+                        const SizedBox(height: 12),
+                        actionButtons,
+                      ],
                     );
                   }
+
                   return Row(
                     children: [
-                      const Expanded(child: title),
-                      const SizedBox(width: 8),
-                      actions,
+                      Expanded(child: titleSection),
+                      const SizedBox(width: 12),
+                      actionButtons,
                     ],
                   );
                 }),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 // Stats Cards
                 _buildStatsCards(context, isDark),
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
 
-                // Roster title header
+                // Vehicle Roster Header
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const AppText(
-                      'Vehicle Roster',
-                      style: AppTextStyle.bodyLarge,
-                      fontWeight: FontWeight.bold,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.local_shipping_rounded,
+                          color: Color(0xFF16A34A),
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Vehicle Roster',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
                     ),
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.list_rounded, size: 20),
+                          icon: Icon(
+                            Icons.format_list_bulleted_rounded,
+                            size: 18,
+                            color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                          ),
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(),
+                          visualDensity: VisualDensity.compact,
                           onPressed: () {},
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.grid_view_rounded,
-                              size: 20, color: AppColors.primary),
-                          onPressed: () {},
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDCFCE7),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(
+                            Icons.grid_view_rounded,
+                            size: 16,
+                            color: Color(0xFF16A34A),
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
-                const Divider(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
                 // Vehicles Grid List
                 GridView.builder(
@@ -3623,9 +4014,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    mainAxisExtent: 215,
+                    crossAxisSpacing: spacing,
+                    mainAxisSpacing: spacing,
+                    mainAxisExtent: 195,
                   ),
                   itemCount: controller.trucks.length,
                   itemBuilder: (context, idx) {
@@ -4758,21 +5149,32 @@ class AdminHomeView extends GetView<AdminHomeController> {
             );
           }
 
-          return GridView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 400,
-              mainAxisExtent: 140,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-            ),
-            itemCount: controller.customers.length,
-            itemBuilder: (context, index) {
-              return _buildCompactCustomerCard(
-                  context, controller.customers[index], isDark);
-            },
-          );
+          return LayoutBuilder(builder: (context, cons) {
+            const hPad = 16.0;
+            final avail = cons.maxWidth - hPad * 2;
+            int crossAxisCount = 3;
+            if (avail < 600) {
+              crossAxisCount = 1;
+            } else if (avail < 950) {
+              crossAxisCount = 2;
+            }
+
+            return GridView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(hPad, 16, hPad, 100),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                mainAxisExtent: 156,
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 14,
+              ),
+              itemCount: controller.customers.length,
+              itemBuilder: (context, index) {
+                return _buildCompactCustomerCard(
+                    context, controller.customers[index], isDark);
+              },
+            );
+          });
         }),
       ),
       floatingActionButton: FloatingActionButton(
@@ -4797,20 +5199,23 @@ class AdminHomeView extends GetView<AdminHomeController> {
     final custId = (c['id'] ?? '').toString();
     final displayId =
         'C-${custId.length >= 4 ? custId.substring(custId.length - 4) : "100"}';
+    final fullAddress = loc.isNotEmpty
+        ? loc
+        : (cityDistrict.isNotEmpty ? cityDistrict : 'Address pending');
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isDark ? Colors.white10 : Colors.grey.shade200,
+          color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
             blurRadius: 6,
-            offset: const Offset(0, 3),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -4818,18 +5223,18 @@ class AdminHomeView extends GetView<AdminHomeController> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // Row 1: Icon + Name & Site + ID & Menu
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF10B981).withValues(alpha: 0.2)
-                      : const Color(0xFFD1FAE5),
-                  borderRadius: BorderRadius.circular(10),
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.apartment_rounded,
-                    color: Color(0xFF10B981), size: 18),
+                    color: Color(0xFF16A34A), size: 18),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -4839,14 +5244,18 @@ class AdminHomeView extends GetView<AdminHomeController> {
                     Row(
                       children: [
                         Expanded(
-                          child: AppText(
+                          child: Text(
                             name,
-                            style: AppTextStyle.bodyLarge,
-                            fontWeight: FontWeight.bold,
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
@@ -4854,13 +5263,15 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             color: isDark
                                 ? Colors.white10
                                 : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(4),
                           ),
-                          child: AppText(
+                          child: Text(
                             displayId,
-                            style: AppTextStyle.labelMedium,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w600,
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF64748B),
+                            ),
                           ),
                         ),
                       ],
@@ -4870,14 +5281,16 @@ class AdminHomeView extends GetView<AdminHomeController> {
                       Row(
                         children: [
                           const Icon(Icons.factory_rounded,
-                              size: 11, color: Color(0xFF10B981)),
+                              size: 12, color: Color(0xFF16A34A)),
                           const SizedBox(width: 4),
                           Expanded(
-                            child: AppText(
+                            child: Text(
                               siteName,
-                              style: AppTextStyle.labelMedium,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF10B981),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF16A34A),
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -4890,7 +5303,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
               ),
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert_rounded,
-                    color: AppColors.textSecondary, size: 18),
+                    color: Color(0xFF94A3B8), size: 18),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 onSelected: (value) {
@@ -4909,7 +5322,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                         Icon(Icons.edit_rounded,
                             size: 16, color: AppColors.primary),
                         SizedBox(width: 8),
-                        AppText('Edit', style: AppTextStyle.bodyMedium),
+                        Text('Edit', style: TextStyle(fontSize: 13)),
                       ],
                     ),
                   ),
@@ -4920,9 +5333,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                         Icon(Icons.delete_outline_rounded,
                             size: 16, color: AppColors.error),
                         SizedBox(width: 8),
-                        AppText('Delete',
-                            style: AppTextStyle.bodyMedium,
-                            color: AppColors.error),
+                        Text('Delete',
+                            style: TextStyle(fontSize: 13, color: AppColors.error)),
                       ],
                     ),
                   ),
@@ -4930,72 +5342,64 @@ class AdminHomeView extends GetView<AdminHomeController> {
               ),
             ],
           ),
-          const Divider(height: 10, thickness: 0.8),
+          
+          Divider(height: 1, color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
+
+          // Row 2: Delivery Location Header + Phone Chip
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.pin_drop_rounded,
-                            size: 12, color: Color(0xFF10B981)),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: AppText(
-                            'Delivery Location',
-                            style: AppTextStyle.labelMedium,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white70 : Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    AppText(
-                      loc.isNotEmpty
-                          ? loc
-                          : (cityDistrict.isNotEmpty
-                              ? cityDistrict
-                              : 'Address pending'),
-                      style: AppTextStyle.labelMedium,
-                      color: Colors.grey,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+              const Icon(Icons.pin_drop_rounded,
+                  size: 12.5, color: Color(0xFF16A34A)),
+              const SizedBox(width: 4),
+              Text(
+                'Delivery Location',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white70 : const Color(0xFF334155),
                 ),
               ),
-              if (phone.isNotEmpty) ...[
-                const SizedBox(width: 8),
+              const Spacer(),
+              if (phone.isNotEmpty)
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                   decoration: BoxDecoration(
                     color: isDark
-                        ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                        : const Color(0xFFD1FAE5),
-                    borderRadius: BorderRadius.circular(8),
+                        ? const Color(0xFF16A34A).withValues(alpha: 0.15)
+                        : const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(Icons.phone_rounded,
-                          size: 12, color: Color(0xFF059669)),
-                      const SizedBox(width: 4),
-                      AppText(
+                          size: 11, color: Color(0xFF15803D)),
+                      const SizedBox(width: 3),
+                      Text(
                         phone,
-                        style: AppTextStyle.labelMedium,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF059669),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF15803D),
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ],
             ],
+          ),
+
+          // Row 3: Full Width Address (up to 3 lines without clipping)
+          Text(
+            fullAddress,
+            style: TextStyle(
+              fontSize: 11.5,
+              color: isDark ? Colors.white60 : const Color(0xFF64748B),
+              height: 1.25,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
