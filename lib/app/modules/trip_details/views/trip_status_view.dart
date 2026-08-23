@@ -1,29 +1,25 @@
-import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/trip_details_controller.dart';
-import '../../../../widgets/app_text.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../data/services/session_service.dart';
 import '../../../core/utils/document_viewer_helper.dart';
-import '../../../core/utils/image_url.dart';
 import '../../../core/utils/app_image_helper.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
-/// Modern, real-time Activity History screen. It displays only the actual logged
-/// milestones from the Firestore milestonesLog with real timestamps and locations.
-/// Does not show fake future ticks or simulated increments.
+/// Redesigned Journey Timeline screen:
+/// - Compact top app bar with back button and clean title
+/// - Trip summary card with status pill, driver/truck tags, and 2-column info grid
+/// - Verification proofs card for photos, passes, and POD documents
+/// - Journey milestones audit vertical timeline with green/orange status styling
+/// - Fully responsive layout with multi-line wrapping and zero clipping
 class TripStatusView extends GetView<TripDetailsController> {
   const TripStatusView({super.key});
 
   String _driverName() {
     try {
       final name = Get.find<SessionService>().name.value;
-      return name.isEmpty ? 'Deep' : name;
+      return name.isEmpty ? 'Driver' : name;
     } catch (_) {
-      return 'Deep';
+      return 'Driver';
     }
   }
 
@@ -56,38 +52,60 @@ class TripStatusView extends GetView<TripDetailsController> {
     }
   }
 
-  Color _statusColor(String status) {
+  (Color, Color) _statusColors(String status) {
     switch (status) {
       case 'DELIVERED':
-        return const Color(0xFF10B981); // Green
+        return (const Color(0xFFDCFCE7), const Color(0xFF15803D)); // Green
       case 'LOAD_REJECTED':
       case 'DELIVERY_REJECTED':
       case 'REJECTED':
-        return const Color(0xFFEF4444); // Red
+        return (const Color(0xFFFEE2E2), const Color(0xFFDC2626)); // Red
       case 'LOAD_REQUESTED':
       case 'DELIVERY_REQUESTED':
-        return const Color(0xFFF59E0B); // Amber
+        return (const Color(0xFFFEF3C7), const Color(0xFFD97706)); // Orange/Amber
+      case 'ACTIVE NOW':
+      case 'EN_ROUTE_VENDOR':
+      case 'LOADING':
+      case 'ASSIGNED':
+        return (const Color(0xFFEFF6FF), const Color(0xFF2563EB)); // Blue
       default:
-        return AppColors.primary; // Blue
+        return (const Color(0xFFDCFCE7), const Color(0xFF15803D));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
         elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: isDark ? Colors.white : AppColors.textPrimary),
+          icon: Icon(
+            Icons.arrow_back_rounded,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+            size: 22,
+          ),
           onPressed: () => Get.back(),
         ),
-        title: const AppText(
+        title: Text(
           'Journey Timeline',
-          style: AppTextStyle.headlineSmall,
-          fontWeight: FontWeight.bold,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+            letterSpacing: -0.3,
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            color: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+            height: 1,
+          ),
         ),
       ),
       body: Obx(() {
@@ -98,7 +116,7 @@ class TripStatusView extends GetView<TripDetailsController> {
 
         // Create a list of milestones starting with an initial "Trip Assigned" event
         final List<Map<String, dynamic>> items = [];
-        
+
         // Always seed "Trip Assigned" as the starting baseline event
         items.add({
           'label': 'Trip Assigned by Admin',
@@ -120,266 +138,22 @@ class TripStatusView extends GetView<TripDetailsController> {
 
         return SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 32),
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // A. Header Overview Card
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        )
-                      ],
-                      border: Border.all(color: isDark ? Colors.white10 : AppColors.border),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: AppText(
-                                controller.tripId,
-                                style: AppTextStyle.bodyLarge,
-                                fontWeight: FontWeight.bold,
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: _statusColor(status).withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: AppText(
-                                  _friendlyStatus(status),
-                                  style: AppTextStyle.labelMedium,
-                                  color: _statusColor(status),
-                                  fontWeight: FontWeight.bold,
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 16,
-                          runSpacing: 6,
-                          children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.person_outline_rounded, size: 16, color: Colors.grey),
-                                const SizedBox(width: 6),
-                                AppText('Driver: ${_driverName()}', style: AppTextStyle.bodyMedium),
-                              ],
-                            ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.local_shipping_outlined, size: 16, color: Colors.grey),
-                                const SizedBox(width: 6),
-                                AppText('Truck: ${controller.vehicleNo.value}', style: AppTextStyle.bodyMedium),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 20),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const AppText('MATERIAL', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 10),
-                                  const SizedBox(height: 4),
-                                  AppText((data['materialName'] ?? '—').toString(), style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
-                                ],
-                              ),
-                            ),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const AppText('ROYALTY OWNER', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 10),
-                                  const SizedBox(height: 4),
-                                  AppText((data['royaltyName'] ?? '—').toString(), style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const AppText('LOADING PASS ID', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 10),
-                                  const SizedBox(height: 4),
-                                  AppText((data['loadingPassId'] ?? '—').toString(), style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
-                                ],
-                              ),
-                            ),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const AppText('PASS GENERATED AT', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 10),
-                                  const SizedBox(height: 4),
-                                  AppText((data['loadingPassGeneratedAt'] ?? '—').toString(), style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                // 1. Trip Summary Card
+                _buildTripSummaryCard(context, isDark, status, data),
+                const SizedBox(height: 14),
 
-                const SizedBox(height: 8),
-
-                // B. Verification Proofs Panel (Photos & Documents)
+                // 2. Verification Proofs Panel (Photos & Documents)
                 _buildVerificationProofsPanel(context, isDark, data),
+                const SizedBox(height: 14),
 
-                const SizedBox(height: 16),
-
-                // C. Real-time Activity Timeline List Section
-                if (items.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-                    child: AppText(
-                      'JOURNEY MILESTONES AUDIT',
-                      style: AppTextStyle.labelMedium,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                    itemCount: items.length,
-                    itemBuilder: (context, index) {
-                      final item = items[index];
-                      final isLast = index == items.length - 1;
-                      final isNewest = index == items.length - 1; // latest event is active
-                      
-                      return IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Left Dot and vertical line connector
-                            Column(
-                              children: [
-                                Container(
-                                  width: 22,
-                                  height: 22,
-                                  decoration: BoxDecoration(
-                                    color: isNewest 
-                                        ? _statusColor(status) 
-                                        : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: isNewest 
-                                          ? _statusColor(status).withValues(alpha: 0.3)
-                                          : Colors.transparent,
-                                      width: 3,
-                                    ),
-                                  ),
-                                  child: Center(
-                                    child: Icon(
-                                      isNewest ? Icons.play_arrow_rounded : Icons.check_rounded,
-                                      size: 12,
-                                      color: isNewest ? Colors.white : (isDark ? Colors.white54 : Colors.grey.shade600),
-                                    ),
-                                  ),
-                                ),
-                                if (!isLast)
-                                  Expanded(
-                                    child: Container(
-                                      width: 2,
-                                      color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
-                                    ),
-                                  ),
-                              ],
-                            ),
-
-                            const SizedBox(width: 16),
-
-                            // Right text information card
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.only(bottom: 24),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(
-                                          child: AppText(
-                                            item['label'].toString(),
-                                            style: AppTextStyle.bodyLarge,
-                                            fontWeight: isNewest ? FontWeight.bold : FontWeight.w600,
-                                            color: isNewest 
-                                                ? (isDark ? Colors.white : AppColors.textPrimary)
-                                                : (isDark ? Colors.white70 : Colors.grey.shade700),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        AppText(
-                                          item['timestamp'].toString(),
-                                          style: AppTextStyle.labelMedium,
-                                          color: Colors.grey,
-                                        ),
-                                      ],
-                                    ),
-                                    if (item['address'].toString().isNotEmpty) ...[
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          const Icon(Icons.place_outlined, size: 13, color: Colors.grey),
-                                          const SizedBox(width: 4),
-                                          Expanded(
-                                            child: AppText(
-                                              item['address'].toString(),
-                                              style: AppTextStyle.labelMedium,
-                                              color: Colors.grey.shade500,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                // 3. Real-time Journey Milestones Audit
+                _buildMilestonesTimeline(context, isDark, status, items),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -388,12 +162,222 @@ class TripStatusView extends GetView<TripDetailsController> {
     );
   }
 
-  Widget _buildVerificationProofsPanel(BuildContext context, bool isDark, Map<String, dynamic> data) {
-    final loadingPhotoUrl = (data['loadingPhotoUrl'] ?? data['loadingPhoto'] ?? '').toString();
-    final gatePassPhotoUrl = (data['gatePassPhotoUrl'] ?? data['gatePassPhoto'] ?? '').toString();
+  // ── 1. Trip Summary Card ───────────────────────────────────────────────────
+  Widget _buildTripSummaryCard(
+    BuildContext context,
+    bool isDark,
+    String status,
+    Map<String, dynamic> data,
+  ) {
+    final (chipBg, chipFg) = _statusColors(status);
+    final truckNo = (controller.vehicleNo.value.isNotEmpty)
+        ? controller.vehicleNo.value
+        : (data['truckNo'] ?? '—').toString();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Top Row: Trip ID + Status Pill
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  controller.tripId,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    letterSpacing: -0.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: chipBg,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  _friendlyStatus(status),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: chipFg,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Driver & Truck Tags Row
+          Wrap(
+            spacing: 12,
+            runSpacing: 6,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.person_outline_rounded,
+                    size: 15,
+                    color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Driver: ${_driverName()}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white70 : const Color(0xFF334155),
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.local_shipping_outlined,
+                    size: 15,
+                    color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Truck: $truckNo',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white70 : const Color(0xFF334155),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          // Divider
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Divider(
+              color: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+              height: 1,
+              thickness: 1,
+            ),
+          ),
+
+          // 2-Column Info Grid
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _summaryField(
+                  'MATERIAL',
+                  (data['materialName'] ?? '—').toString(),
+                  isDark,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _summaryField(
+                  'ROYALTY OWNER',
+                  (data['royaltyName'] ?? '—').toString(),
+                  isDark,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _summaryField(
+                  'LOADING PASS ID',
+                  (data['loadingPassId'] ?? '—').toString(),
+                  isDark,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _summaryField(
+                  'PASS GENERATED AT',
+                  (data['loadingPassGeneratedAt'] ?? '—').toString(),
+                  isDark,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryField(String label, String value, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w700,
+            color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+            letterSpacing: 0.4,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value.isEmpty ? '—' : value,
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+            height: 1.2,
+          ),
+          softWrap: true,
+        ),
+      ],
+    );
+  }
+
+  // ── 2. Verification Proofs Panel ───────────────────────────────────────────
+  Widget _buildVerificationProofsPanel(
+    BuildContext context,
+    bool isDark,
+    Map<String, dynamic> data,
+  ) {
+    final loadingPhotoUrl =
+        (data['loadingPhotoUrl'] ?? data['loadingPhoto'] ?? '').toString();
+    final gatePassPhotoUrl =
+        (data['gatePassPhotoUrl'] ?? data['gatePassPhoto'] ?? '').toString();
     final passData = data['truckOwnerPassData'] as Map?;
-    final truckOwnerPassId = (data['truckOwnerPassId'] ?? passData?['passId'] ?? '').toString();
-    String truckOwnerPassUrl = (data['truckOwnerPassUrl'] ?? '').toString().trim();
+    final truckOwnerPassId =
+        (data['truckOwnerPassId'] ?? passData?['passId'] ?? '').toString();
+    String truckOwnerPassUrl =
+        (data['truckOwnerPassUrl'] ?? '').toString().trim();
     if (truckOwnerPassUrl.isEmpty && passData != null) {
       truckOwnerPassUrl = (passData['passPhotoUrl'] ??
               passData['passDocumentUrl'] ??
@@ -404,7 +388,8 @@ class TripStatusView extends GetView<TripDetailsController> {
           .trim();
     }
 
-    String destinationDocUrl = (data['destinationDocUrl'] ?? '').toString().trim();
+    String destinationDocUrl =
+        (data['destinationDocUrl'] ?? '').toString().trim();
     if (destinationDocUrl.isEmpty) {
       destinationDocUrl = (data['destinationPhotoUrl'] ??
               data['adminDocUrl'] ??
@@ -413,7 +398,9 @@ class TripStatusView extends GetView<TripDetailsController> {
           .toString()
           .trim();
     }
-    final podUrl = (data['podPhotoUrl'] ?? data['podPhoto'] ?? data['podUrl'] ?? '').toString();
+    final podUrl =
+        (data['podPhotoUrl'] ?? data['podPhoto'] ?? data['podUrl'] ?? '')
+            .toString();
     final remarks = (data['remarks'] ?? '').toString();
 
     final hasTruckOwnerPass = (data['hasTruckOwnerPass'] == true) ||
@@ -421,7 +408,8 @@ class TripStatusView extends GetView<TripDetailsController> {
         truckOwnerPassUrl.isNotEmpty ||
         passData != null;
 
-    final hasLoadingProof = loadingPhotoUrl.isNotEmpty || gatePassPhotoUrl.isNotEmpty;
+    final hasLoadingProof =
+        loadingPhotoUrl.isNotEmpty || gatePassPhotoUrl.isNotEmpty;
     final hasAdminProof = hasTruckOwnerPass || destinationDocUrl.isNotEmpty;
     final hasPodProof = podUrl.isNotEmpty;
 
@@ -430,123 +418,212 @@ class TripStatusView extends GetView<TripDetailsController> {
     }
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
         ],
-        border: Border.all(color: isDark ? Colors.white10 : AppColors.border),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Row(
+          // Section Header
+          Row(
             children: [
-              Icon(Icons.verified_user_rounded, color: AppColors.primary, size: 20),
-              SizedBox(width: 8),
-              Expanded(
-                child: AppText(
-                  'VERIFICATION PROOFS',
-                  style: AppTextStyle.labelLarge,
-                  fontWeight: FontWeight.bold,
+              const Icon(
+                Icons.verified_user_rounded,
+                color: Color(0xFF16A34A),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'VERIFICATION PROOFS',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  letterSpacing: 0.3,
                 ),
               ),
             ],
           ),
-          const Divider(height: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Divider(
+              color: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+              height: 1,
+              thickness: 1,
+            ),
+          ),
 
           // A. Loading Stage Proofs
           if (hasLoadingProof) ...[
-            const AppText('LOADING STAGE PROOFS', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey),
+            Text(
+              'LOADING STAGE PROOFS',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                letterSpacing: 0.3,
+              ),
+            ),
             const SizedBox(height: 10),
-            Row(
+            Wrap(
+              spacing: 12,
+              runSpacing: 10,
               children: [
-                if (loadingPhotoUrl.isNotEmpty) ...[
-                  _buildPhotoThumbnail(context, loadingPhotoUrl, 'Loading Photo', isDark),
-                  const SizedBox(width: 12),
-                ],
-                if (gatePassPhotoUrl.isNotEmpty) ...[
-                  _buildPhotoThumbnail(context, gatePassPhotoUrl, 'Gate Pass Photo', isDark),
-                ],
+                if (loadingPhotoUrl.isNotEmpty)
+                  _buildPhotoThumbnail(
+                      context, loadingPhotoUrl, 'Loading Photo', isDark),
+                if (gatePassPhotoUrl.isNotEmpty)
+                  _buildPhotoThumbnail(
+                      context, gatePassPhotoUrl, 'Gate Pass Photo', isDark),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
           ],
 
           // B. Truck Owner Pass & Admin Documents
           if (hasAdminProof) ...[
-            const AppText('TRUCK OWNER PASS & ADMIN DOCUMENTS', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey),
+            Text(
+              'TRUCK OWNER PASS & ADMIN DOCUMENTS',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                letterSpacing: 0.3,
+              ),
+            ),
             const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Wrap(
+              spacing: 12,
+              runSpacing: 10,
               children: [
-                if (truckOwnerPassUrl.isNotEmpty) ...[
-                  _buildPhotoThumbnail(context, truckOwnerPassUrl, 'Truck Owner Pass', isDark),
-                  const SizedBox(width: 12),
-                ] else if (hasTruckOwnerPass) ...[
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFECFDF5),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 24),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                AppText('Truck Owner Pass Issued ✅', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46)),
-                                if (truckOwnerPassId.isNotEmpty)
-                                  AppText('Pass ID: #$truckOwnerPassId', style: AppTextStyle.bodyMedium, fontWeight: FontWeight.bold),
-                                if (passData?['ownerName']?.toString().isNotEmpty == true)
-                                  AppText('Owner/Transporter: ${passData!['ownerName']}', style: AppTextStyle.bodyMedium, color: Colors.grey),
-                              ],
-                            ),
-                          ),
-                        ],
+                if (truckOwnerPassUrl.isNotEmpty)
+                  _buildPhotoThumbnail(
+                      context, truckOwnerPassUrl, 'Truck Owner Pass', isDark)
+                else if (hasTruckOwnerPass)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF064E3B).withValues(alpha: 0.4)
+                          : const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: const Color(0xFF16A34A).withValues(alpha: 0.4),
                       ),
                     ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.verified_rounded,
+                          color: Color(0xFF16A34A),
+                          size: 22,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Truck Owner Pass Issued ✅',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark
+                                      ? const Color(0xFF86EFAC)
+                                      : const Color(0xFF15803D),
+                                ),
+                              ),
+                              if (truckOwnerPassId.isNotEmpty)
+                                Text(
+                                  'Pass ID: #$truckOwnerPassId',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark
+                                        ? Colors.white
+                                        : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                              if (passData?['ownerName']?.toString().isNotEmpty == true)
+                                Text(
+                                  'Owner/Transporter: ${passData!['ownerName']}',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: isDark
+                                        ? Colors.white60
+                                        : const Color(0xFF64748B),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 12),
-                ],
-                if (destinationDocUrl.isNotEmpty) ...[
-                  _buildPhotoThumbnail(context, destinationDocUrl, 'Destination Doc/Photo', isDark),
-                ],
+                if (destinationDocUrl.isNotEmpty)
+                  _buildPhotoThumbnail(
+                      context, destinationDocUrl, 'Destination Doc/Photo', isDark),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
           ],
 
           // C. Proof of Delivery (POD)
           if (hasPodProof) ...[
-            const AppText('PROOF OF DELIVERY (POD)', style: AppTextStyle.labelMedium, fontWeight: FontWeight.bold, color: Colors.grey),
+            Text(
+              'PROOF OF DELIVERY (POD)',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                letterSpacing: 0.3,
+              ),
+            ),
             const SizedBox(height: 10),
             if (remarks.isNotEmpty) ...[
-              const AppText('REMARKS / NOTES', style: AppTextStyle.labelMedium, color: Colors.grey),
+              Text(
+                'REMARKS / NOTES',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                ),
+              ),
               const SizedBox(height: 4),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+                  ),
                 ),
-                child: AppText(remarks, style: AppTextStyle.bodyMedium),
+                child: Text(
+                  remarks,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: isDark ? Colors.white70 : const Color(0xFF334155),
+                    height: 1.3,
+                  ),
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
             ],
             _buildPhotoThumbnail(context, podUrl, 'POD Document', isDark),
           ],
@@ -555,7 +632,12 @@ class TripStatusView extends GetView<TripDetailsController> {
     );
   }
 
-  Widget _buildPhotoThumbnail(BuildContext context, String url, String label, bool isDark) {
+  Widget _buildPhotoThumbnail(
+    BuildContext context,
+    String url,
+    String label,
+    bool isDark,
+  ) {
     final isPdf = DocumentViewerHelper.isPdf(url);
 
     Widget imageWidget;
@@ -565,9 +647,16 @@ class TripStatusView extends GetView<TripDetailsController> {
         child: const Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.picture_as_pdf_rounded, size: 32, color: Colors.redAccent),
+            Icon(Icons.picture_as_pdf_rounded, size: 28, color: Color(0xFFDC2626)),
             SizedBox(height: 4),
-            Text('PDF File', style: TextStyle(fontSize: 10, color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            Text(
+              'PDF File',
+              style: TextStyle(
+                fontSize: 10,
+                color: Color(0xFFDC2626),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
         ),
       );
@@ -576,9 +665,9 @@ class TripStatusView extends GetView<TripDetailsController> {
         source: url,
         fit: BoxFit.cover,
         errorWidget: Container(
-          color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+          color: isDark ? Colors.grey.shade900 : const Color(0xFFF1F5F9),
           child: const Center(
-            child: Icon(Icons.broken_image_outlined, size: 24, color: Colors.grey),
+            child: Icon(Icons.broken_image_outlined, size: 22, color: Colors.grey),
           ),
         ),
       );
@@ -590,11 +679,14 @@ class TripStatusView extends GetView<TripDetailsController> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 90,
-            height: 90,
+            width: 84,
+            height: 84,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300),
+              border: Border.all(
+                color: isDark ? Colors.white24 : const Color(0xFFE2E8F0),
+                width: 1,
+              ),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(11),
@@ -602,7 +694,204 @@ class TripStatusView extends GetView<TripDetailsController> {
             ),
           ),
           const SizedBox(height: 4),
-          AppText(label, style: AppTextStyle.labelMedium, color: Colors.grey, fontWeight: FontWeight.bold),
+          SizedBox(
+            width: 84,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white60 : const Color(0xFF64748B),
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── 3. Journey Milestones Audit Vertical Timeline ───────────────────────────
+  Widget _buildMilestonesTimeline(
+    BuildContext context,
+    bool isDark,
+    String status,
+    List<Map<String, dynamic>> items,
+  ) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    final isDelivered = status == 'DELIVERED';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Section Title
+          Text(
+            'JOURNEY MILESTONES AUDIT',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+              letterSpacing: 0.3,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Divider(
+              color: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+              height: 1,
+              thickness: 1,
+            ),
+          ),
+
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final item = items[index];
+              final isLast = index == items.length - 1;
+              final isLatest = isLast;
+
+              final (nodeBg, nodeFg) = (isLatest && !isDelivered)
+                  ? (const Color(0xFFFEF3C7), const Color(0xFFD97706)) // Active / In Progress
+                  : (const Color(0xFFDCFCE7), const Color(0xFF15803D)); // Completed
+
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Left Column: Dot Icon + Vertical Connector Line
+                    Column(
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: nodeBg,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: nodeFg.withValues(alpha: 0.3),
+                              width: 2,
+                            ),
+                          ),
+                          child: Center(
+                            child: Icon(
+                              (isLatest && !isDelivered)
+                                  ? Icons.radio_button_checked_rounded
+                                  : Icons.check_rounded,
+                              size: 13,
+                              color: nodeFg,
+                            ),
+                          ),
+                        ),
+                        if (!isLast)
+                          Expanded(
+                            child: Container(
+                              width: 2,
+                              color: isDark
+                                  ? Colors.white12
+                                  : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Right Content: Label + Timestamp + Address
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(bottom: isLast ? 4 : 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item['label'].toString(),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF0F172A),
+                                      height: 1.25,
+                                    ),
+                                    softWrap: true,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  item['timestamp'].toString(),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: isDark
+                                        ? Colors.white54
+                                        : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (item['address'].toString().isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.place_outlined,
+                                    size: 14,
+                                    color: isDark
+                                        ? Colors.white38
+                                        : const Color(0xFF94A3B8),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      item['address'].toString(),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDark
+                                            ? Colors.white60
+                                            : const Color(0xFF64748B),
+                                        height: 1.25,
+                                      ),
+                                      softWrap: true,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ],
       ),
     );

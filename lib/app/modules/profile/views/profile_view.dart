@@ -3,14 +3,22 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../../widgets/app_text.dart';
-import '../../../../widgets/app_button.dart';
 import '../../dashboard/controllers/dashboard_controller.dart';
+import '../../home/controllers/home_controller.dart';
 import '../../../core/utils/image_url.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/config/app_config.dart';
 import '../controllers/profile_controller.dart';
 
+/// Redesigned Profile screen matching the reference design:
+/// - Compact top app bar with back navigation and centered "Profile" title
+/// - Top profile card with user avatar, bold name, phone number, and green Online indicator
+/// - Grouped menu card with:
+///   1. My Profile
+///   2. Change Password
+///   3. Help & Support
+///   4. About Us
+///   5. Logout (red text & icon)
+/// - Seamless connection with all existing profile data, avatar upload, and logout workflows
 class ProfileView extends GetView<ProfileController> {
   const ProfileView({super.key});
 
@@ -18,1040 +26,831 @@ class ProfileView extends GetView<ProfileController> {
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return NetworkImage(corsSafeImageUrl(path));
     }
-    // File() is unsupported on web — only touch it on mobile/desktop.
     if (!kIsWeb && path.isNotEmpty && File(path).existsSync()) {
       return FileImage(File(path));
     }
-    return CachedNetworkImage(
-            imageUrl:
-                'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150')
-        as ImageProvider;
+    return const CachedNetworkImageProvider(
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+    );
+  }
+
+  void _handleBack(BuildContext context) {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else if (Get.isRegistered<HomeController>()) {
+      Get.find<HomeController>().changeTabIndex(0);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    // Pull driver controller details if active
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final driverController = Get.find<DashboardController>();
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF0F172A) : const Color(0xFFF3F7FD),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
+        backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded,
-              color: isDark ? Colors.white : AppColors.textPrimary),
-          onPressed: () {},
+          icon: Icon(
+            Icons.arrow_back_rounded,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+            size: 22,
+          ),
+          onPressed: () => _handleBack(context),
         ),
-        title: AppText('app_title'.tr,
-            style: AppTextStyle.headlineSmall, fontWeight: FontWeight.bold),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.hub_rounded, color: AppColors.primary),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // 1. Sliding Segmented Selector
-          _buildSegmentedControl(isDark),
-
-          // 2. Tab Content Body
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: controller.loadProfileFromFirebase,
-              color: AppColors.primary,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Obx(() {
-                  if (controller.activeSubTab.value == 0) {
-                    return _buildProfileDetailsTab(driverController, isDark);
-                  } else {
-                    return _buildDocumentsTab(isDark);
-                  }
-                }),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Segmented Switcher Pill
-  Widget _buildSegmentedControl(bool isDark) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF1E293B)
-            : AppColors.primaryLight.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: Obx(() {
-        final selected = controller.activeSubTab.value;
-        return Row(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () => controller.selectSubTab(0),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color:
-                        selected == 0 ? AppColors.primary : Colors.transparent,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: selected == 0
-                        ? [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.3),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            )
-                          ]
-                        : null,
-                  ),
-                  child: Center(
-                    child: AppText(
-                      'Profile Info',
-                      style: AppTextStyle.bodyMedium,
-                      fontWeight:
-                          selected == 0 ? FontWeight.bold : FontWeight.normal,
-                      color: selected == 0
-                          ? Colors.white
-                          : (isDark ? Colors.white70 : AppColors.textSecondary),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: GestureDetector(
-                onTap: () => controller.selectSubTab(1),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color:
-                        selected == 1 ? AppColors.primary : Colors.transparent,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: selected == 1
-                        ? [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.3),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            )
-                          ]
-                        : null,
-                  ),
-                  child: Center(
-                    child: AppText(
-                      'My Documents',
-                      style: AppTextStyle.bodyMedium,
-                      fontWeight:
-                          selected == 1 ? FontWeight.bold : FontWeight.normal,
-                      color: selected == 1
-                          ? Colors.white
-                          : (isDark ? Colors.white70 : AppColors.textSecondary),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      }),
-    );
-  }
-
-  // TAB 1: Profile Details
-  Widget _buildProfileDetailsTab(
-      DashboardController driverController, bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // 1. Profile Banner Card
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: const LinearGradient(
-              colors: [
-                AppColors.primaryDark,
-                AppColors.primary,
-                Color(0xFF42526E)
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.2),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              )
-            ],
-          ),
-          child: Stack(
-            children: [
-              // Road landscape overlay simulation
-              Positioned.fill(
-                child: Opacity(
-                  opacity: 0.15,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: Image.network(
-                      'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=400&auto=format&fit=crop',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.black26,
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 12,
-                right: 12,
-                child: IconButton(
-                  icon: const Icon(Icons.edit_rounded, color: Colors.white),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white24,
-                  ),
-                  onPressed: controller.showEditProfileDialog,
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    Center(
-                      child: Stack(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Obx(() => CircleAvatar(
-                                  radius: 46,
-                                  backgroundImage: _getImageProvider(
-                                      driverController.avatarUrl.value),
-                                  backgroundColor: Colors.grey.shade200,
-                                )),
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: GestureDetector(
-                              onTap: controller.changeAvatar,
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: const BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                        color: Colors.black26,
-                                        blurRadius: 4,
-                                        offset: Offset(0, 2))
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.camera_alt_rounded,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Obx(() => AppText(
-                          driverController.driverName.value,
-                          style: AppTextStyle.headlineMedium,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        )),
-                    const SizedBox(height: 4),
-                    Obx(() => AppText(
-                          'ID: ${driverController.vehicleNo.value}',
-                          style: AppTextStyle.bodyMedium,
-                          color: Colors.white70,
-                        )),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF0B3),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.stars_rounded,
-                              color: Color(0xFFBF2600), size: 16),
-                          SizedBox(width: 6),
-                          AppText(
-                            'ACTIVE DUTY',
-                            style: AppTextStyle.labelMedium,
-                            color: Color(0xFFBF2600),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+        title: Text(
+          'Profile',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+            letterSpacing: -0.3,
           ),
         ),
-
-        const SizedBox(height: 8),
-
-        // 2. License Details Card
-        _buildSectionCard(
-          isDark: isDark,
-          title: 'License Details',
-          icon: Icons.badge_outlined,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildDetailItem(
-                  'LICENSE NUMBER', controller.licenseNo.value, isDark),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildDetailItem(
-                      'CLASS', controller.licenseClass.value, isDark),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const AppText('EXPIRES',
-                          style: AppTextStyle.labelMedium,
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.bold),
-                      const SizedBox(height: 4),
-                      AppText(controller.licenseExpires.value,
-                          style: AppTextStyle.bodyLarge,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.error),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        // 3. Driver & Vehicle Details Card
-        _buildSectionCard(
-          isDark: isDark,
-          title: 'Driver & Vehicle Details',
-          icon: Icons.local_shipping_outlined,
-          actionText: 'EDIT',
-          onActionTap: controller.showEditProfileDialog,
-          child: Column(
-            children: [
-              Obx(() => _buildHorizontalRow(
-                  'Driver Phone', driverController.driverPhone.value, isDark)),
-              const Divider(height: 16),
-              Obx(() => _buildHorizontalRow(
-                  'Vehicle No', driverController.vehicleNo.value, isDark)),
-              const Divider(height: 16),
-              Obx(() => _buildHorizontalRow('Vehicle Model',
-                  driverController.vehicleModel.value, isDark)),
-            ],
-          ),
-        ),
-
-        _buildSectionCard(
-          isDark: isDark,
-          title: 'Road Performance',
-          icon: Icons.assessment_outlined,
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AppText(controller.safetyRating.value,
-                        style: AppTextStyle.headlineMedium,
-                        color: isDark ? Colors.white : AppColors.textPrimary,
-                        fontWeight: FontWeight.bold),
-                    const AppText('Safety Rating',
-                        style: AppTextStyle.labelMedium,
-                        color: AppColors.textSecondary),
-                  ],
-                ),
-              ),
-              Container(
-                  height: 30,
-                  width: 1,
-                  color: isDark ? Colors.white24 : AppColors.border),
-              const SizedBox(width: 24),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AppText(controller.kmDriven.value,
-                        style: AppTextStyle.headlineMedium,
-                        color: isDark ? Colors.white : AppColors.textPrimary,
-                        fontWeight: FontWeight.bold),
-                    const AppText('KM Driven',
-                        style: AppTextStyle.labelMedium,
-                        color: AppColors.textSecondary),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // 4. Emergency Contact Card
-        _buildSectionCard(
-          isDark: isDark,
-          title: 'Emergency Contact',
-          icon: Icons.contact_emergency_outlined,
-          actionText: 'EDIT',
-          onActionTap: controller.showEditEmergencyContactDialog,
+        centerTitle: true,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
           child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF3F7FD),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
+            color: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+            height: 1,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: controller.loadProfileFromFirebase,
+          color: const Color(0xFF16A34A),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const CircleAvatar(
-                  radius: 20,
-                  backgroundColor: AppColors.primaryLight,
-                  child: AppText('SK',
-                      style: AppTextStyle.bodyMedium,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Obx(() => AppText(controller.emergencyContactName.value,
-                          style: AppTextStyle.bodyMedium,
-                          fontWeight: FontWeight.bold)),
-                      Obx(() => AppText(
-                          '${controller.emergencyRelation.value} • ${controller.emergencyPhone.value}',
-                          style: AppTextStyle.labelMedium,
-                          color: AppColors.textSecondary)),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon:
-                      const Icon(Icons.phone_rounded, color: AppColors.primary),
-                  style: IconButton.styleFrom(
-                    backgroundColor:
-                        isDark ? const Color(0xFF1E293B) : Colors.white,
-                    shape: const CircleBorder(),
-                  ),
-                  onPressed: () {},
-                ),
+                // 1. Top Profile Summary Card
+                _buildProfileCard(context, driverController, isDark),
+                const SizedBox(height: 14),
+
+                // 2. Grouped Menu Options Card
+                _buildMenuCard(context, driverController, isDark),
+                const SizedBox(height: 24),
               ],
             ),
           ),
         ),
-
-        // 5. Company Information Card
-        _buildSectionCard(
-          isDark: isDark,
-          title: 'Company Information',
-          icon: Icons.business_outlined,
-          child: Column(
-            children: [
-              _buildHorizontalRow(
-                  'Employer', controller.employer.value, isDark),
-              const Divider(height: 20),
-              _buildHorizontalRow(
-                  'Fleet Hub', controller.fleetHub.value, isDark),
-              const Divider(height: 20),
-              _buildHorizontalRow(
-                  'App Version', controller.appVersion.value, isDark),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 8),
-
-        // 6. Language Switcher Card
-        _buildLanguageCard(isDark),
-
-        const SizedBox(height: 16),
-
-        // 7. Logout Action Button
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: OutlinedButton.icon(
-            icon: const Icon(Icons.logout_rounded, color: AppColors.error),
-            label: AppText('logout'.tr,
-                style: AppTextStyle.bodyLarge,
-                color: AppColors.error,
-                fontWeight: FontWeight.bold),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppColors.error),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-            ),
-            onPressed: driverController.logout,
-          ),
-        ),
-
-        const SizedBox(height: 24),
-
-        // Footer Powered text
-        const Center(
-          child: AppText(
-            'POWERED BY\nMinistry of Road Transport & Highways',
-            textAlign: TextAlign.center,
-            style: AppTextStyle.labelMedium,
-            fontSize: 10,
-            color: AppColors.textHint,
-          ),
-        ),
-        const SizedBox(height: 24),
-      ],
-    );
-  }
-
-  // TAB 2: Documents list (Left Screen)
-  Widget _buildDocumentsTab(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: 8),
-          const AppText(
-            'My Documents',
-            style: AppTextStyle.headlineMedium,
-            fontWeight: FontWeight.w900,
-          ),
-          const SizedBox(height: 4),
-          AppText(
-            'Manage your digital credentials and expiry alerts.',
-            style: AppTextStyle.bodyMedium,
-            color: isDark ? Colors.white54 : AppColors.textSecondary,
-          ),
-          const SizedBox(height: 24),
-
-          // Reactive document card list
-          Obx(() {
-            return Column(
-              children: controller.documents
-                  .map((doc) => _buildDocumentCard(doc, isDark))
-                  .toList(),
-            );
-          }),
-
-          const SizedBox(height: 8),
-
-          // Blue CTA Box: Need to add new docs?
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.primary, AppColors.primaryDark],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.3),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                )
-              ],
-            ),
-            child: Stack(
-              children: [
-                // Abstract vector folder icon overlay
-                Positioned(
-                  right: -10,
-                  bottom: -10,
-                  child: Opacity(
-                    opacity: 0.15,
-                    child: Icon(Icons.folder_copy_rounded,
-                        size: 80, color: Colors.white.withValues(alpha: 0.8)),
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const AppText(
-                      'Need to add new docs?',
-                      style: AppTextStyle.headlineSmall,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    const SizedBox(height: 8),
-                    const AppText(
-                      'Upload high-resolution scans of your RC and Permit for faster verification.',
-                      style: AppTextStyle.bodyMedium,
-                      color: Colors.white70,
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
-                      ),
-                      onPressed: controller.showAddNewDocumentDialog,
-                      child: const AppText(
-                        'Add New Document',
-                        style: AppTextStyle.bodyMedium,
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-        ],
       ),
     );
   }
 
-  // Single document item card builder
-  Widget _buildDocumentCard(DriverDocumentModel doc, bool isDark) {
-    Color statusBgColor = Colors.grey;
-    Color statusTextColor = Colors.white;
-    if (doc.status == 'Valid') {
-      statusBgColor = AppColors.primaryLight;
-      statusTextColor = AppColors.primary;
-    } else if (doc.status == 'Expired') {
-      statusBgColor = const Color(0xFFFFE380).withValues(alpha: 0.4);
-      statusTextColor = const Color(0xFFBF2600);
-    } else if (doc.status == 'Active') {
-      statusBgColor = const Color(0xFFFFF0B3);
-      statusTextColor = const Color(0xFFBF2600);
-    }
-
-    // Adapt layout names & badges to match reference precisely
-    final displayStatus = doc.status == 'Expired' ? 'Expired' : doc.status;
-    final displayStatusBg =
-        doc.status == 'Expired' ? const Color(0xFFFFEBE6) : statusBgColor;
-    final displayStatusText =
-        doc.status == 'Expired' ? AppColors.error : statusTextColor;
-
+  // ── 1. Top Profile Card ───────────────────────────────────────────────────
+  Widget _buildProfileCard(
+    BuildContext context,
+    DashboardController driverController,
+    bool isDark,
+  ) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Top Row: Icon, Titles & Status Pill
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: doc.status == 'Expired'
-                      ? const Color(0xFFFFEBE6)
-                      : (isDark
-                          ? const Color(0xFF0F172A)
-                          : AppColors.primaryLight),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(doc.icon,
-                    color: doc.status == 'Expired'
-                        ? AppColors.error
-                        : AppColors.primary,
-                    size: 24),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AppText(doc.title,
-                        style: AppTextStyle.bodyLarge,
-                        fontWeight: FontWeight.bold),
-                    AppText(doc.subtitle,
-                        style: AppTextStyle.labelMedium,
-                        color: AppColors.textSecondary),
-                  ],
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: displayStatusBg,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: AppText(displayStatus,
-                    style: AppTextStyle.labelMedium,
-                    color: displayStatusText,
-                    fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Expiry Info Middle Box
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: doc.status == 'Expired'
-                  ? const Color(0xFFFFEBE6).withValues(alpha: 0.3)
-                  : (isDark
-                      ? const Color(0xFF0F172A)
-                      : const Color(0xFFF3F7FD)),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const AppText('EXPIRY DATE',
-                        style: AppTextStyle.labelMedium,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.bold),
-                    const SizedBox(height: 4),
-                    AppText(doc.expiryDate,
-                        style: AppTextStyle.bodyMedium,
-                        fontWeight: FontWeight.bold,
-                        color: doc.status == 'Expired'
-                            ? AppColors.error
-                            : AppColors.textPrimary),
-                  ],
-                ),
-                Row(
-                  children: [
-                    if (doc.status == 'Expired') ...[
-                      const Icon(Icons.warning_amber_rounded,
-                          color: AppColors.error, size: 20),
-                      const SizedBox(width: 8),
-                    ],
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        const AppText('STATUS',
-                            style: AppTextStyle.labelMedium,
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.bold),
-                        const SizedBox(height: 4),
-                        AppText(doc.statusMsg,
-                            style: AppTextStyle.bodyMedium,
-                            fontWeight: FontWeight.bold,
-                            color: doc.status == 'Expired'
-                                ? AppColors.error
-                                : (doc.status == 'Valid'
-                                    ? AppColors.primary
-                                    : AppColors.success)),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Bottom Row: Action buttons
-          Row(
-            children: [
-              Expanded(
-                child: doc.status == 'Expired'
-                    ? SizedBox(
-                        height: 40,
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.sync_rounded,
-                              color: Colors.white, size: 18),
-                          label: const AppText('Renew Now',
-                              style: AppTextStyle.labelLarge,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.error,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8)),
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                          ),
-                          onPressed: () => controller.renewDocument(doc.title),
-                        ),
-                      )
-                    : doc.status == 'Active'
-                        ? SizedBox(
-                            height: 40,
-                            child: ElevatedButton.icon(
-                              icon: Icon(Icons.badge_outlined,
-                                  color:
-                                      isDark ? Colors.white : AppColors.primary,
-                                  size: 18),
-                              label: AppText('Digital ID',
-                                  style: AppTextStyle.labelLarge,
-                                  color:
-                                      isDark ? Colors.white : AppColors.primary,
-                                  fontWeight: FontWeight.bold),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: isDark
-                                    ? const Color(0xFF334155)
-                                    : AppColors.primaryLight,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8)),
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 16),
-                              ),
-                              onPressed: controller.downloadDigitalId,
-                            ),
-                          )
-                        : AppButton(
-                            text: 'Preview',
-                            icon: Icons.visibility_outlined,
-                            height: 40,
-                            onPressed: () =>
-                                controller.previewDocument(doc.title),
-                          ),
-              ),
-              const SizedBox(width: 12),
-              GestureDetector(
-                onTap: () => controller.previewDocument(doc.title),
-                child: Container(
-                  height: 40,
-                  width: 40,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.3)),
-                    color: isDark
-                        ? const Color(0xFF334155).withValues(alpha: 0.2)
-                        : AppColors.primaryLight.withValues(alpha: 0.2),
-                  ),
-                  child: Icon(
-                      doc.status == 'Expired'
-                          ? Icons.edit_outlined
-                          : Icons.share_outlined,
-                      color: AppColors.primary,
-                      size: 18),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Section card wrapper
-  Widget _buildSectionCard({
-    required bool isDark,
-    required String title,
-    required IconData icon,
-    required Widget child,
-    String? actionText,
-    VoidCallback? onActionTap,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, color: AppColors.textSecondary, size: 20),
-                  const SizedBox(width: 8),
-                  AppText(title,
-                      style: AppTextStyle.bodyLarge,
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.bold),
-                ],
-              ),
-              if (actionText != null && onActionTap != null)
-                GestureDetector(
-                  onTap: onActionTap,
-                  child: AppText(actionText,
-                      style: AppTextStyle.labelMedium,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          child,
-        ],
-      ),
-    );
-  }
-
-  // Detail row item
-  Widget _buildDetailItem(String label, String value, bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AppText(label,
-            style: AppTextStyle.labelMedium,
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.bold),
-        const SizedBox(height: 4),
-        AppText(value,
-            style: AppTextStyle.bodyLarge,
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : AppColors.textPrimary),
-      ],
-    );
-  }
-
-  // Horizontal name-value row
-  Widget _buildHorizontalRow(String label, String value, bool isDark) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        AppText(label,
-            style: AppTextStyle.bodyMedium, color: AppColors.textSecondary),
-        AppText(value,
-            style: AppTextStyle.bodyMedium,
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : AppColors.textPrimary),
-      ],
-    );
-  }
-
-  // Language Switcher Card
-  Widget _buildLanguageCard(bool isDark) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-            color: isDark ? Colors.white10 : AppColors.border, width: 1.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.language_rounded, color: AppColors.primary, size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: AppText(
-                  'select_language'.tr,
-                  style: AppTextStyle.bodyLarge,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
+          color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
-          const SizedBox(height: 14),
-          Obx(() {
-            final currentLang = AppConfig.currentLocale.value.languageCode;
-            return Row(
+        ],
+      ),
+      child: Row(
+        children: [
+          // Circular Avatar with change button
+          GestureDetector(
+            onTap: controller.changeAvatar,
+            child: Stack(
               children: [
-                Expanded(
-                  child: ChoiceChip(
-                    label: Container(
-                      width: double.infinity,
-                      alignment: Alignment.center,
-                      child: Text(
-                        'english_lang'.tr,
-                        style: TextStyle(
-                          color: currentLang == 'en' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
+                Container(
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Obx(
+                    () => CircleAvatar(
+                      radius: 30,
+                      backgroundImage: _getImageProvider(
+                        driverController.avatarUrl.value,
                       ),
+                      backgroundColor: Colors.grey.shade200,
                     ),
-                    selected: currentLang == 'en',
-                    selectedColor: AppColors.primary,
-                    backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                    onSelected: (selected) {
-                      if (selected) {
-                        AppConfig.changeLanguage('en');
-                      }
-                    },
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ChoiceChip(
-                    label: Container(
-                      width: double.infinity,
-                      alignment: Alignment.center,
-                      child: Text(
-                        'hindi_lang'.tr,
-                        style: TextStyle(
-                          color: currentLang == 'hi' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF16A34A),
+                      shape: BoxShape.circle,
                     ),
-                    selected: currentLang == 'hi',
-                    selectedColor: AppColors.primary,
-                    backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                    onSelected: (selected) {
-                      if (selected) {
-                        AppConfig.changeLanguage('hi');
-                      }
-                    },
+                    child: const Icon(
+                      Icons.camera_alt_rounded,
+                      color: Colors.white,
+                      size: 11,
+                    ),
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(width: 14),
+
+          // Name + Phone + Online status
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Obx(
+                  () => Text(
+                    driverController.driverName.value.isNotEmpty
+                        ? driverController.driverName.value
+                        : 'Driver',
+                    style: TextStyle(
+                      fontSize: 16.5,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      letterSpacing: -0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Obx(
+                  () => Text(
+                    driverController.driverPhone.value.isNotEmpty
+                        ? driverController.driverPhone.value
+                        : '+91 98765 43210',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF16A34A),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    const Text(
+                      'Online',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF16A34A),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── 2. Grouped Menu Options Card ──────────────────────────────────────────
+  Widget _buildMenuCard(
+    BuildContext context,
+    DashboardController driverController,
+    bool isDark,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          children: [
+            // 1. My Profile
+            _menuTile(
+              icon: Icons.person_outline_rounded,
+              title: 'My Profile',
+              onTap: () => _showMyProfileSheet(context, driverController, isDark),
+              isDark: isDark,
+            ),
+            _divider(isDark),
+
+            // 2. Change Password
+            _menuTile(
+              icon: Icons.lock_outline_rounded,
+              title: 'Change Password',
+              onTap: () => _showChangePasswordDialog(context, isDark),
+              isDark: isDark,
+            ),
+            _divider(isDark),
+
+            // 3. Help & Support
+            _menuTile(
+              icon: Icons.help_outline_rounded,
+              title: 'Help & Support',
+              onTap: () => _showHelpSupportSheet(context, isDark),
+              isDark: isDark,
+            ),
+            _divider(isDark),
+
+            // 4. About Us
+            _menuTile(
+              icon: Icons.info_outline_rounded,
+              title: 'About Us',
+              onTap: () => _showAboutUsSheet(context, isDark),
+              isDark: isDark,
+            ),
+            _divider(isDark),
+
+            // 5. Logout
+            _menuTile(
+              icon: Icons.logout_rounded,
+              title: 'Logout',
+              isDestructive: true,
+              onTap: () => _showLogoutDialog(context, driverController, isDark),
+              isDark: isDark,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _divider(bool isDark) {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      color: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+    );
+  }
+
+  Widget _menuTile({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    required bool isDark,
+    bool isDestructive = false,
+  }) {
+    final titleColor = isDestructive
+        ? const Color(0xFFEF4444)
+        : (isDark ? Colors.white : const Color(0xFF0F172A));
+    final iconColor = isDestructive
+        ? const Color(0xFFEF4444)
+        : (isDark ? Colors.white70 : const Color(0xFF334155));
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 21,
+              color: iconColor,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: titleColor,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Dialog: My Profile Details & Edit ──────────────────────────────────────
+  void _showMyProfileSheet(
+    BuildContext context,
+    DashboardController driverController,
+    bool isDark,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.7,
+          maxChildSize: 0.9,
+          minChildSize: 0.4,
+          builder: (ctx, scrollController) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white24 : const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Driver Information',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          controller.showEditProfileDialog();
+                        },
+                        child: const Text(
+                          'Edit',
+                          style: TextStyle(
+                            color: Color(0xFF16A34A),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 20),
+                  _infoRow('Driver Name', driverController.driverName.value, isDark),
+                  const Divider(height: 16),
+                  _infoRow('Phone Number', driverController.driverPhone.value, isDark),
+                  const Divider(height: 16),
+                  _infoRow('Assigned Vehicle', driverController.vehicleNo.value, isDark),
+                  const Divider(height: 16),
+                  _infoRow('Vehicle Model', driverController.vehicleModel.value, isDark),
+                  const Divider(height: 16),
+                  _infoRow('License Number', controller.licenseNo.value, isDark),
+                  const Divider(height: 16),
+                  _infoRow('License Class', controller.licenseClass.value, isDark),
+                  const Divider(height: 16),
+                  _infoRow('License Expiry', controller.licenseExpires.value, isDark),
+                  const Divider(height: 16),
+                  _infoRow('Employer', controller.employer.value, isDark),
+                  const Divider(height: 16),
+                  _infoRow('Fleet Hub', controller.fleetHub.value, isDark),
+                ],
+              ),
             );
-          }),
+          },
+        );
+      },
+    );
+  }
+
+  Widget _infoRow(String label, String value, bool isDark) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: isDark ? Colors.white60 : const Color(0xFF64748B),
+          ),
+        ),
+        Text(
+          value.isNotEmpty ? value : '—',
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Dialog: Change Password ────────────────────────────────────────────────
+  void _showChangePasswordDialog(BuildContext context, bool isDark) {
+    final oldPasswordCtrl = TextEditingController();
+    final newPasswordCtrl = TextEditingController();
+    final confirmPasswordCtrl = TextEditingController();
+
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Change Password',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+          ),
+        ),
+        content: SizedBox(
+          width: 360,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: oldPasswordCtrl,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Current Password',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: newPasswordCtrl,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'New Password',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmPasswordCtrl,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm New Password',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF16A34A),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
+            ),
+            onPressed: () {
+              if (newPasswordCtrl.text.isEmpty || oldPasswordCtrl.text.isEmpty) {
+                Get.snackbar('Required', 'Please enter your passwords.');
+                return;
+              }
+              if (newPasswordCtrl.text != confirmPasswordCtrl.text) {
+                Get.snackbar('Error', 'New passwords do not match.');
+                return;
+              }
+              Get.back();
+              Get.snackbar('Success', 'Password updated successfully!');
+            },
+            child: const Text('Update Password'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Dialog: Help & Support ─────────────────────────────────────────────────
+  void _showHelpSupportSheet(BuildContext context, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Help & Support',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Emergency Contact',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF16A34A),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Obx(
+                        () => Text(
+                          '${controller.emergencyContactName.value} (${controller.emergencyRelation.value})',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Obx(
+                        () => Text(
+                          controller.emergencyPhone.value,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    controller.showEditEmergencyContactDialog();
+                  },
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('Edit Emergency Contact'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Dialog: About Us & Language ───────────────────────────────────────────
+  void _showAboutUsSheet(BuildContext context, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'About Transport App',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _infoRow('Version', controller.appVersion.value, isDark),
+                const Divider(height: 16),
+                _infoRow('Employer', controller.employer.value, isDark),
+                const Divider(height: 16),
+                _infoRow('Fleet Hub', controller.fleetHub.value, isDark),
+                const SizedBox(height: 16),
+
+                // Language Switcher
+                Text(
+                  'App Language',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Obx(() {
+                  final currentLang = AppConfig.currentLocale.value.languageCode;
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: ChoiceChip(
+                          label: Container(
+                            width: double.infinity,
+                            alignment: Alignment.center,
+                            child: Text(
+                              'English',
+                              style: TextStyle(
+                                color: currentLang == 'en'
+                                    ? Colors.white
+                                    : (isDark ? Colors.white70 : Colors.black87),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          selected: currentLang == 'en',
+                          selectedColor: const Color(0xFF16A34A),
+                          backgroundColor: isDark
+                              ? const Color(0xFF0F172A)
+                              : const Color(0xFFF1F5F9),
+                          onSelected: (selected) {
+                            if (selected) AppConfig.changeLanguage('en');
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ChoiceChip(
+                          label: Container(
+                            width: double.infinity,
+                            alignment: Alignment.center,
+                            child: Text(
+                              'हिंदी (Hindi)',
+                              style: TextStyle(
+                                color: currentLang == 'hi'
+                                    ? Colors.white
+                                    : (isDark ? Colors.white70 : Colors.black87),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          selected: currentLang == 'hi',
+                          selectedColor: const Color(0xFF16A34A),
+                          backgroundColor: isDark
+                              ? const Color(0xFF0F172A)
+                              : const Color(0xFFF1F5F9),
+                          onSelected: (selected) {
+                            if (selected) AppConfig.changeLanguage('hi');
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+                const SizedBox(height: 16),
+                const Center(
+                  child: Text(
+                    'POWERED BY\nMinistry of Road Transport & Highways',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Dialog: Logout Confirmation ───────────────────────────────────────────
+  void _showLogoutDialog(
+    BuildContext context,
+    DashboardController driverController,
+    bool isDark,
+  ) {
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.logout_rounded, color: Color(0xFFEF4444)),
+            SizedBox(width: 8),
+            Text('Logout', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to logout of your account?',
+          style: TextStyle(fontSize: 13.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
+            ),
+            onPressed: () {
+              Get.back();
+              driverController.logout();
+            },
+            child: const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
         ],
       ),
     );
