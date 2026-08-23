@@ -167,11 +167,12 @@ class DashboardView extends GetView<DashboardController> {
 
   // ---- Greeting header (avatar + name + bell + SOS) ----
   Widget _buildHeader(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: [
         Obx(() => CircleAvatar(
-              radius: 22,
-              backgroundColor: AppColors.primaryLight,
+              radius: 20,
+              backgroundColor: const Color(0xFFDCFCE7),
               backgroundImage: _getImageProvider(controller.avatarUrl.value),
             )),
         const SizedBox(width: 12),
@@ -179,69 +180,54 @@ class DashboardView extends GetView<DashboardController> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppText(_greeting(),
-                  style: AppTextStyle.labelMedium,
-                  color: AppColors.textSecondary),
-              Row(
-                children: [
-                  Expanded(
-                    child: Obx(() => AppText(
-                          controller.driverName.value.isEmpty
-                              ? 'Driver'
-                              : controller.driverName.value,
-                          style: AppTextStyle.titleLarge,
-                          fontWeight: FontWeight.w800,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        )),
-                  ),
-                  // if (Get.isRegistered<ClockInService>())
-                  //   Obx(() {
-                  //     final cs = Get.find<ClockInService>();
-                  //     if (!cs.isClockedIn.value) return const SizedBox.shrink();
-                  //     return Container(
-                  //       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  //       decoration: BoxDecoration(
-                  //         color: AppColors.primary.withOpacity(0.12),
-                  //         borderRadius: BorderRadius.circular(12),
-                  //         border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                  //       ),
-                  //       child: Row(
-                  //         children: [
-                  //           const CircleAvatar(radius: 3.5, backgroundColor: AppColors.primary),
-                  //           const SizedBox(width: 5),
-                  //           Text(
-                  //             'On Duty • ${cs.shiftDurationText.value}',
-                  //             style: const TextStyle(
-                  //               fontSize: 11,
-                  //               fontWeight: FontWeight.bold,
-                  //               color: AppColors.primary,
-                  //             ),
-                  //           ),
-                  //         ],
-                  //       ),
-                  //     );
-                  //   }),
-                ],
+              Text(
+                _greeting(),
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
+              const SizedBox(height: 1),
+              Obx(() => Text(
+                    controller.driverName.value.isEmpty
+                        ? 'Driver'
+                        : controller.driverName.value,
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      letterSpacing: -0.3,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  )),
             ],
           ),
         ),
         GestureDetector(
           onTap: controller.triggerEmergencySos,
           child: Container(
-            width: 40,
-            height: 40,
-            margin: const EdgeInsets.only(right: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            margin: const EdgeInsets.only(right: 6),
             decoration: BoxDecoration(
-              color: AppColors.error.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
+              color: const Color(0xFFFEE2E2),
+              borderRadius: BorderRadius.circular(20),
             ),
-            child:
-                const Icon(Icons.sos_rounded, color: AppColors.error, size: 20),
+            child: const Text(
+              'SOS',
+              style: TextStyle(
+                color: Color(0xFFDC2626),
+                fontWeight: FontWeight.w900,
+                fontSize: 11.5,
+                letterSpacing: 0.5,
+              ),
+            ),
           ),
         ),
-        const NotificationBell(color: AppColors.textPrimary),
+        NotificationBell(color: isDark ? Colors.white : const Color(0xFF0F172A)),
       ],
     );
   }
@@ -255,14 +241,24 @@ class DashboardView extends GetView<DashboardController> {
       final hasTruck = truck != null && truckNo.isNotEmpty;
 
       return Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: hasTruck ? AppColors.saffronGradient : [const Color(0xFF334155), const Color(0xFF1E293B)],
+            colors: [
+              Color(0xFF16A34A),
+              Color(0xFF15803D),
+            ],
           ),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF16A34A).withValues(alpha: 0.25),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           children: [
@@ -270,31 +266,54 @@ class DashboardView extends GetView<DashboardController> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppText('My Truck',
-                      style: AppTextStyle.labelMedium,
-                      color: Colors.white.withValues(alpha: 0.9)),
-                  const SizedBox(height: 4),
-                  AppText(hasTruck ? truckNo : 'No Truck Assigned',
-                      style: AppTextStyle.headlineSmall,
-                      color: Colors.white,
+                  Text(
+                    'My Truck',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.85),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    hasTruck ? truckNo : 'No Truck Assigned',
+                    style: const TextStyle(
+                      fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                  AppText(hasTruck ? (model.isNotEmpty ? model : 'Ready for Duty') : 'Waiting for Admin Allocation',
-                      style: AppTextStyle.labelMedium,
-                      color: Colors.white.withValues(alpha: 0.85)),
+                      color: Colors.white,
+                      letterSpacing: 0.3,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    hasTruck
+                        ? (model.isNotEmpty ? model : 'Ready for Duty')
+                        : 'Waiting for Admin Allocation',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
             ),
             Container(
-              width: 52,
-              height: 52,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.local_shipping_rounded,
-                  color: Colors.white, size: 28),
+              child: const Icon(
+                Icons.local_shipping_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
             ),
           ],
         ),
@@ -304,19 +323,17 @@ class DashboardView extends GetView<DashboardController> {
 
   // ---- Today's Trip + Trip Status tiles ----
   Widget _buildTodayTiles(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Obx(() {
       final trip = controller.currentTrip;
       final status = friendlyStatus(trip?.status ?? '');
+      final tripId = trip?.id ?? 'No Trip';
+
       return Row(
         children: [
+          // Tile 1: Today's Trip
           Expanded(
-            child: _miniTile(
-              context,
-              label: "Today's Trip",
-              value: trip?.id ?? 'No Trip',
-              sub: trip != null ? status : '—',
-              icon: Icons.assignment_rounded,
-              tint: const Color(0xFF7E22CE),
+            child: InkWell(
               onTap: trip == null
                   ? null
                   : () => Navigator.of(context, rootNavigator: true).pushNamed(
@@ -326,18 +343,123 @@ class DashboardView extends GetView<DashboardController> {
                           'isAlreadyActive': trip.isActive
                         },
                       ),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF2E1065).withValues(alpha: 0.4) : const Color(0xFFFAF5FF),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark ? Colors.purple.shade900 : const Color(0xFFF3E8FF),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Today's Trip",
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF9333EA),
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            tripId,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            trip != null ? status : '—',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF94A3B8),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.assignment_rounded,
+                      color: Color(0xFF9333EA),
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
+          // Tile 2: Trip Status
           Expanded(
-            child: _miniTile(
-              context,
-              label: 'Trip Status',
-              value: status,
-              sub: trip != null ? trip.id : '—',
-              icon: Icons.location_on_rounded,
-              tint: AppColors.info,
-              onTap: null,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF172554).withValues(alpha: 0.4) : const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? Colors.blue.shade900 : const Color(0xFFDBEAFE),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Trip Status',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF2563EB),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          status,
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          trip != null ? trip.id : '—',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF94A3B8),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.location_on_rounded,
+                    color: Color(0xFF2563EB),
+                    size: 20,
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -345,105 +467,81 @@ class DashboardView extends GetView<DashboardController> {
     });
   }
 
-  Widget _miniTile(BuildContext context,
-      {required String label,
-      required String value,
-      required String sub,
-      required IconData icon,
-      required Color tint,
-      VoidCallback? onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: tint.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: tint.withValues(alpha: 0.2)),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AppText(label, style: AppTextStyle.labelMedium, color: tint),
-                  const SizedBox(height: 2),
-                  AppText(value,
-                      style: AppTextStyle.bodyLarge,
-                      fontWeight: FontWeight.w800,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                  AppText(sub,
-                      style: AppTextStyle.labelMedium,
-                      color: AppColors.textHint,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                ],
-              ),
-            ),
-            Icon(icon, color: tint, size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ---- 6-tile action grid ----
   Widget _buildActionGrid(BuildContext context, HomeController home) {
-    Widget tile(IconData icon, String label, Color color, VoidCallback onTap,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    Widget tile(IconData icon, String label, Color iconColor, Color iconBg, VoidCallback onTap,
         {int badge = 0}) {
       return InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Stack(
-                clipBehavior: Clip.none,
+                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      color: iconBg,
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(icon, color: color, size: 22),
+                    alignment: Alignment.center,
+                    child: Icon(icon, color: iconColor, size: 19),
                   ),
                   if (badge > 0)
                     Positioned(
                       right: -4,
                       top: -4,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                         decoration: BoxDecoration(
-                          color: AppColors.error,
+                          color: const Color(0xFFDC2626),
                           borderRadius: BorderRadius.circular(9),
                         ),
-                        child: AppText('$badge',
-                            style: AppTextStyle.labelMedium,
+                        child: Text(
+                          '$badge',
+                          style: const TextStyle(
+                            fontSize: 9.5,
                             color: Colors.white,
-                            fontWeight: FontWeight.bold),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                 ],
               ),
-              const SizedBox(height: 6),
-              AppText(label,
-                  style: AppTextStyle.labelMedium,
-                  fontWeight: FontWeight.w600,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
             ],
           ),
         ),
@@ -464,47 +562,82 @@ class DashboardView extends GetView<DashboardController> {
         crossAxisCount: 3,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
-        childAspectRatio: 1.15,
+        childAspectRatio: 1.14,
         children: [
-          tile(Icons.local_shipping_rounded, 'my_trips'.tr, AppColors.primary, () {
-            if (!controller.ensureCheckedIn()) return;
-            home.changeTabIndex(1);
-          }),
-          tile(Icons.fact_check_rounded, 'inspection'.tr, AppColors.info, () {
-            if (!controller.ensureCheckedIn()) return;
-            home.changeTabIndex(3);
-          }, badge: inspectionBadge),
-          tile(Icons.workspace_premium_rounded, 'pass_and_royalty'.tr,
-              const Color(0xFF7E22CE), () {
-            if (!controller.ensureCheckedIn()) return;
-            final trip = controller.currentTrip;
-            if (trip == null) {
-              AppSnackBar.showInfo(
-                  title: 'No Trip', message: 'Abhi koi trip assigned nahi.');
-              return;
-            }
-            Navigator.of(context, rootNavigator: true).pushNamed(
-              Routes.TRIP_DETAILS,
-              arguments: {'tripId': trip.id, 'isAlreadyActive': trip.isActive},
-            );
-          }),
-          tile(Icons.description_rounded, 'driver_documents'.tr, AppColors.tertiaryDark,
-              () {
-            if (!controller.ensureCheckedIn()) return;
-            home.changeTabIndex(4);
-            try {
-              Get.find<ProfileController>().selectSubTab(1);
-            } catch (_) {}
-          }),
-          tile(Icons.currency_rupee_rounded, 'earnings'.tr, AppColors.success, () {
-            if (!controller.ensureCheckedIn()) return;
-            home.changeTabIndex(2);
-          }),
-          tile(Icons.notifications_rounded, 'notifications'.tr, AppColors.error,
-              () {
-            if (!controller.ensureCheckedIn()) return;
-            const NotificationBell().open(context);
-          }, badge: notifBadge),
+          tile(
+            Icons.local_shipping_rounded,
+            'my_trips'.tr,
+            const Color(0xFF16A34A),
+            const Color(0xFFDCFCE7),
+            () {
+              if (!controller.ensureCheckedIn()) return;
+              home.changeTabIndex(1);
+            },
+          ),
+          tile(
+            Icons.fact_check_rounded,
+            'inspection'.tr,
+            const Color(0xFF2563EB),
+            const Color(0xFFEFF6FF),
+            () {
+              if (!controller.ensureCheckedIn()) return;
+              home.changeTabIndex(3);
+            },
+            badge: inspectionBadge,
+          ),
+          tile(
+            Icons.workspace_premium_rounded,
+            'pass_and_royalty'.tr,
+            const Color(0xFF7E22CE),
+            const Color(0xFFFAF5FF),
+            () {
+              if (!controller.ensureCheckedIn()) return;
+              final trip = controller.currentTrip;
+              if (trip == null) {
+                AppSnackBar.showInfo(
+                    title: 'No Trip', message: 'Abhi koi trip assigned nahi.');
+                return;
+              }
+              Navigator.of(context, rootNavigator: true).pushNamed(
+                Routes.TRIP_DETAILS,
+                arguments: {'tripId': trip.id, 'isAlreadyActive': trip.isActive},
+              );
+            },
+          ),
+          tile(
+            Icons.description_rounded,
+            'driver_documents'.tr,
+            const Color(0xFFEA580C),
+            const Color(0xFFFFF7ED),
+            () {
+              if (!controller.ensureCheckedIn()) return;
+              home.changeTabIndex(4);
+              try {
+                Get.find<ProfileController>().selectSubTab(1);
+              } catch (_) {}
+            },
+          ),
+          tile(
+            Icons.currency_rupee_rounded,
+            'earnings'.tr,
+            const Color(0xFF16A34A),
+            const Color(0xFFDCFCE7),
+            () {
+              if (!controller.ensureCheckedIn()) return;
+              home.changeTabIndex(2);
+            },
+          ),
+          tile(
+            Icons.notifications_rounded,
+            'notifications'.tr,
+            const Color(0xFFDC2626),
+            const Color(0xFFFEE2E2),
+            () {
+              if (!controller.ensureCheckedIn()) return;
+              const NotificationBell().open(context);
+            },
+            badge: notifBadge,
+          ),
         ],
       );
     });
@@ -512,6 +645,7 @@ class DashboardView extends GetView<DashboardController> {
 
   // ---- Trip Progress stepper card (5 reference stages) ----
   Widget _buildTripProgressCard(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Obx(() {
       final trip = controller.currentTrip;
       if (trip == null) return const SizedBox.shrink();
@@ -563,32 +697,57 @@ class DashboardView extends GetView<DashboardController> {
       }
 
       return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: _cardDecoration(context),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const AppText('Trip Progress',
-                style: AppTextStyle.bodyLarge, fontWeight: FontWeight.w800),
+            Text(
+              'Trip Progress',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+              ),
+            ),
             const SizedBox(height: 8),
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
-                color: AppColors.info.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
+                color: isDark
+                    ? const Color(0xFF1E3A8A).withValues(alpha: 0.3)
+                    : const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
                   const Icon(Icons.info_rounded,
-                      color: AppColors.info, size: 16),
+                      color: Color(0xFF2563EB), size: 15),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: AppText(info,
-                        style: AppTextStyle.labelMedium,
-                        color: AppColors.info,
+                    child: Text(
+                      info,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: Color(0xFF2563EB),
                         fontWeight: FontWeight.w600,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis),
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -601,9 +760,9 @@ class DashboardView extends GetView<DashboardController> {
                   final idx = i ~/ 2;
                   return Expanded(
                     child: Container(
-                      height: 3,
-                      margin: const EdgeInsets.only(top: 11),
-                      color: idx < done ? AppColors.success : AppColors.border,
+                      height: 2,
+                      margin: const EdgeInsets.only(top: 10),
+                      color: idx < done ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1),
                     ),
                   );
                 }
@@ -611,42 +770,62 @@ class DashboardView extends GetView<DashboardController> {
                 final isDone = idx < done;
                 final isCurrent = idx == done && trip.status != 'DELIVERED';
                 final color = isDone
-                    ? AppColors.success
-                    : (isCurrent ? AppColors.info : AppColors.textHint);
+                    ? const Color(0xFF16A34A)
+                    : (isCurrent ? const Color(0xFF2563EB) : const Color(0xFF94A3B8));
                 return Column(
                   children: [
-                    Icon(
+                     Icon(
                         isDone
                             ? Icons.check_circle_rounded
                             : (isCurrent
                                 ? Icons.radio_button_checked_rounded
                                 : Icons.circle_outlined),
-                        size: 24,
+                        size: 20,
                         color: color),
                     const SizedBox(height: 4),
                     SizedBox(
-                      width: 56,
-                      child: AppText(labels[idx],
-                          style: AppTextStyle.labelMedium,
-                          textAlign: TextAlign.center,
+                      width: 54,
+                      child: Text(
+                        labels[idx],
+                        style: TextStyle(
+                          fontSize: 9.5,
                           color: color,
                           fontWeight:
-                              isCurrent ? FontWeight.w700 : FontWeight.w500),
+                              isCurrent ? FontWeight.w800 : FontWeight.w600,
+                          height: 1.2,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                      ),
                     ),
                   ],
                 );
               }),
             ),
             const SizedBox(height: 14),
-            AppButton(
-              text: 'Update Status',
-              icon: Icons.published_with_changes_rounded,
+            ElevatedButton.icon(
               onPressed: () {
-                // Switch to Trips Tab (index 1)
                 Get.find<HomeController>().changeTabIndex(1);
-                // Scroll to the active trip card
                 Get.find<TripsController>().scrollToActiveTrip(trip.id);
               },
+              icon: const Icon(Icons.published_with_changes_rounded, size: 16, color: Colors.white),
+              label: const Text(
+                'Update Status',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF16A34A),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 0,
+              ),
             ),
           ],
         ),
@@ -913,98 +1092,125 @@ class DashboardView extends GetView<DashboardController> {
     });
   }
 
-  // ---- Duty / Check-in card (kept from before) ----
+  // ---- Duty / Check-in card ----
   Widget _buildDutyCard(BuildContext context) {
-
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Obx(() {
       final onDuty = controller.isOnDuty;
-      final accent = onDuty ? AppColors.success : AppColors.textSecondary;
+      final accent = onDuty ? const Color(0xFF16A34A) : const Color(0xFF64748B);
       return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: _cardDecoration(context),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: Icon(
-                    onDuty
-                        ? Icons.check_circle_rounded
-                        : Icons.nightlight_round,
-                    color: accent,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AppText(onDuty ? 'On Duty • Available' : 'Off Duty',
-                          style: AppTextStyle.titleLarge,
-                          fontWeight: FontWeight.w700,
-                          color: accent),
-                      const SizedBox(height: 2),
-                      AppText(
-                        onDuty
-                            ? (controller.checkInAddress.value.isNotEmpty
-                                ? '📍 ${controller.checkInAddress.value}'
-                                : 'You are marked available to admin.')
-                            : 'Check in to mark yourself available for trips.',
-                        style: AppTextStyle.labelMedium,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: onDuty
-                  ? OutlinedButton.icon(
-                      onPressed: controller.checkOut,
-                      icon: const Icon(Icons.logout_rounded, size: 18),
-                      label: const Text('Check Out'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.error,
-                        side: const BorderSide(color: AppColors.error),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    )
-                  : ElevatedButton.icon(
-                      onPressed: controller.checkIn,
-                      icon: const Icon(Icons.my_location_rounded, size: 18),
-                      label: const Text('Check In'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.success,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: onDuty ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                onDuty
+                    ? Icons.check_circle_rounded
+                    : Icons.nightlight_round,
+                color: accent,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    onDuty ? 'On Duty • Available' : 'Off Duty',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                      color: accent,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    onDuty
+                        ? (controller.checkInAddress.value.isNotEmpty
+                            ? '📍 ${controller.checkInAddress.value}'
+                            : 'You are marked available to admin.')
+                        : 'Check in to mark yourself available for trips.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                      height: 1.25,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            onDuty
+                ? OutlinedButton.icon(
+                    onPressed: controller.checkOut,
+                    icon: const Icon(Icons.logout_rounded, size: 14, color: Color(0xFFDC2626)),
+                    label: const Text(
+                      'Check Out',
+                      style: TextStyle(
+                        color: Color(0xFFDC2626),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-            ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFFCA5A5)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  )
+                : ElevatedButton.icon(
+                    onPressed: controller.checkIn,
+                    icon: const Icon(Icons.my_location_rounded, size: 14, color: Colors.white),
+                    label: const Text(
+                      'Check In',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF16A34A),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                  ),
           ],
         ),
       );
     });
-  }
-
-  BoxDecoration _cardDecoration(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return BoxDecoration(
-      color: isDark ? const Color(0xFF1E293B) : Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: isDark ? Colors.white10 : AppColors.border),
-    );
   }
 
   Widget _buildOfflineView(BuildContext context, bool isDark) {
