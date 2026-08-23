@@ -2567,9 +2567,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
             children: [
               CircleAvatar(
                 radius: 17,
-                backgroundColor: isDark
-                    ? const Color(0xFF334155)
-                    : const Color(0xFFE2E8F0),
+                backgroundColor:
+                    isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                 child: ClipOval(
                   child: CachedNetworkImage(
                     imageUrl: corsSafeImageUrl(avatarUrl.isNotEmpty
@@ -2711,17 +2710,15 @@ class AdminHomeView extends GetView<AdminHomeController> {
                       Container(
                         width: 1.5,
                         height: 26,
-                        color: isDark
-                            ? Colors.white24
-                            : const Color(0xFFCBD5E1),
+                        color:
+                            isDark ? Colors.white24 : const Color(0xFFCBD5E1),
                       ),
                       Container(
                         width: 7,
                         height: 7,
                         decoration: BoxDecoration(
-                          color: isDark
-                              ? Colors.white38
-                              : const Color(0xFF94A3B8),
+                          color:
+                              isDark ? Colors.white38 : const Color(0xFF94A3B8),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -2785,7 +2782,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: dropCity.isNotEmpty
-                              ? (isDark ? Colors.white : const Color(0xFF1E293B))
+                              ? (isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1E293B))
                               : const Color(0xFF94A3B8),
                         ),
                         maxLines: 1,
@@ -3075,8 +3074,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
           Divider(
             height: 1,
             thickness: 1,
-            color:
-                isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+            color: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
           ),
           const SizedBox(height: 4),
 
@@ -3089,8 +3087,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
                       arguments: {'tripId': tripId}),
                   borderRadius: BorderRadius.circular(6),
                   child: const Padding(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -3567,7 +3564,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                 decoration: BoxDecoration(
                   color: statusBg,
                   borderRadius: BorderRadius.circular(6),
@@ -3590,9 +3588,12 @@ class AdminHomeView extends GetView<AdminHomeController> {
             Align(
               alignment: Alignment.centerLeft,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -3682,7 +3683,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
             ),
           ],
 
-          Divider(height: 1, color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
+          Divider(
+              height: 1,
+              color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
 
           // Bottom Action row: Edit, Delete, Assign / Reassign
           Row(
@@ -3712,7 +3715,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                 onTap: () => _showAssignTruckDialog(context, truck),
                 borderRadius: BorderRadius.circular(6),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: const Color(0xFFDCFCE7),
                     borderRadius: BorderRadius.circular(6),
@@ -3869,7 +3873,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
-                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF0F172A),
                                 letterSpacing: -0.3,
                               ),
                               maxLines: 1,
@@ -3880,7 +3886,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                               'Real-time status and deployment metrics for all ground units.',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                                color: isDark
+                                    ? Colors.white60
+                                    : const Color(0xFF64748B),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -3897,13 +3905,19 @@ class AdminHomeView extends GetView<AdminHomeController> {
                       OutlinedButton.icon(
                         onPressed: () {},
                         icon: const Icon(Icons.filter_list_rounded, size: 15),
-                        label: const Text('Filter', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                        label: const Text('Filter',
+                            style: TextStyle(
+                                fontSize: 12.5, fontWeight: FontWeight.w600)),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: isDark ? Colors.white70 : const Color(0xFF334155),
+                          foregroundColor:
+                              isDark ? Colors.white70 : const Color(0xFF334155),
                           side: BorderSide(
-                            color: isDark ? Colors.white24 : const Color(0xFFCBD5E1),
+                            color: isDark
+                                ? Colors.white24
+                                : const Color(0xFFCBD5E1),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -3912,12 +3926,18 @@ class AdminHomeView extends GetView<AdminHomeController> {
                       const SizedBox(width: 10),
                       ElevatedButton.icon(
                         onPressed: () => _showTruckFormDialog(context, isDark),
-                        icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
-                        label: const Text('Register Vehicle', style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.bold)),
+                        icon: const Icon(Icons.add_rounded,
+                            size: 16, color: Colors.white),
+                        label: const Text('Register Vehicle',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF16A34A),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -3970,7 +3990,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            color:
+                                isDark ? Colors.white : const Color(0xFF0F172A),
                           ),
                         ),
                       ],
@@ -3982,7 +4003,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           icon: Icon(
                             Icons.format_list_bulleted_rounded,
                             size: 18,
-                            color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                            color: isDark
+                                ? Colors.white60
+                                : const Color(0xFF64748B),
                           ),
                           padding: const EdgeInsets.all(6),
                           constraints: const BoxConstraints(),
@@ -5249,7 +5272,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             style: TextStyle(
                               fontSize: 14.5,
                               fontWeight: FontWeight.w800,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF0F172A),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -5334,7 +5359,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             size: 16, color: AppColors.error),
                         SizedBox(width: 8),
                         Text('Delete',
-                            style: TextStyle(fontSize: 13, color: AppColors.error)),
+                            style: TextStyle(
+                                fontSize: 13, color: AppColors.error)),
                       ],
                     ),
                   ),
@@ -5342,8 +5368,10 @@ class AdminHomeView extends GetView<AdminHomeController> {
               ),
             ],
           ),
-          
-          Divider(height: 1, color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
+
+          Divider(
+              height: 1,
+              color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
 
           // Row 2: Delivery Location Header + Phone Chip
           Row(
@@ -5875,8 +5903,13 @@ class AdminHomeView extends GetView<AdminHomeController> {
         text: editModeTrip?['royaltyName'] ??
             prefilledPassData?['royaltyName'] ??
             '');
-    final autoGeneratedPassId = (10000000 + Random().nextInt(90000000)).toString();
-    final existingPassId = (editModeTrip?['loadingPassId'] ?? prefilledPassData?['loadingPassId'] ?? '').toString().trim();
+    final autoGeneratedPassId =
+        (10000000 + Random().nextInt(90000000)).toString();
+    final existingPassId = (editModeTrip?['loadingPassId'] ??
+            prefilledPassData?['loadingPassId'] ??
+            '')
+        .toString()
+        .trim();
     final loadingPassCtrl = TextEditingController(
         text: existingPassId.isNotEmpty ? existingPassId : autoGeneratedPassId);
     final pickupDistrictCtrl =
@@ -5930,7 +5963,9 @@ class AdminHomeView extends GetView<AdminHomeController> {
     final initialTruck = controller.trucks.firstWhereOrNull(
         (t) => t['assignedTo'] == selectedDriver)?['truckNo'] as String?;
     String selectedTruck = prefilledPassData?['truckNo'] ??
-        initialTruck ?? editModeTrip?['truckNo'] ?? 'MH-12-BV-0045';
+        initialTruck ??
+        editModeTrip?['truckNo'] ??
+        'MH-12-BV-0045';
 
     final availableTrucks =
         controller.trucks.map((t) => t['truckNo'] as String).toList();
@@ -6173,10 +6208,14 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                     final name = controller.users.firstWhere(
                                         (u) => u['phone'] == d,
                                         orElse: () => {'name': d})['name'];
-                                    final activeCount = controller.driverActiveTripCount(d);
-                                    final suffix = activeCount > 0 ? ' ($activeCount active trip${activeCount > 1 ? 's' : ''})' : '';
+                                    final activeCount =
+                                        controller.driverActiveTripCount(d);
+                                    final suffix = activeCount > 0
+                                        ? ' ($activeCount active trip${activeCount > 1 ? 's' : ''})'
+                                        : '';
                                     return DropdownMenuItem(
-                                        value: d, child: Text('$name ($d)$suffix'));
+                                        value: d,
+                                        child: Text('$name ($d)$suffix'));
                                   }).toList(),
                                   onChanged: (val) {
                                     if (val != null) {
@@ -6264,11 +6303,10 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                               style: AppTextStyle.labelMedium,
                                               color: AppColors.textHint),
                                           ...items.map((item) {
-                                            final isSelected =
-                                                materialCtrl.text
-                                                        .trim()
-                                                        .toLowerCase() ==
-                                                    item.toLowerCase();
+                                            final isSelected = materialCtrl.text
+                                                    .trim()
+                                                    .toLowerCase() ==
+                                                item.toLowerCase();
                                             return Padding(
                                               padding: const EdgeInsets.only(
                                                   right: 6),
@@ -6278,7 +6316,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                                         fontSize: 11,
                                                         fontWeight: isSelected
                                                             ? FontWeight.bold
-                                                            : FontWeight.normal)),
+                                                            : FontWeight
+                                                                .normal)),
                                                 selected: isSelected,
                                                 onSelected: (selected) {
                                                   if (selected) {
@@ -6322,7 +6361,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             maxLength: 8,
                             decoration: const InputDecoration(
                               labelText: 'Loading Pass ID (Auto-generated)',
-                              helperText: 'Auto-generated 8-digit pass ID (optional to change)',
+                              helperText:
+                                  'Auto-generated 8-digit pass ID (optional to change)',
                               border: OutlineInputBorder(),
                               prefixIcon:
                                   Icon(Icons.confirmation_number_rounded),
@@ -6330,7 +6370,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                             ),
                             validator: (v) {
                               final s = (v ?? '').trim();
-                              if (s.isNotEmpty && !RegExp(r'^\d{8}$').hasMatch(s)) {
+                              if (s.isNotEmpty &&
+                                  !RegExp(r'^\d{8}$').hasMatch(s)) {
                                 return 'Must be 8 digits if modified';
                               }
                               return null;
@@ -6409,12 +6450,14 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                       'materialName': materialCtrl.text.trim(),
                                       'passHolderName':
                                           passHolderCtrl.text.trim(),
-                                      'royaltyName': royaltyCtrl.text.trim().isNotEmpty
-                                          ? royaltyCtrl.text.trim()
-                                          : 'N/A',
-                                      'loadingPassId': loadingPassCtrl.text.trim().isNotEmpty
-                                          ? loadingPassCtrl.text.trim()
-                                          : autoGeneratedPassId,
+                                      'royaltyName':
+                                          royaltyCtrl.text.trim().isNotEmpty
+                                              ? royaltyCtrl.text.trim()
+                                              : 'N/A',
+                                      'loadingPassId':
+                                          loadingPassCtrl.text.trim().isNotEmpty
+                                              ? loadingPassCtrl.text.trim()
+                                              : autoGeneratedPassId,
                                       'loadingPassGeneratedAt': ((editModeTrip?[
                                                       'loadingPassId'] ??
                                                   '') ==
@@ -6648,8 +6691,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                                   const SizedBox(height: 8),
                                   if (vendorItems.isEmpty)
                                     const Padding(
-                                      padding: EdgeInsets.only(
-                                          left: 4, bottom: 4),
+                                      padding:
+                                          EdgeInsets.only(left: 4, bottom: 4),
                                       child: AppText(
                                         'Multiple items add kar sakte hain (Enter key ya + icon se add karein)',
                                         style: AppTextStyle.labelMedium,
@@ -10274,12 +10317,21 @@ class AdminHomeView extends GetView<AdminHomeController> {
                         final fb = Get.find<FirebaseService>();
                         final tripDoc = await fb.getTripData(tripId);
                         final truckNo = (tripDoc?['truckNo'] ?? '').toString();
-                        final driverName = (tripDoc?['driverName'] ?? '').toString();
-                        final driverPhone = (tripDoc?['driverPhone'] ?? '').toString();
-                        final pickupLocation = (tripDoc?['pickupLocation'] ?? tripDoc?['vendorLocation'] ?? '').toString();
-                        final dropCity = (tripDoc?['dropCity'] ?? tripDoc?['dropLocation'] ?? '').toString();
+                        final driverName =
+                            (tripDoc?['driverName'] ?? '').toString();
+                        final driverPhone =
+                            (tripDoc?['driverPhone'] ?? '').toString();
+                        final pickupLocation = (tripDoc?['pickupLocation'] ??
+                                tripDoc?['vendorLocation'] ??
+                                '')
+                            .toString();
+                        final dropCity = (tripDoc?['dropCity'] ??
+                                tripDoc?['dropLocation'] ??
+                                '')
+                            .toString();
 
-                        final pdfBase64 = await TruckOwnerPassPdfGenerator.generatePdfBase64(
+                        final pdfBase64 =
+                            await TruckOwnerPassPdfGenerator.generatePdfBase64(
                           passId: passIdCtrl.text.trim(),
                           ownerName: ownerNameCtrl.text.trim(),
                           tripId: tripId,
@@ -10291,7 +10343,8 @@ class AdminHomeView extends GetView<AdminHomeController> {
                           dropCity: dropCity,
                         );
 
-                        finalPassUrl = await fb.uploadTruckOwnerPassPhoto(tripId, pdfBase64);
+                        finalPassUrl = await fb.uploadTruckOwnerPassPhoto(
+                            tripId, pdfBase64);
                       } else {
                         finalPassUrl = await Get.find<FirebaseService>()
                             .uploadTruckOwnerPassPhoto(tripId, finalPassUrl);
