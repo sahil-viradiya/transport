@@ -18,7 +18,7 @@ void main() {
     await session1.setSession(
         phone: '+91 98765 43210', name: 'Yash', role: 'admin');
     expect(session1.isLoggedIn, isTrue);
-    expect(session1.ownerKey, '919876543210');
+    expect(session1.ownerKey, '+919876543210');
 
     // --- app restarted: brand new service instances, same storage ---
     final storage2 = await StorageService().init();
@@ -27,7 +27,7 @@ void main() {
 
     expect(session2.isLoggedIn, isTrue,
         reason: 'user must NOT have to log in again after a restart');
-    expect(session2.ownerKey, '919876543210');
+    expect(session2.ownerKey, '+919876543210');
     expect(session2.isAdmin, isTrue, reason: 'role must persist too');
   });
 

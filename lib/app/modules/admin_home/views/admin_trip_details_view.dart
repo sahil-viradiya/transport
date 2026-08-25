@@ -706,11 +706,11 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                   ),
 
                   // Center distance indicator
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
-                      children: const [
+                      children: [
                         Icon(Icons.arrow_forward_rounded, color: Color(0xFF94A3B8), size: 16),
                         SizedBox(height: 4),
                         Text(
@@ -922,17 +922,21 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: const [
+          const Row(
+            children: [
               Icon(Icons.workspace_premium_outlined, color: Color(0xFF16A34A), size: 17),
               SizedBox(width: 8),
-              Text(
-                'PASS & ROYALTY DETAILS',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF16A34A),
-                  letterSpacing: 0.5,
+              Flexible(
+                child: Text(
+                  'PASS & ROYALTY DETAILS',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF16A34A),
+                    letterSpacing: 0.5,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -1077,17 +1081,21 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: const [
+          const Row(
+            children: [
               Icon(Icons.check_circle_outline_rounded, color: Color(0xFF16A34A), size: 17),
               SizedBox(width: 8),
-              Text(
-                'VERIFICATION PROOFS',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF16A34A),
-                  letterSpacing: 0.5,
+              Flexible(
+                child: Text(
+                  'VERIFICATION PROOFS',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF16A34A),
+                    letterSpacing: 0.5,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -1608,17 +1616,21 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: const [
+          const Row(
+            children: [
               Icon(Icons.checklist_rtl_rounded, color: Color(0xFF16A34A), size: 17),
               SizedBox(width: 8),
-              Text(
-                'JOURNEY MILESTONES AUDIT',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF16A34A),
-                  letterSpacing: 0.5,
+              Flexible(
+                child: Text(
+                  'JOURNEY MILESTONES AUDIT',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF16A34A),
+                    letterSpacing: 0.5,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -1779,8 +1791,11 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
                             ],
                           ),
                           const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
@@ -1852,17 +1867,21 @@ class AdminTripDetailsView extends GetView<AdminHomeController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: const [
+          const Row(
+            children: [
               Icon(Icons.check_circle_outline_rounded, color: Color(0xFF16A34A), size: 17),
               SizedBox(width: 8),
-              Text(
-                'PROOF OF DELIVERY (POD)',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF16A34A),
-                  letterSpacing: 0.5,
+              Flexible(
+                child: Text(
+                  'PROOF OF DELIVERY (POD)',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF16A34A),
+                    letterSpacing: 0.5,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

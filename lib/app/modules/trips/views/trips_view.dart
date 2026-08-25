@@ -436,21 +436,23 @@ class _TripsViewState extends State<TripsView> {
                   ),
                   const SizedBox(width: 6),
                 ],
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: chipBg,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    DashboardView.friendlyStatus(trip.status),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: chipFg,
-                      fontWeight: FontWeight.w700,
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: chipBg,
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    child: Text(
+                      DashboardView.friendlyStatus(trip.status),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: chipFg,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
               ],

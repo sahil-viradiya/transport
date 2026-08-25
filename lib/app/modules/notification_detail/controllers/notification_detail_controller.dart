@@ -99,7 +99,7 @@ class NotificationDetailController extends GetxController {
           await _fb.acceptTrip(tripId, driverName: name);
           break;
         case 'parking':
-          final dId = parkingRequest.value?['driverId'] ?? refId.split('_').first;
+          final dId = (parkingRequest.value?['driverId'] ?? note['fromPhone'] ?? (refId.startsWith('park_') ? '' : refId.split('_').first)).toString();
           await _fb.approveParkingConfirmation(dId, refId, adminName: name);
           break;
       }
@@ -167,7 +167,7 @@ class NotificationDetailController extends GetxController {
           await _fb.rejectTrip(tripId, reason: reason, driverName: name);
           break;
         case 'parking':
-          final dId = parkingRequest.value?['driverId'] ?? refId.split('_').first;
+          final dId = (parkingRequest.value?['driverId'] ?? note['fromPhone'] ?? (refId.startsWith('park_') ? '' : refId.split('_').first)).toString();
           await _fb.rejectParkingConfirmation(dId, refId, reason, adminName: name);
           break;
       }

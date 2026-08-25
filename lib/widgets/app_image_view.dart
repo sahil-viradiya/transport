@@ -1,9 +1,4 @@
-import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../app/core/theme/app_colors.dart';
 import '../app/core/utils/app_image_helper.dart';
 

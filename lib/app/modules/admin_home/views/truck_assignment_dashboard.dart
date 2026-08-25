@@ -7,6 +7,7 @@ import 'package:transport/widgets/app_text.dart';
 import 'package:transport/app/data/services/firebase_service.dart';
 import 'package:transport/app/data/services/session_service.dart';
 import 'package:transport/widgets/dialogs/app_popup.dart';
+import 'package:transport/widgets/dialogs/app_snackbar.dart';
 import 'package:transport/app/core/utils/image_url.dart';
 import 'package:transport/app/core/utils/image_picker_helper.dart';
 import 'package:transport/app/core/utils/truck_owner_pass_pdf_generator.dart';
@@ -1428,10 +1429,6 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     );
   }
 
-  void _showFullImageDialog(String imageUrl) {
-    DocumentViewerHelper.showDocument(context, imageUrl, title: 'Proof Document');
-  }
-
   Future<void> _approveLoadDirectly(String tripId) async {
     _showTruckOwnerPassApprovalDialog(tripId);
   }
@@ -1444,7 +1441,6 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     final ownerNameCtrl = TextEditingController();
     final remarksCtrl = TextEditingController();
     String? passPhotoUrl;
-    String? adminPhotoUrl;
 
     Get.dialog(
       StatefulBuilder(
@@ -1477,36 +1473,33 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text(
-                        'Pass details fill karein. Photo upload ki jarurat nahi hai — Save & Approve karne par official Truck Owner Pass PDF automatically generate hoke driver ko mil jayegi.',
+                        'Confirm details to generate the official Truck Owner Pass and approve this trip.',
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
                       TextFormField(
                         controller: passIdCtrl,
-                        decoration: InputDecoration(
-                          labelText: 'Truck Owner Pass ID *',
-                          prefixIcon: const Icon(
-                              Icons.confirmation_number_rounded,
-                              size: 18),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                        decoration: const InputDecoration(
+                          labelText: 'Pass ID *',
+                          prefixIcon: Icon(Icons.confirmation_number_outlined),
+                          border: OutlineInputBorder(),
                         ),
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Pass ID enter karein'
-                            : null,
+                        validator: (v) =>
+                            (v == null || v.trim().isEmpty) ? 'Pass ID is required' : null,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       TextFormField(
                         controller: ownerNameCtrl,
-                        decoration: InputDecoration(
-                          labelText: 'Truck Owner / Transporter Name',
-                          prefixIcon:
-                              const Icon(Icons.business_rounded, size: 18),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                        decoration: const InputDecoration(
+                          labelText: 'Truck Owner Name *',
+                          prefixIcon: Icon(Icons.person_outline),
+                          border: OutlineInputBorder(),
                         ),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Owner name is required'
+                            : null,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       TextFormField(
                         controller: remarksCtrl,
                         decoration: InputDecoration(
@@ -1629,8 +1622,6 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         'passPdfUrl': finalPassUrl,
                         'generatedAt':
                             DateTime.now().toString().substring(0, 16),
-                        if (adminPhotoUrl != null && adminPhotoUrl!.isNotEmpty)
-                          'adminPhotoUrl': adminPhotoUrl,
                       };
                       final err = await _firebaseService.approveLoad(
                         tripId,
@@ -1946,27 +1937,35 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
   /// Approve / Reject action buttons.
   Widget _buildParkingVerificationPanel(MockTruck truck) {
     final pc = truck.parkingConfirmation;
-    final driverId = truck.selectedDriver?.phone ?? '';
-    final reqId = (pc?['id'] ?? '').toString();
+    final driverPhone = truck.selectedDriver?.phone ?? '';
+    final driverId = (driverPhone.isNotEmpty ? driverPhone : (pc?['driverId'] ?? '')).toString();
+    final reqId = (pc?['requestId'] ?? pc?['id'] ?? '').toString();
 
     // Parse arrival time
     String formattedDate = '';
     String formattedTime = '';
-    final arrivalRaw = (pc?['arrivalTime'] ?? '').toString();
-    if (arrivalRaw.isNotEmpty) {
+    final arrivalRaw = pc?['arrivalTime'] ?? pc?['submittedAtIso'] ?? pc?['submittedAt'];
+    if (arrivalRaw != null) {
       try {
-        final dt = DateTime.parse(arrivalRaw).toLocal();
-        formattedDate =
-            '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-        final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-        final min = dt.minute.toString().padLeft(2, '0');
-        final ampm = dt.hour >= 12 ? 'PM' : 'AM';
-        formattedTime = '$hour:$min $ampm';
+        DateTime? dt;
+        if (arrivalRaw is Timestamp) {
+          dt = arrivalRaw.toDate().toLocal();
+        } else if (arrivalRaw is String && arrivalRaw.isNotEmpty) {
+          dt = DateTime.tryParse(arrivalRaw)?.toLocal();
+        }
+        if (dt != null) {
+          formattedDate =
+              '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+          final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+          final min = dt.minute.toString().padLeft(2, '0');
+          final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+          formattedTime = '$hour:$min $ampm';
+        }
       } catch (_) {}
     }
 
-    final photoUrl = (pc?['truckPhotoUrl'] ?? '').toString();
-    final address = (pc?['address'] ?? '').toString();
+    final photoUrl = (pc?['truckPhotoUrl'] ?? pc?['photoUrl'] ?? '').toString();
+    final address = (pc?['address'] ?? pc?['locationAddress'] ?? '').toString();
     final distanceKm = (pc?['distanceKm'] ?? '').toString();
 
     return Container(
@@ -2171,10 +2170,10 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                           const SizedBox(width: 4),
                           Text(
                             formattedTime,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: const Color(0xFFF97316),
+                              color: Color(0xFFF97316),
                             ),
                           ),
                         ],
@@ -2265,10 +2264,24 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                       ),
                     );
                     if (confirm == true) {
-                      await _firebaseService.approveParkingConfirmation(
-                        driverId,
-                        reqId,
-                      );
+                      try {
+                        AppPopup.showLoading(message: 'Approving parking...');
+                        await _firebaseService.approveParkingConfirmation(
+                          driverId,
+                          reqId,
+                        );
+                        AppPopup.hideLoading();
+                        AppSnackBar.showSuccess(
+                          title: 'Parking Approved ✅',
+                          message: 'Driver has been verified for station arrival.',
+                        );
+                      } catch (e) {
+                        AppPopup.hideLoading();
+                        AppSnackBar.showError(
+                          title: 'Error',
+                          message: e.toString(),
+                        );
+                      }
                     }
                   },
                   icon: const Icon(Icons.check_circle_rounded, size: 13),
@@ -2331,11 +2344,25 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                       ),
                     );
                     if (reason != null) {
-                      await _firebaseService.rejectParkingConfirmation(
-                        driverId,
-                        reqId,
-                        reason,
-                      );
+                      try {
+                        AppPopup.showLoading(message: 'Rejecting parking...');
+                        await _firebaseService.rejectParkingConfirmation(
+                          driverId,
+                          reqId,
+                          reason,
+                        );
+                        AppPopup.hideLoading();
+                        AppSnackBar.showInfo(
+                          title: 'Parking Rejected',
+                          message: 'Driver has been requested to re-submit photo.',
+                        );
+                      } catch (e) {
+                        AppPopup.hideLoading();
+                        AppSnackBar.showError(
+                          title: 'Error',
+                          message: e.toString(),
+                        );
+                      }
                     }
                   },
                   icon: const Icon(Icons.cancel_rounded, size: 13),

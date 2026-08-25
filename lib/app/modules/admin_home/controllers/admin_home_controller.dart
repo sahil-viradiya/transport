@@ -842,8 +842,9 @@ class AdminHomeController extends GetxController {
 
   List<Map<String, dynamic>> get assignedTrucks => trucks.where((t) {
         final assignedTo = (t['assignedTo'] ?? '').toString();
-        if (assignedTo.isEmpty || t['inspectionStatus'] == 'problem')
+        if (assignedTo.isEmpty || t['inspectionStatus'] == 'problem') {
           return false;
+        }
         final trip = currentTripForDriver(assignedTo);
         return _matchesQuery((t['truckNo'] ?? '').toString(), assignedTo) &&
             _matchesStatus(t, trip) &&

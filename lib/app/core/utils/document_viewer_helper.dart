@@ -266,7 +266,7 @@ class DocumentViewerHelper {
 
   /// Opens the PDF file directly IN-APP using InAppPdfViewerScreen
   static Future<void> viewPdf(
-      BuildContext context, String urlOrBase64, String title) async {
+      BuildContext? context, String urlOrBase64, String title) async {
     try {
       final cleanTitle = title.replaceAll(RegExp(r'[^\w\-]'), '_');
       final bytes = await _resolveBytes(urlOrBase64);
@@ -276,34 +276,29 @@ class DocumentViewerHelper {
         final file = File('${tempDir.path}/$cleanTitle.pdf');
         await file.writeAsBytes(bytes);
 
-        if (context.mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (ctx) => InAppPdfViewerScreen(
-                filePath: file.path,
-                title: title,
-                urlOrBase64: urlOrBase64,
-              ),
-            ),
-          );
-        }
+        Get.to(
+          () => InAppPdfViewerScreen(
+            filePath: file.path,
+            title: title,
+            urlOrBase64: urlOrBase64,
+          ),
+        );
       } else if (urlOrBase64.startsWith('http')) {
         final uri = Uri.parse(urlOrBase64);
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         }
       } else {
-        await downloadToFolder(urlOrBase64, title, context: context);
+        await downloadToFolder(urlOrBase64, title);
       }
     } catch (e) {
       debugPrint('📄 [PDF VIEW ERROR] $e');
-      await downloadToFolder(urlOrBase64, title, context: context);
+      await downloadToFolder(urlOrBase64, title);
     }
   }
 
   /// Downloads file directly to device's Documents & Downloads folders (My Files)
-  static Future<void> downloadToFolder(String urlOrBase64, String title, {BuildContext? context}) async {
+  static Future<void> downloadToFolder(String urlOrBase64, String title, {BuildContext? context, BuildContext? parentContext}) async {
     final cleanTitle = title.replaceAll(RegExp(r'[^\w\-]'), '_');
     final ext = isPdf(urlOrBase64) ? 'pdf' : 'jpg';
     final fileName =
@@ -503,19 +498,16 @@ class DocumentViewerHelper {
                 onPressed: () async {
                   Get.back();
                   final targetPath = openablePath ?? primaryPath;
-                  final ctx = context ?? Get.context;
                   try {
                     final res = await OpenFilex.open(targetPath);
                     debugPrint(
                         '📄 [OPEN FILE RESULT] type: ${res.type}, message: ${res.message}');
-                    if (res.type != ResultType.done && ctx != null) {
-                      await viewPdf(ctx, urlOrBase64, title);
+                    if (res.type != ResultType.done) {
+                      await viewPdf(null, urlOrBase64, title);
                     }
                   } catch (e) {
                     debugPrint('📄 [OPEN FILE ERROR] $e');
-                    if (ctx != null) {
-                      await viewPdf(ctx, urlOrBase64, title);
-                    }
+                    await viewPdf(null, urlOrBase64, title);
                   }
                 },
                 icon: const Icon(Icons.open_in_new_rounded, size: 16),

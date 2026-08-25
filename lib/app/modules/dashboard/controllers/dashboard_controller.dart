@@ -354,7 +354,7 @@ class DashboardController extends GetxController {
     );
   }
 
-  Future<void> openParkingConfirmationDialog(BuildContext context) async {
+  Future<void> openParkingConfirmationDialog() async {
     AppPopup.showLoading(message: 'Capturing live GPS location...');
     try {
       final loc = Get.find<LocationService>();
@@ -372,7 +372,6 @@ class DashboardController extends GetxController {
       AppPopup.hideLoading();
 
       await ParkingConfirmationDialog.show(
-        context: context,
         driverName: driverName.value,
         driverId: _session.ownerKey,
         vehicleNo: vehicleNo.value.isNotEmpty ? vehicleNo.value : (myTruckNo.isNotEmpty ? myTruckNo : 'GJ-01-AX-9988'),

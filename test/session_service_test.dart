@@ -22,7 +22,7 @@ void main() {
     final s = await SessionService(storage: storage).init();
     await s.setSession(phone: '+91 98765 43210', name: 'Ramesh', role: 'owner');
 
-    expect(s.ownerKey, '919876543210');
+    expect(s.ownerKey, '+919876543210');
     expect(s.isLoggedIn, true);
     expect(s.isAdmin, false);
   });
@@ -32,7 +32,7 @@ void main() {
     await first.setSession(phone: '+919876543210', name: 'Ramesh');
 
     final restored = await SessionService(storage: storage).init();
-    expect(restored.ownerKey, '919876543210');
+    expect(restored.ownerKey, '+919876543210');
     expect(restored.name.value, 'Ramesh');
     expect(restored.isLoggedIn, true);
   });

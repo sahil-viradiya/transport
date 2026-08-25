@@ -21,6 +21,29 @@ import 'app/routes/app_pages.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Global Flutter framework error handler
+  FlutterError.onError = (FlutterErrorDetails details) {
+    final msg = details.exceptionAsString();
+    if (kIsWeb && msg.contains('Trying to render a disposed EngineFlutterView')) {
+      return;
+    }
+    debugPrint('[FlutterError] ${details.summary}');
+    if (kDebugMode && !kIsWeb) {
+      FlutterError.presentError(details);
+    }
+  };
+
+  // Global platform/zone uncaught asynchronous error handler
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    final str = error.toString();
+    if (kIsWeb && str.contains('Trying to render a disposed EngineFlutterView')) {
+      return true;
+    }
+    debugPrint('[Uncaught Exception] $str');
+    return true;
+  };
+
   // Register FCM background message handler BEFORE runApp
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 

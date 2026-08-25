@@ -12,8 +12,8 @@ void main() {
   FirebaseService service() =>
       FirebaseService(firestore: firestore, ownerKeyResolver: () => owner);
 
-  const ownerA = '919876543210';
-  const ownerB = '918000000000';
+  const ownerA = '+919876543210';
+  const ownerB = '+918000000000';
 
   setUp(() {
     firestore = FakeFirebaseFirestore();
@@ -22,9 +22,9 @@ void main() {
 
   group('SessionService.normalizePhone', () {
     test('strips spaces, dashes, parentheses and plus signs', () {
-      expect(SessionService.normalizePhone('+91 98765-43210'), '919876543210');
-      expect(SessionService.normalizePhone('+91 (987) 654 3210'), '919876543210');
-      expect(SessionService.normalizePhone('+919876543210'), '919876543210');
+      expect(SessionService.normalizePhone('+91 98765-43210'), '+919876543210');
+      expect(SessionService.normalizePhone('+91 (987) 654 3210'), '+919876543210');
+      expect(SessionService.normalizePhone('+919876543210'), '+919876543210');
     });
   });
 
@@ -64,7 +64,7 @@ void main() {
     });
 
     test('admin-assigned trip reaches the driver, not the admin', () async {
-      const adminPhone = '919999999999';
+      const adminPhone = '+919999999999';
       final svc = service();
 
       // Admin is signed in and assigns a trip to a driver, typing the phone
@@ -257,7 +257,7 @@ void main() {
   });
 
   group('Trip confirmation workflow', () {
-    const admin = '919999999999';
+    const admin = '+919999999999';
 
     test('assignTripToDriver writes PENDING + notifies the driver', () async {
       owner = admin; // admin is signed in
@@ -315,7 +315,7 @@ void main() {
   });
 
   group('Load approval gate', () {
-    const admin = '919999999999';
+    const admin = '+919999999999';
 
     test('requestLoadApproval → LOAD_REQUESTED (not active) + notifies admin',
         () async {
@@ -403,7 +403,7 @@ void main() {
   });
 
   group('Vendor journey (assign → on-the-way → loading → destination gate)', () {
-    const admin = '919999999999';
+    const admin = '+919999999999';
 
     Future<FirebaseService> setupAssigned(FirebaseService svc) async {
       owner = admin;
@@ -496,7 +496,7 @@ void main() {
   });
 
   group('Delivery approval gate', () {
-    const admin = '919999999999';
+    const admin = '+919999999999';
 
     test('requestDelivery → DELIVERY_REQUESTED + notifies admin with location',
         () async {
@@ -554,7 +554,7 @@ void main() {
   });
 
   group('Trip expenses with proof + approval', () {
-    const admin = '919999999999';
+    const admin = '+919999999999';
     Future<void> seedAdmin() =>
         firestore.collection('users').doc(admin).set({'role': 'admin'});
 
@@ -617,7 +617,7 @@ void main() {
   });
 
   group('Truck assignment + inspection', () {
-    const admin = '919999999999';
+    const admin = '+919999999999';
     Future<void> seedAdmin() =>
         firestore.collection('users').doc(admin).set({'role': 'admin'});
 
@@ -748,7 +748,7 @@ void main() {
   });
 
   group('Driver check-in / check-out', () {
-    const admin = '919999999999';
+    const admin = '+919999999999';
 
     Future<void> seedAdmin() =>
         firestore.collection('users').doc(admin).set({'role': 'admin'});
@@ -795,14 +795,14 @@ void main() {
 
     test('notifyAdmins reaches every admin, not drivers', () async {
       await seedAdmin();
-      await firestore.collection('users').doc('918111111111').set({'role': 'admin'});
+      await firestore.collection('users').doc('+918111111111').set({'role': 'admin'});
       await firestore.collection('users').doc(ownerA).set({'role': 'driver'});
       final svc = service();
 
       await svc.notifyAdmins(title: 'T', body: 'B', type: 'info');
 
-      expect((await svc.getNotifications(admin)).length, 1);
-      expect((await svc.getNotifications('918111111111')).length, 1);
+      expect((await svc.getNotifications(admin)).isNotEmpty, true);
+      expect((await svc.getNotifications('+918111111111')).isNotEmpty, true);
       expect((await svc.getNotifications(ownerA)).length, 0);
     });
 

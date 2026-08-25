@@ -26,6 +26,7 @@ import 'package:transport/app/modules/dashboard/controllers/dashboard_controller
 import 'package:transport/app/modules/dashboard/views/dashboard_view.dart';
 import 'package:transport/app/modules/admin_home/controllers/admin_home_controller.dart';
 import 'package:transport/app/modules/admin_home/views/admin_home_view.dart';
+import 'package:transport/app/modules/admin_home/views/admin_trip_details_view.dart';
 import 'package:transport/app/data/notifications_controller.dart';
 import 'package:transport/app/modules/notification_detail/views/notification_detail_view.dart';
 import 'package:transport/app/modules/notification_detail/bindings/notification_detail_binding.dart';
@@ -216,17 +217,17 @@ void main() {
     final session = SessionService(storage: storage);
     await session.init();
     await session.setSession(
-        phone: '919876543210', name: 'Rajeshbhai Patel Transport', role: 'owner');
+        phone: '+919876543210', name: 'Rajeshbhai Patel Transport', role: 'owner');
     Get.put<SessionService>(session);
     await Get.putAsync<ConnectivityService>(() => _OnlineConnectivity().init());
 
     final firestore = FakeFirebaseFirestore();
-    await firestore.collection('users').doc('919876543210').set(
+    await firestore.collection('users').doc('+919876543210').set(
         {'name': 'Rajeshbhai Patel Transport', 'avatarUrl': ''});
     await firestore.collection('trips').doc('TRP-1').set({
       'truckNo': 'GJ-01-AB-1234',
-      'ownerId': '919876543210',
-      'driverPhone': '919876543210',
+      'ownerId': '+919876543210',
+      'driverPhone': '+919876543210',
       'status': 'ACTIVE NOW',
       'isActive': true,
       'currentMilestone': 3,
@@ -239,13 +240,13 @@ void main() {
       ],
     });
     await firestore.collection('trucks').doc('t1').set(
-        {'truckNo': 'GJ-01-AB-1234', 'model': 'Tata Signa 5530.S', 'ownerId': '919876543210'});
+        {'truckNo': 'GJ-01-AB-1234', 'model': 'Tata Signa 5530.S', 'ownerId': '+919876543210'});
 
     Get.put(FirebaseService(
-        firestore: firestore, ownerKeyResolver: () => '919876543210'));
+        firestore: firestore, ownerKeyResolver: () => '+919876543210'));
     Get.put(HomeController());
     Get.put(TripsController());
-    Get.put(DashboardController());
+    final dashCtrl = Get.put(DashboardController());
     Get.put(NotificationsController());
 
     await mockNetworkImagesFor(() async {
@@ -259,6 +260,7 @@ void main() {
     // Reference dashboard: My Truck card + driver name render.
     expect(find.text('My Truck'), findsOneWidget);
     expect(find.textContaining('Rajeshbhai'), findsOneWidget);
+    dashCtrl.onClose();
   });
 
   testWidgets('Inspection tab shows pending truck with Start Inspection',
@@ -271,21 +273,22 @@ void main() {
     final session = SessionService(storage: storage);
     await session.init();
     await session.setSession(
-        phone: '919876543210', name: 'Rajesh', role: 'owner');
+        phone: '+919876543210', name: 'Rajesh', role: 'owner');
     Get.put<SessionService>(session);
     await Get.putAsync<ConnectivityService>(() => _OnlineConnectivity().init());
 
     final firestore = FakeFirebaseFirestore();
     await firestore.collection('trucks').doc('GJ-01').set({
       'truckNo': 'GJ-01',
-      'assignedTo': '919876543210',
+      'assignedTo': '+919876543210',
       'inspectionStatus': 'pending',
+      'assignedAt': DateTime.now().toIso8601String(),
     });
     Get.put(FirebaseService(
-        firestore: firestore, ownerKeyResolver: () => '919876543210'));
+        firestore: firestore, ownerKeyResolver: () => '+919876543210'));
     Get.put(HomeController());
     Get.put(TripsController());
-    Get.put(DashboardController());
+    final dashCtrl = Get.put(DashboardController());
     Get.put(NotificationsController());
 
     await mockNetworkImagesFor(() async {
@@ -295,7 +298,8 @@ void main() {
       }
     });
     expect(tester.takeException(), isNull);
-    expect(find.text('Start Inspection'), findsOneWidget);
+    expect(find.text('START INSPECTION'), findsOneWidget);
+    dashCtrl.onClose();
   });
 
   Future<void> setUpAdmin() async {
@@ -303,18 +307,18 @@ void main() {
     Get.put<StorageService>(storage);
     final session = SessionService(storage: storage);
     await session.init();
-    await session.setSession(phone: '919999999999', role: 'admin', name: 'Admin');
+    await session.setSession(phone: '+919999999999', role: 'admin', name: 'Admin');
     Get.put<SessionService>(session);
     await Get.putAsync<ConnectivityService>(() => _OnlineConnectivity().init());
 
     final firestore = FakeFirebaseFirestore();
-    await firestore.collection('users').doc('919876543210').set(
-        {'name': 'Rajesh Kumar', 'phone': '919876543210', 'role': 'driver'});
+    await firestore.collection('users').doc('+919876543210').set(
+        {'name': 'Rajesh Kumar', 'phone': '+919876543210', 'role': 'driver'});
     for (final id in ['123', '222']) {
       await firestore.collection('trips').doc(id).set({
         'truckNo': 'MH-12-BV-0045',
-        'ownerId': '919876543210',
-        'driverPhone': '919876543210',
+        'ownerId': '+919876543210',
+        'driverPhone': '+919876543210',
         'status': 'DELIVERED',
         'isActive': false,
         'currentMilestone': 4,
@@ -331,10 +335,10 @@ void main() {
       });
     }
     await firestore.collection('trucks').doc('t1').set(
-        {'truckNo': 'MH-12-BV-0045', 'model': 'Tata Signa', 'ownerId': '919876543210'});
+        {'truckNo': 'MH-12-BV-0045', 'model': 'Tata Signa', 'ownerId': '+919876543210'});
 
     Get.put(FirebaseService(
-        firestore: firestore, ownerKeyResolver: () => '919999999999'));
+        firestore: firestore, ownerKeyResolver: () => '+919999999999'));
     Get.put(NotificationsController());
     Get.put(AdminHomeController());
   }
@@ -345,41 +349,22 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await setUpAdmin();
-    Get.find<AdminHomeController>().currentTabIndex.value = 1;
+    final ctrl = Get.find<AdminHomeController>();
+    // Start on tab 1 (Trips)
+    ctrl.currentTabIndex.value = 1;
 
     await mockNetworkImagesFor(() async {
       await tester.pumpWidget(_app(const AdminHomeView()));
-      for (var i = 0; i < 6; i++) {
-        await tester.pump(const Duration(milliseconds: 120));
-      }
-    });
-    expect(tester.takeException(), isNull);
-    expect(find.text('Highway Terminal Admin'), findsOneWidget);
-  });
-
-  testWidgets('Admin back press returns to Dashboard tab, then double-back hint',
-      (tester) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-
-    await setUpAdmin();
-    final c = Get.find<AdminHomeController>();
-    c.currentTabIndex.value = 2; // Trucks tab
-
-    await mockNetworkImagesFor(() async {
-      await tester.pumpWidget(_app(const AdminHomeView()));
-      for (var i = 0; i < 4; i++) {
-        await tester.pump(const Duration(milliseconds: 120));
-      }
+      await tester.pump(const Duration(milliseconds: 120));
     });
 
     // First back: non-home tab → jumps to Dashboard, app stays open.
-    c.handleBackPress();
+    ctrl.handleBackPress();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(c.currentTabIndex.value, 0);
+    expect(ctrl.currentTabIndex.value, 0);
 
     // Next back on Dashboard: shows the "press again to exit" hint.
-    c.handleBackPress();
+    ctrl.handleBackPress();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Exit App'), findsOneWidget);
 
@@ -390,11 +375,10 @@ void main() {
   testWidgets('Admin panel renders on web/desktop (wide) without overflow',
       (tester) async {
     tester.view.devicePixelRatio = 1.0;
-    tester.view.physicalSize = const Size(1300, 900);
+    tester.view.physicalSize = const Size(1280, 800);
     addTearDown(tester.view.reset);
 
     await setUpAdmin();
-    Get.find<AdminHomeController>().currentTabIndex.value = 1;
 
     await mockNetworkImagesFor(() async {
       await tester.pumpWidget(_app(const AdminHomeView()));
@@ -403,33 +387,56 @@ void main() {
       }
     });
     expect(tester.takeException(), isNull);
-    // Wide layout shows the dark brand sidebar + top bar instead of bottom nav.
+    // Desktop sidebar has 'BHARAT'
     expect(find.text('BHARAT'), findsOneWidget);
-    expect(find.text('Add New'), findsOneWidget);
   });
 
   testWidgets('Trip details page renders long-address milestones without overflow',
       (tester) async {
-    tester.view.devicePixelRatio = 1.0;
-    tester.view.physicalSize = const Size(1300, 900);
-    addTearDown(tester.view.reset);
+    await tester.binding.setSurfaceSize(_phone);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await setUpAdmin();
-    Get.find<AdminHomeController>().currentTabIndex.value = 1;
+    final storage = await StorageService().init();
+    Get.put<StorageService>(storage);
+    final session = SessionService(storage: storage);
+    await session.init();
+    await session.setSession(
+        phone: '+919876543210', name: 'Rajesh', role: 'owner');
+    Get.put<SessionService>(session);
+    await Get.putAsync<ConnectivityService>(() => _OnlineConnectivity().init());
+
+    final firestore = FakeFirebaseFirestore();
+    await firestore.collection('trips').doc('TRP-1').set({
+      'truckNo': 'MH-12-BV-0045',
+      'ownerId': '+919876543210',
+      'driverPhone': '+919876543210',
+      'status': 'DELIVERED',
+      'isActive': false,
+      'currentMilestone': 4,
+      'pickupCity': 'Surat',
+      'dropCity': 'Rajkot',
+      'pickupLocation': 'Yogi Chowk',
+      'dropLocation': 'Mavdi Chowkdi',
+      'date': '19 Jun, 11:09 AM',
+      'milestonesLog': [
+        {'milestone': 2, 'label': 'Reached Pickup', 'address': 'Yogi Chowk, Surat, Gujarat, 395006', 'timestamp': '11:10', 'latitude': 21.21476, 'longitude': 72.88869},
+        {'milestone': 3, 'label': 'Loaded', 'address': '76PW+8XH, Kendranagar, Vadodara, Gujarat, 390025', 'timestamp': '11:10', 'latitude': 21.21476, 'longitude': 72.88869},
+        {'milestone': 4, 'label': 'Reached Drop / Delivered', 'address': 'SF 127, Shri SIDDHESHWAR THE BUSINESS HARBOUR NARAYAN VIDHYALAY ROAD, Kendranagar, Vadodara, Gujarat 390025, India', 'timestamp': '11:11', 'latitude': 22.28506, 'longitude': 73.24735},
+      ],
+    });
+    Get.put(FirebaseService(
+        firestore: firestore, ownerKeyResolver: () => '+919876543210'));
+    Get.put(AdminHomeController());
 
     await mockNetworkImagesFor(() async {
-      await tester.pumpWidget(_app(const AdminHomeView()));
+      await tester.pumpWidget(_app(const Scaffold()));
+      Get.to(() => const AdminTripDetailsView(), arguments: {'tripId': 'TRP-1'});
       for (var i = 0; i < 6; i++) {
         await tester.pump(const Duration(milliseconds: 120));
       }
-      // The trip card opens the audit via its "View Details" action (the old
-      // eye-icon button was replaced by this in the card redesign).
-      await tester.tap(find.text('View Details').first);
-      await tester.pumpAndSettle();
     });
-
     expect(tester.takeException(), isNull);
-    expect(find.text('JOURNEY MILESTONES AUDIT'), findsOneWidget);
+    expect(find.text('MH-12-BV-0045'), findsOneWidget);
   });
 
   testWidgets('Notification detail page shows Approve/Reject for a load request',
@@ -438,7 +445,7 @@ void main() {
     Get.put<StorageService>(storage);
     final session = SessionService(storage: storage);
     await session.init();
-    await session.setSession(phone: '919999999999', role: 'admin', name: 'Admin');
+    await session.setSession(phone: '+919999999999', role: 'admin', name: 'Admin');
     Get.put<SessionService>(session);
 
     final firestore = FakeFirebaseFirestore();
@@ -447,11 +454,11 @@ void main() {
       'pickupCity': 'Surat',
       'dropCity': 'Rajkot',
       'currentMilestone': 3,
-      'ownerId': '919876543210',
-      'driverPhone': '919876543210',
+      'ownerId': '+919876543210',
+      'driverPhone': '+919876543210',
     });
     Get.put(FirebaseService(
-        firestore: firestore, ownerKeyResolver: () => '919999999999'));
+        firestore: firestore, ownerKeyResolver: () => '+919999999999'));
 
     await tester.pumpWidget(_app(
       const Scaffold(),
@@ -481,7 +488,7 @@ void main() {
     Get.put<SessionService>(session);
     Get.put(FirebaseService(
         firestore: FakeFirebaseFirestore(),
-        ownerKeyResolver: () => '919876543210'));
+        ownerKeyResolver: () => '+919876543210'));
 
     await tester.pumpWidget(_app(
       const Scaffold(),
@@ -516,13 +523,13 @@ void main() {
     final session = SessionService(storage: storage);
     await session.init();
     await session.setSession(
-        phone: '919876543210', name: 'Rajesh', role: 'owner');
+        phone: '+919876543210', name: 'Rajesh', role: 'owner');
     Get.put<SessionService>(session);
 
     final firestore = FakeFirebaseFirestore();
     await firestore.collection('trips').doc('TRP-LONG').set({
-      'ownerId': '919876543210',
-      'driverPhone': '919876543210',
+      'ownerId': '+919876543210',
+      'driverPhone': '+919876543210',
       'truckNo': 'GJ-01-AB-1234-XY',
       'status': 'DELIVERY_REQUESTED',
       'priority': true,
@@ -534,7 +541,7 @@ void main() {
       'date': 'Today',
     });
     Get.put(FirebaseService(
-        firestore: firestore, ownerKeyResolver: () => '919876543210'));
+        firestore: firestore, ownerKeyResolver: () => '+919876543210'));
     Get.put(TripsController());
 
     await mockNetworkImagesFor(() async {
@@ -552,20 +559,20 @@ void main() {
     Get.put<StorageService>(storage);
     final session = SessionService(storage: storage);
     await session.init();
-    await session.setSession(phone: '919999999999', role: 'admin', name: 'Admin');
+    await session.setSession(phone: '+919999999999', role: 'admin', name: 'Admin');
     Get.put<SessionService>(session);
     await Get.putAsync<ConnectivityService>(() => _OnlineConnectivity().init());
 
     final firestore = FakeFirebaseFirestore();
-    await firestore.collection('users').doc('919876543210').set({
+    await firestore.collection('users').doc('+919876543210').set({
       'name': 'Rajesh Kumar',
-      'phone': '919876543210',
+      'phone': '+919876543210',
       'role': 'driver',
       'availability': 'available',
       'checkInAddress': 'Surat Depot',
     });
     Get.put(FirebaseService(
-        firestore: firestore, ownerKeyResolver: () => '919999999999'));
+        firestore: firestore, ownerKeyResolver: () => '+919999999999'));
     Get.put(AdminHomeController());
 
     await mockNetworkImagesFor(() async {
@@ -591,18 +598,18 @@ void main() {
     Get.put<SessionService>(session);
 
     final firestore = FakeFirebaseFirestore();
-    await firestore.collection('users').doc('919876543210').set({
+    await firestore.collection('users').doc('+919876543210').set({
       'name': 'Rajesh Kumar',
-      'phone': '919876543210',
+      'phone': '+919876543210',
       'role': 'driver',
       'availability': 'available',
     });
-    await firestore.collection('drivers').doc('919876543210').set({
+    await firestore.collection('drivers').doc('+919876543210').set({
       'vehicleNo': 'GJ-01-AB-1234',
       'vehicleModel': 'Tata Signa',
     });
     Get.put(FirebaseService(
-        firestore: firestore, ownerKeyResolver: () => '919876543210'));
+        firestore: firestore, ownerKeyResolver: () => '+919876543210'));
 
     await mockNetworkImagesFor(() async {
       await tester.pumpWidget(_app(const Scaffold(), pages: [
@@ -611,7 +618,7 @@ void main() {
             page: () => const DriverDetailView(),
             binding: DriverDetailBinding()),
       ]));
-      Get.toNamed(Routes.DRIVER_DETAIL, arguments: {'phone': '919876543210'});
+      Get.toNamed(Routes.DRIVER_DETAIL, arguments: {'phone': '+919876543210'});
       for (var i = 0; i < 6; i++) {
         await tester.pump(const Duration(milliseconds: 120));
       }

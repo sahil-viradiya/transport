@@ -1,7 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/trip_details_controller.dart';
@@ -10,9 +6,7 @@ import '../../../../widgets/app_text.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/session_service.dart';
 import '../../../core/utils/document_viewer_helper.dart';
-import '../../../core/utils/image_url.dart';
 import '../../../core/utils/app_image_helper.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 class TripDetailsView extends GetView<TripDetailsController> {
   const TripDetailsView({super.key});

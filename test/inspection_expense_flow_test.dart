@@ -11,7 +11,7 @@ import 'package:transport/app/data/services/firebase_service.dart';
 /// This exercises the real Firestore lifecycle + the exact filter the admin
 /// dashboard uses.
 void main() {
-  const driver = '919876543210';
+  const driver = '+919876543210';
 
   late FakeFirebaseFirestore db;
   late FirebaseService fb;

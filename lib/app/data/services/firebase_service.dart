@@ -54,23 +54,6 @@ class FirebaseService extends GetxService {
     return this;
   }
 
-  /// Commits independent updates in Firestore's maximum-size-safe chunks.
-  /// This preserves each document's payload while replacing N network commits
-  /// with one commit per 500 documents.
-  Future<void> _setInBatches(
-    Iterable<DocumentReference<Map<String, dynamic>>> references,
-    Map<String, dynamic> data,
-  ) async {
-    final refs = references.toList(growable: false);
-    for (var start = 0; start < refs.length; start += 500) {
-      final batch = _db.batch();
-      for (final ref in refs.skip(start).take(500)) {
-        batch.set(ref, data, SetOptions(merge: true));
-      }
-      await batch.commit();
-    }
-  }
-
   /// Runs a Firestore write and turns a failure into a readable error instead
   /// of swallowing it.
   ///
@@ -561,8 +544,9 @@ class FirebaseService extends GetxService {
     try {
       final data =
           (await _db.collection('trips').doc(tripId).get()).data() ?? {};
-      if (data['status'] != 'LOAD_REQUESTED' && data['status'] != 'LOADING')
+      if (data['status'] != 'LOAD_REQUESTED' && data['status'] != 'LOADING') {
         return false;
+      }
       if (data['destinationReminderSent'] == true) return false;
       if ((data['dropCity'] ?? '').toString().isNotEmpty) return false;
 
@@ -1027,7 +1011,10 @@ class FirebaseService extends GetxService {
     Map<String, dynamic> expenseData, {
     String? driverName,
   }) async {
-    final amount = double.tryParse((expenseData['amount'] ?? '').toString()) ?? 0;
+    final cleanAmountStr = (expenseData['amount'] ?? '')
+        .toString()
+        .replaceAll(RegExp(r'[^\d.]'), '');
+    final amount = double.tryParse(cleanAmountStr) ?? 0;
     if (amount <= 0) {
       throw ValidationException('Expense amount must be greater than zero!');
     }
@@ -1193,9 +1180,10 @@ class FirebaseService extends GetxService {
   Stream<List<Map<String, dynamic>>> watchNotifications(String phone) {
     final rawP = phone.trim();
     final p = SessionService.normalizePhone(phone);
-    final session = Get.find<SessionService>();
-    final isAdmin = session.isAdmin || rawP == 'admin' || p == 'admin';
-    final adminPhone = session.ownerKey.trim();
+    final session =
+        Get.isRegistered<SessionService>() ? Get.find<SessionService>() : null;
+    final isAdmin = (session?.isAdmin ?? false) || rawP == 'admin' || p == 'admin';
+    final adminPhone = (session?.ownerKey ?? '').trim();
     final normAdminPhone = SessionService.normalizePhone(adminPhone);
 
     Query<Map<String, dynamic>> query = _db.collection('notifications');
@@ -1246,9 +1234,10 @@ class FirebaseService extends GetxService {
   Future<List<Map<String, dynamic>>> getNotifications(String phone) async {
     final rawP = phone.trim();
     final p = SessionService.normalizePhone(phone);
-    final session = Get.find<SessionService>();
-    final isAdmin = session.isAdmin || rawP == 'admin' || p == 'admin';
-    final adminPhone = session.ownerKey.trim();
+    final session =
+        Get.isRegistered<SessionService>() ? Get.find<SessionService>() : null;
+    final isAdmin = (session?.isAdmin ?? false) || rawP == 'admin' || p == 'admin';
+    final adminPhone = (session?.ownerKey ?? '').trim();
     final normAdminPhone = SessionService.normalizePhone(adminPhone);
 
     try {
@@ -1311,9 +1300,10 @@ class FirebaseService extends GetxService {
 
   Future<void> markAllNotificationsRead(String phone) async {
     final p = SessionService.normalizePhone(phone);
-    final session = Get.find<SessionService>();
-    final isAdmin = session.isAdmin || phone.trim() == 'admin' || p == 'admin';
-    final adminPhone = session.ownerKey.trim();
+    final session =
+        Get.isRegistered<SessionService>() ? Get.find<SessionService>() : null;
+    final isAdmin = (session?.isAdmin ?? false) || phone.trim() == 'admin' || p == 'admin';
+    final adminPhone = (session?.ownerKey ?? '').trim();
     final normAdminPhone = SessionService.normalizePhone(adminPhone);
 
     try {
@@ -1366,9 +1356,10 @@ class FirebaseService extends GetxService {
   Future<void> deleteAllNotifications(String phone) async {
     final rawP = phone.trim();
     final p = SessionService.normalizePhone(phone);
-    final session = Get.find<SessionService>();
-    final isAdmin = session.isAdmin || rawP == 'admin' || p == 'admin';
-    final adminPhone = session.ownerKey.trim();
+    final session =
+        Get.isRegistered<SessionService>() ? Get.find<SessionService>() : null;
+    final isAdmin = (session?.isAdmin ?? false) || rawP == 'admin' || p == 'admin';
+    final adminPhone = (session?.ownerKey ?? '').trim();
     final normAdminPhone = SessionService.normalizePhone(adminPhone);
 
     try {
@@ -1722,9 +1713,12 @@ class FirebaseService extends GetxService {
         'currentAddress': address,
         'lastLocationUpdate': FieldValue.serverTimestamp(),
       };
-      if (remainingDistance != null)
+      if (remainingDistance != null) {
         updates['remainingDistance'] = remainingDistance;
-      if (estimatedTime != null) updates['estimatedTime'] = estimatedTime;
+      }
+      if (estimatedTime != null) {
+        updates['estimatedTime'] = estimatedTime;
+      }
       await _db
           .collection('trips')
           .doc(tripId)
@@ -1961,7 +1955,10 @@ class FirebaseService extends GetxService {
 
       final addr = (address != null && address.isNotEmpty) ? address : (locationAddress ?? '');
 
+      final nowIso = DateTime.now().toIso8601String();
+
       final parkingData = <String, dynamic>{
+        'id': reqId,
         'requestId': reqId,
         'driverId': id,
         'driverName': driverName,
@@ -1975,6 +1972,8 @@ class FirebaseService extends GetxService {
         'distanceKm': distanceKm ?? 0.0,
         'notes': notes ?? '',
         'status': 'PENDING',
+        'arrivalTime': nowIso,
+        'submittedAtIso': nowIso,
         'submittedAt': FieldValue.serverTimestamp(),
       };
 
@@ -1991,6 +1990,7 @@ class FirebaseService extends GetxService {
 
         await _ownerDoc(id).set(updateData, SetOptions(merge: true));
         await _db.collection('users').doc(id).set(updateData, SetOptions(merge: true));
+        await _db.collection('drivers').doc(id).set(updateData, SetOptions(merge: true));
         if (normId.isNotEmpty && normId != id) {
           await _ownerDoc(normId).set(updateData, SetOptions(merge: true));
           await _db.collection('users').doc(normId).set(updateData, SetOptions(merge: true));
@@ -2017,14 +2017,17 @@ class FirebaseService extends GetxService {
       final normId = SessionService.normalizePhone(id);
       final admin = adminName ?? 'Admin';
       final nowIso = DateTime.now().toIso8601String();
+      final cleanReqId = requestId.trim();
 
       await _write('approveParkingConfirmation', () async {
-        await _db.collection('parking_confirmations').doc(requestId).set({
-          'status': 'APPROVED',
-          'approvedBy': admin,
-          'approvedAt': FieldValue.serverTimestamp(),
-          'approvedAtIso': nowIso,
-        }, SetOptions(merge: true));
+        if (cleanReqId.isNotEmpty) {
+          await _db.collection('parking_confirmations').doc(cleanReqId).set({
+            'status': 'APPROVED',
+            'approvedBy': admin,
+            'approvedAt': FieldValue.serverTimestamp(),
+            'approvedAtIso': nowIso,
+          }, SetOptions(merge: true));
+        }
 
         final updateData = <String, dynamic>{
           'dutyStatus': 'STATION_VERIFIED',
@@ -2037,8 +2040,11 @@ class FirebaseService extends GetxService {
           'lastDutyChange': FieldValue.serverTimestamp(),
         };
 
-        await _ownerDoc(id).set(updateData, SetOptions(merge: true));
-        await _db.collection('users').doc(id).set(updateData, SetOptions(merge: true));
+        if (id.isNotEmpty) {
+          await _ownerDoc(id).set(updateData, SetOptions(merge: true));
+          await _db.collection('users').doc(id).set(updateData, SetOptions(merge: true));
+          await _db.collection('drivers').doc(id).set(updateData, SetOptions(merge: true));
+        }
         if (normId.isNotEmpty && normId != id) {
           await _ownerDoc(normId).set(updateData, SetOptions(merge: true));
           await _db.collection('users').doc(normId).set(updateData, SetOptions(merge: true));
@@ -2046,11 +2052,11 @@ class FirebaseService extends GetxService {
         }
 
         await createNotification(
-          toPhone: id,
+          toPhone: id.isNotEmpty ? id : normId,
           title: 'Parking Confirmation Approved ✅',
           body: 'Your truck parking at the transport station has been verified. You can now clock out. Auto clock-out after 3 hours.',
           type: 'parking_approved',
-          refId: requestId,
+          refId: cleanReqId.isNotEmpty ? cleanReqId : 'park_${DateTime.now().millisecondsSinceEpoch}',
         );
       });
     } catch (e) {
@@ -2064,14 +2070,17 @@ class FirebaseService extends GetxService {
       final id = driverId.isEmpty ? ownerKey : driverId;
       final normId = SessionService.normalizePhone(id);
       final admin = adminName ?? 'Admin';
+      final cleanReqId = requestId.trim();
 
       await _write('rejectParkingConfirmation', () async {
-        await _db.collection('parking_confirmations').doc(requestId).set({
-          'status': 'REJECTED',
-          'rejectionReason': reason,
-          'rejectedBy': admin,
-          'rejectedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+        if (cleanReqId.isNotEmpty) {
+          await _db.collection('parking_confirmations').doc(cleanReqId).set({
+            'status': 'REJECTED',
+            'rejectionReason': reason,
+            'rejectedBy': admin,
+            'rejectedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
 
         final updateData = <String, dynamic>{
           'dutyStatus': 'RETURNING_TO_STATION',
@@ -2082,19 +2091,23 @@ class FirebaseService extends GetxService {
           'lastDutyChange': FieldValue.serverTimestamp(),
         };
 
-        await _ownerDoc(id).set(updateData, SetOptions(merge: true));
-        await _db.collection('users').doc(id).set(updateData, SetOptions(merge: true));
+        if (id.isNotEmpty) {
+          await _ownerDoc(id).set(updateData, SetOptions(merge: true));
+          await _db.collection('users').doc(id).set(updateData, SetOptions(merge: true));
+          await _db.collection('drivers').doc(id).set(updateData, SetOptions(merge: true));
+        }
         if (normId.isNotEmpty && normId != id) {
+          await _ownerDoc(normId).set(updateData, SetOptions(merge: true));
           await _db.collection('users').doc(normId).set(updateData, SetOptions(merge: true));
           await _db.collection('drivers').doc(normId).set(updateData, SetOptions(merge: true));
         }
 
         await createNotification(
-          toPhone: id,
+          toPhone: id.isNotEmpty ? id : normId,
           title: 'Parking Confirmation Rejected ❌',
           body: 'Reason: $reason. Please re-submit parking confirmation photo.',
           type: 'parking_rejected',
-          refId: requestId,
+          refId: cleanReqId.isNotEmpty ? cleanReqId : 'park_${DateTime.now().millisecondsSinceEpoch}',
         );
       });
     } catch (e) {
@@ -2105,7 +2118,9 @@ class FirebaseService extends GetxService {
 
   Future<Map<String, dynamic>?> getParkingConfirmation(String requestId) async {
     try {
-      final doc = await _db.collection('parking_confirmations').doc(requestId).get();
+      final cleanId = requestId.trim();
+      if (cleanId.isEmpty) return null;
+      final doc = await _db.collection('parking_confirmations').doc(cleanId).get();
       return doc.data();
     } catch (_) {
       return null;
@@ -2949,8 +2964,9 @@ class FirebaseService extends GetxService {
       String truckNo, Map<String, dynamic> payload, String action) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
-      final session = Get.find<SessionService>();
-      final isUserAdmin = session.isAdmin;
+      final session =
+          Get.isRegistered<SessionService>() ? Get.find<SessionService>() : null;
+      final isUserAdmin = session?.isAdmin ?? false;
       AppLogger.d("Project Id: ${Firebase.app().options.projectId}");
       AppLogger.d("UID: ${user?.uid}");
       AppLogger.d("Phone: ${user?.phoneNumber}");
@@ -2978,10 +2994,10 @@ class FirebaseService extends GetxService {
       debugPrint('Merged document after update: $mergedDoc');
       debugPrint('Authenticated UID: ${user?.uid}');
       debugPrint('Authenticated phone: ${user?.phoneNumber}');
-      debugPrint('Session phone: ${session.phone.value}');
+      debugPrint('Session phone: ${session?.phone.value}');
       debugPrint('ownerId: ${mergedDoc['ownerId']}');
       debugPrint('assignedTo: ${mergedDoc['assignedTo']}');
-      debugPrint('Admin role: ${session.role.value}');
+      debugPrint('Admin role: ${session?.role.value}');
       debugPrint('Firestore rule expected to pass: '
           '${isUserAdmin ? "isAdmin()" : "ownsIncoming() / ownsExisting() / isPhoneMatch(assignedTo)"}');
       debugPrint('-------------------------------------------');
@@ -3049,8 +3065,8 @@ class FirebaseService extends GetxService {
     final cleanTruck = truckId.trim();
     if (cleanTruck.isEmpty) return;
 
-    final String Function(String) clean =
-        (val) => val.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    String clean(String val) =>
+        val.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
     final targetClean = clean(cleanTruck);
 
     // 1. Unassign truck first to clean up active driver bindings
@@ -3198,9 +3214,9 @@ class FirebaseService extends GetxService {
       // 1. Owner profile
       await profileRef.set({
         'driverName': name,
-        'driverPhone': ownerPhone,
+        'driverPhone': owner,
         'name': name,
-        'phone': ownerPhone,
+        'phone': owner,
         'avatarUrl': avatarUrl ?? '',
         'vehicleNo': 'GJ-01-AB-1234',
         'vehicleModel': 'Tata Signa 5530.S',

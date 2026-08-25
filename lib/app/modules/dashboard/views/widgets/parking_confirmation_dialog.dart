@@ -26,7 +26,7 @@ class ParkingConfirmationDialog extends StatefulWidget {
   });
 
   static Future<void> show({
-    required BuildContext context,
+    BuildContext? context,
     required String driverName,
     required String driverId,
     required String vehicleNo,
@@ -34,11 +34,8 @@ class ParkingConfirmationDialog extends StatefulWidget {
     required double distanceKm,
     required Function(Uint8List photoBytes) onSubmit,
   }) async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ParkingConfirmationDialog(
+    await Get.bottomSheet(
+      ParkingConfirmationDialog(
         driverName: driverName,
         driverId: driverId,
         vehicleNo: vehicleNo,
@@ -46,6 +43,8 @@ class ParkingConfirmationDialog extends StatefulWidget {
         distanceKm: distanceKm,
         onSubmit: onSubmit,
       ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
     );
   }
 

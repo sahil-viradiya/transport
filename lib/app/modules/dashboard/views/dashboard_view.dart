@@ -1135,7 +1135,7 @@ class DashboardView extends GetView<DashboardController> {
               const SizedBox(height: 14),
               ElevatedButton.icon(
                 onPressed: () =>
-                    controller.openParkingConfirmationDialog(context),
+                    controller.openParkingConfirmationDialog(),
                 icon: const Icon(Icons.local_parking_rounded),
                 label: Text(
                     isRejected
