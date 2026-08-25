@@ -6,6 +6,8 @@ import '../../app/core/theme/app_colors.dart';
 class AppPopup {
   AppPopup._();
 
+  static bool _isLoadingOpen = false;
+
   static Future<bool?> showConfirmation({
     required String title,
     required String description,
@@ -64,26 +66,43 @@ class AppPopup {
   }
 
   static void showLoading({String message = 'Loading...'}) {
-    final context = Get.context!;
+    // If a loading dialog is already displayed, prevent opening duplicate overlapping dialogs.
+    if (_isLoadingOpen) return;
+
+    final context = Get.overlayContext ?? Get.context;
+    if (context == null) return;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    _isLoadingOpen = true;
 
     Get.dialog(
       PopScope(
         canPop: false,
         child: Center(
           child: Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF0F172A) : Colors.white,
               borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.8,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 AppText(
                   message.tr,
                   style: AppTextStyle.bodyMedium,
@@ -94,21 +113,26 @@ class AppPopup {
         ),
       ),
       barrierDismissible: false,
-    );
+    ).then((_) {
+      _isLoadingOpen = false;
+    });
   }
 
   static void hideLoading() {
-    if (Get.isDialogOpen ?? false) {
+    if (_isLoadingOpen || (Get.isDialogOpen ?? false)) {
+      _isLoadingOpen = false;
       try {
         final context = Get.overlayContext ?? Get.context;
-        if (context != null) {
+        if (context != null && Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
-        } else {
+        } else if (Get.isDialogOpen ?? false) {
           Get.back();
         }
       } catch (_) {
         try {
-          Get.back();
+          if (Get.isDialogOpen ?? false) {
+            Get.back();
+          }
         } catch (_) {}
       }
     }

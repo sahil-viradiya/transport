@@ -3682,19 +3682,22 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
 
                 // Automatically create and assign the trip
                 if (truck.selectedDriver != null) {
-                  await _autoCreateTrip({
-                    'driverPhone': truck.selectedDriver!.phone,
-                    'truckNo': truck.truckNo,
-                    'vendorName': data['vendorName'],
-                    'vendorLocation': data['vendorSite'],
-                    'itemName': data['itemName'],
-                    'royaltyName': data['royaltyName'],
-                    'loadingPassId': data['loadingPassId'],
-                    'loadingPassGeneratedAt': data['generatedAt'],
-                    'dropCity': '',
-                    'dropLocation': '',
-                    'remarks': '',
-                  });
+                  await _autoCreateTrip(
+                    {
+                      'driverPhone': truck.selectedDriver!.phone,
+                      'truckNo': truck.truckNo,
+                      'vendorName': data['vendorName'],
+                      'vendorLocation': data['vendorSite'],
+                      'itemName': data['itemName'],
+                      'royaltyName': data['royaltyName'],
+                      'loadingPassId': data['loadingPassId'],
+                      'loadingPassGeneratedAt': data['generatedAt'],
+                      'dropCity': '',
+                      'dropLocation': '',
+                      'remarks': '',
+                    },
+                    showProgress: false,
+                  );
                 }
 
                 AppPopup.hideLoading();
@@ -4088,9 +4091,12 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     );
   }
 
-  Future<void> _autoCreateTrip(Map<String, dynamic> data) async {
+  Future<void> _autoCreateTrip(Map<String, dynamic> data,
+      {bool showProgress = true}) async {
     final controller = Get.find<AdminHomeController>();
-    AppPopup.showLoading(message: 'Assigning Trip...');
+    if (showProgress) {
+      AppPopup.showLoading(message: 'Assigning Trip...');
+    }
     try {
       final tripId = await _firebaseService.generateTripId();
       final tripData = {
@@ -4122,24 +4128,29 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         'loadingPassGeneratedAt': data['loadingPassGeneratedAt'] ?? '',
       };
       await _firebaseService.assignTripToDriver(tripId, tripData);
-      AppPopup.hideLoading();
-      Get.snackbar(
-        'Trip Assigned ✅',
-        'Trip $tripId sent to the driver for confirmation.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFF10B981),
-        colorText: Colors.white,
-      );
+      if (showProgress) {
+        AppPopup.hideLoading();
+        Get.snackbar(
+          'Trip Assigned ✅',
+          'Trip $tripId sent to the driver for confirmation.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: const Color(0xFF10B981),
+          colorText: Colors.white,
+        );
+      }
       await controller.loadData();
     } catch (e) {
-      AppPopup.hideLoading();
-      Get.snackbar(
-        'Error',
-        e.toString(),
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
-      );
+      if (showProgress) {
+        AppPopup.hideLoading();
+        Get.snackbar(
+          'Error',
+          e.toString(),
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.redAccent,
+          colorText: Colors.white,
+        );
+      }
+      rethrow;
     }
   }
 
