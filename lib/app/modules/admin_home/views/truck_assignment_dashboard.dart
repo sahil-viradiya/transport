@@ -410,20 +410,29 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           .where((t) => t.status != 'Pending Acceptance' && t.isDayCompleted)
           .toList();
 
-      final bool hasParkingPendingCard = inProgressTrucks
-          .any((t) => t.driverDutyStatus.toUpperCase() == 'PARKING_PENDING');
-      final bool hasApprovalActionCard = inProgressTrucks.any((t) =>
-          t.activeTripStatus == 'LOAD_REQUESTED' ||
-          t.activeTripStatus == 'DELIVERY_REQUESTED');
-      final bool hasAddTripOrActiveCard = inProgressTrucks.any(
-          (t) => t.hasActiveTrip || t.hasLoadingPass || t.hasDestinationSetup);
-      final double assignedContainerHeight = hasParkingPendingCard
-          ? 510.0
-          : hasApprovalActionCard
-              ? 400.0
-              : hasAddTripOrActiveCard
-                  ? 345.0
-                  : 290.0;
+      double assignedContainerHeight = 215.0;
+      if (inProgressTrucks.isNotEmpty) {
+        final maxH = inProgressTrucks
+            .map((t) => _calculateCardHeight(t))
+            .reduce((a, b) => a > b ? a : b);
+        assignedContainerHeight = maxH + 8.0;
+      }
+
+      double pendingContainerHeight = 210.0;
+      if (pendingTrucks.isNotEmpty) {
+        final maxH = pendingTrucks
+            .map((t) => _calculateCardHeight(t))
+            .reduce((a, b) => a > b ? a : b);
+        pendingContainerHeight = maxH + 8.0;
+      }
+
+      double completedContainerHeight = 215.0;
+      if (completedTrucks.isNotEmpty) {
+        final maxH = completedTrucks
+            .map((t) => _calculateCardHeight(t))
+            .reduce((a, b) => a > b ? a : b);
+        completedContainerHeight = maxH + 8.0;
+      }
 
       // Check auto reset condition reactively
       _checkAutoReset(dbTrucks);
@@ -493,7 +502,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             ),
             const SizedBox(height: 8),
             SizedBox(
-              height: 215.0,
+              height: pendingContainerHeight,
               child: pendingTrucks.isEmpty
                   ? _buildEmptyPlaceholder(
                       'All trucks assigned! Look below. 🎉')
@@ -514,7 +523,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                       ),
                     ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
           ],
 
           // --- ROW 2: ASSIGNED & ACCEPTED (IN-PROGRESS) ---
@@ -563,7 +572,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                       ),
                     ),
             ),
-            // const SizedBox(height: 12),
+            const SizedBox(height: 14),
           ],
 
           // --- ROW 3: COMPLETED TRUCKS (DAY'S WORK DONE) ---
@@ -590,7 +599,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             ),
             const SizedBox(height: 8),
             SizedBox(
-              height: 245.0,
+              height: completedContainerHeight,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
@@ -616,6 +625,39 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         ],
       );
     });
+  }
+
+  double _calculateCardHeight(MockTruck t) {
+    if (t.driverDutyStatus.toUpperCase() == 'PARKING_PENDING') {
+      return 490.0;
+    }
+    if (t.activeTripStatus == 'LOAD_REQUESTED' ||
+        t.activeTripStatus == 'DELIVERY_REQUESTED') {
+      return 370.0;
+    }
+    if (t.isDayCompleted) {
+      return 215.0;
+    }
+    if (t.status == 'Pending Acceptance') {
+      return 205.0;
+    }
+
+    // Base card height for an assigned/pending-confirmation truck without active trip/loading pass
+    double h = 210.0;
+    if (t.hasLoadingPass &&
+        t.loadingPass != null &&
+        t.loadingPass!['generatedAt'] != null) {
+      h += 24.0;
+    }
+    if (t.hasActiveTrip && t.activeTripStatus != null) {
+      h += 48.0;
+    }
+    final bool isFirstTripCreated =
+        t.hasActiveTrip || t.hasLoadingPass || t.hasDestinationSetup;
+    if (!t.isDayCompleted && t.selectedDriver != null && isFirstTripCreated) {
+      h += 42.0;
+    }
+    return h;
   }
 
   Widget _buildEmptyPlaceholder(String message) {
