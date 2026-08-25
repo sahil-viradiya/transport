@@ -46,9 +46,11 @@ class MockTruck {
   String? activeTripGatePassUrl;
   String? activeTripPodUrl;
   String? activeTripRemarks;
+
   /// Driver's current duty status – used to detect return-to-station states.
   /// Values: 'RETURNING_TO_STATION' | 'PARKING_PENDING' | 'STATION_VERIFIED' | others
   String driverDutyStatus;
+
   /// Parking confirmation data submitted by the driver (from users.parkingConfirmation)
   Map<String, dynamic>? parkingConfirmation;
 
@@ -72,6 +74,28 @@ class MockTruck {
     this.driverDutyStatus = '',
     this.parkingConfirmation,
   });
+
+  /// Whether this truck has completed all its duties for the day (e.g. return journey/parking verified or day completed).
+  bool get isDayCompleted {
+    // If truck is pending driver acceptance/confirmation or in problem state, it is NOT completed.
+    if (status == 'Pending Acceptance' ||
+        status == 'Pending Confirmation' ||
+        status == 'Problem') {
+      return false;
+    }
+    final duty = driverDutyStatus.toUpperCase();
+    if (duty == 'STATION_VERIFIED' ||
+        duty == 'PARKING_APPROVED' ||
+        duty == 'COMPLETED') {
+      return true;
+    }
+    final parkStatus =
+        parkingConfirmation?['status']?.toString().toUpperCase() ?? '';
+    if (parkStatus == 'APPROVED' || parkStatus == 'VERIFIED') {
+      return true;
+    }
+    return false;
+  }
 }
 
 class TruckAssignmentDashboard extends StatefulWidget {
@@ -249,11 +273,16 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           });
           if (u != null) {
             selectedDriver = _driverFromMap(u);
-            // Capture driver's return-to-station duty status while we have the map.
-            final rawDuty = (u['dutyStatus'] ?? '').toString().toUpperCase();
-            driverDutyStatusFromMap = rawDuty;
-            // Also capture the parking confirmation data if present
-            parkingConfirmationFromMap = u['parkingConfirmation'] as Map<String, dynamic>?;
+            // Capture driver's return-to-station duty status only if this assignment is active/accepted.
+            // If the truck is in pending confirmation (freshly assigned), ignore any leftover dutyStatus.
+            if (status != 'Pending Confirmation' &&
+                status != 'Pending Acceptance' &&
+                status != 'Problem') {
+              final rawDuty = (u['dutyStatus'] ?? '').toString().toUpperCase();
+              driverDutyStatusFromMap = rawDuty;
+              parkingConfirmationFromMap =
+                  u['parkingConfirmation'] as Map<String, dynamic>?;
+            }
           } else {
             final avatarUrl = controller.driverAvatarFor(assignedTo);
             final name = controller.driverNameFor(assignedTo);
@@ -270,8 +299,12 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
         }
 
         // Also try reading dutyStatus from the truck document itself (written by firebase_service.startReturnJourney)
-        if (driverDutyStatusFromMap.isEmpty) {
-          driverDutyStatusFromMap = (t['driverDutyStatus'] ?? '').toString().toUpperCase();
+        if (driverDutyStatusFromMap.isEmpty &&
+            status != 'Pending Confirmation' &&
+            status != 'Pending Acceptance' &&
+            status != 'Problem') {
+          driverDutyStatusFromMap =
+              (t['driverDutyStatus'] ?? '').toString().toUpperCase();
         }
 
         final hasLoadingPass = t['hasLoadingPass'] == true;
@@ -308,7 +341,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           final isOngoingB = b['status'] != 'PENDING';
           if (isOngoingA != isOngoingB) return isOngoingA ? -1 : 1;
 
-          return (a['id'] ?? '').toString().compareTo((b['id'] ?? '').toString());
+          return (a['id'] ?? '')
+              .toString()
+              .compareTo((b['id'] ?? '').toString());
         });
 
         final activeTripDoc = nonCompletedTrips.firstOrNull;
@@ -328,8 +363,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           hasDestinationSetup: hasDestinationSetup,
           destinationSetup: destinationSetup,
           hasActiveTrip: hasActiveTrip,
-          activeTripStatus:
-              activeTripDoc?['status']?.toString(),
+          activeTripStatus: activeTripDoc?['status']?.toString(),
           activeTripPhotoUrl: (activeTripDoc?['loadingPhotoUrl'] ??
                   activeTripDoc?['loadingPhoto'] ??
                   activeTripDoc?['photoUrl'])
@@ -343,8 +377,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                   activeTripDoc?['podPhoto'] ??
                   activeTripDoc?['podProof'])
               ?.toString(),
-          activeTripRemarks:
-              activeTripDoc?['remarks']?.toString(),
+          activeTripRemarks: activeTripDoc?['remarks']?.toString(),
         );
       }).toList();
 
@@ -368,22 +401,29 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
       }
       final dedupedTrucks = seenTrucks.values.toList();
 
-
       final pendingTrucks =
           dedupedTrucks.where((t) => t.status == 'Pending Acceptance').toList();
-      final assignedTrucks =
-          dedupedTrucks.where((t) => t.status != 'Pending Acceptance').toList();
+      final inProgressTrucks = dedupedTrucks
+          .where((t) => t.status != 'Pending Acceptance' && !t.isDayCompleted)
+          .toList();
+      final completedTrucks = dedupedTrucks
+          .where((t) => t.status != 'Pending Acceptance' && t.isDayCompleted)
+          .toList();
 
-
-      final bool hasParkingPendingCard = assignedTrucks.any(
-          (t) => t.driverDutyStatus.toUpperCase() == 'PARKING_PENDING');
-      final bool hasExpandedAssignedCard = assignedTrucks.any(
+      final bool hasParkingPendingCard = inProgressTrucks
+          .any((t) => t.driverDutyStatus.toUpperCase() == 'PARKING_PENDING');
+      final bool hasApprovalActionCard = inProgressTrucks.any((t) =>
+          t.activeTripStatus == 'LOAD_REQUESTED' ||
+          t.activeTripStatus == 'DELIVERY_REQUESTED');
+      final bool hasAddTripOrActiveCard = inProgressTrucks.any(
           (t) => t.hasActiveTrip || t.hasLoadingPass || t.hasDestinationSetup);
       final double assignedContainerHeight = hasParkingPendingCard
-          ? 560.0
-          : hasExpandedAssignedCard
-              ? 540.0
-              : 275.0;
+          ? 510.0
+          : hasApprovalActionCard
+              ? 400.0
+              : hasAddTripOrActiveCard
+                  ? 345.0
+                  : 290.0;
 
       // Check auto reset condition reactively
       _checkAutoReset(dbTrucks);
@@ -453,7 +493,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             ),
             const SizedBox(height: 8),
             SizedBox(
-              height: 205,
+              height: 215.0,
               child: pendingTrucks.isEmpty
                   ? _buildEmptyPlaceholder(
                       'All trucks assigned! Look below. 🎉')
@@ -477,8 +517,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             const SizedBox(height: 12),
           ],
 
-          // --- ROW 2: ASSIGNED & ACCEPTED (LOWER ROW) ---
-          if (assignedTrucks.isNotEmpty || pendingTrucks.isNotEmpty) ...[
+          // --- ROW 2: ASSIGNED & ACCEPTED (IN-PROGRESS) ---
+          if (inProgressTrucks.isNotEmpty ||
+              (pendingTrucks.isNotEmpty && completedTrucks.isEmpty)) ...[
             Row(
               children: [
                 Container(
@@ -492,7 +533,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: AppText(
-                    'Assigned & Accepted Trucks (${assignedTrucks.length})',
+                    'Assigned & Accepted Trucks (${inProgressTrucks.length})',
                     style: AppTextStyle.bodyLarge,
                     fontWeight: FontWeight.bold,
                   ),
@@ -502,16 +543,16 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             const SizedBox(height: 8),
             SizedBox(
               height: assignedContainerHeight,
-              child: assignedTrucks.isEmpty
+              child: inProgressTrucks.isEmpty
                   ? _buildEmptyPlaceholder(
-                      'No trucks assigned yet. Assign a truck from above.')
+                      'No trucks in progress. Assign a truck from above.')
                   : SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: List.generate(assignedTrucks.length, (idx) {
-                          final truck = assignedTrucks[idx];
+                        children: List.generate(inProgressTrucks.length, (idx) {
+                          final truck = inProgressTrucks[idx];
                           return Padding(
                             key: ValueKey('assigned_${truck.id}_$idx'),
                             padding:
@@ -522,7 +563,51 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                       ),
                     ),
             ),
-          ] else ...[
+            // const SizedBox(height: 12),
+          ],
+
+          // --- ROW 3: COMPLETED TRUCKS (DAY'S WORK DONE) ---
+          if (completedTrucks.isNotEmpty) ...[
+            Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: AppText(
+                    'Completed Trucks (${completedTrucks.length})',
+                    style: AppTextStyle.bodyLarge,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 245.0,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: List.generate(completedTrucks.length, (idx) {
+                    final truck = completedTrucks[idx];
+                    return Padding(
+                      key: ValueKey('completed_${truck.id}_$idx'),
+                      padding: const EdgeInsets.only(right: 16, bottom: 8),
+                      child: _buildInteractiveCard(truck),
+                    );
+                  }),
+                ),
+              ),
+            ),
+          ] else if (pendingTrucks.isEmpty && inProgressTrucks.isEmpty) ...[
             SizedBox(
               height: 200,
               child: _buildEmptyPlaceholder('No trucks available.'),
@@ -543,7 +628,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: widget.isDark ? const Color.from(alpha: 0.102, red: 1, green: 1, blue: 1) : Colors.grey.shade200,
+          color: widget.isDark
+              ? const Color.from(alpha: 0.102, red: 1, green: 1, blue: 1)
+              : Colors.grey.shade200,
           style: BorderStyle.solid,
         ),
       ),
@@ -589,9 +676,10 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
       width: 290,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: _getCardBgColor(state),
+        color: _getCardBgColor(truck, state),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _getCardBorderColor(state), width: 1.5),
+        border:
+            Border.all(color: _getCardBorderColor(truck, state), width: 1.5),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: widget.isDark ? 0.2 : 0.04),
@@ -600,85 +688,69 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AppText(truck.truckNo,
-                        style: AppTextStyle.bodyMedium,
-                        fontWeight: FontWeight.bold),
-                    AppText(truck.name,
-                        style: AppTextStyle.labelMedium, color: Colors.grey),
-                  ],
-                ),
-              ),
-              Row(
-                children: [
-                  _buildStatusBadge(state),
-                  if (state != 'Pending Acceptance' && state != 'Accepted') ...[
-                    const SizedBox(width: 4),
-                    Tooltip(
-                      message: 'Reset card assignment',
-                      child: GestureDetector(
-                        onTap: () => _resetTruck(truck),
-                        child: Icon(
-                          Icons.refresh_rounded,
-                          size: 14,
-                          color: widget.isDark
-                              ? Colors.white38
-                              : Colors.grey.shade400,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // Truck Types Chips
-          Row(
-            children: [
-              const AppText('Type: ',
-                  style: AppTextStyle.labelMedium, color: Colors.grey),
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  truck.selectedType,
-                  style: const TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+      child: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppText(truck.truckNo,
+                          style: AppTextStyle.bodyMedium,
+                          fontWeight: FontWeight.bold),
+                      AppText(truck.name,
+                          style: AppTextStyle.labelMedium, color: Colors.grey),
+                    ],
                   ),
                 ),
-              ),
-              if (truck.hasLoadingPass &&
-                  truck.loadingPass != null &&
-                  truck.loadingPass!['itemName'] != null) ...[
-                const SizedBox(width: 8),
+                Row(
+                  children: [
+                    _buildStatusBadge(truck, state),
+                    if (state != 'Pending Acceptance' &&
+                        state != 'Accepted') ...[
+                      const SizedBox(width: 4),
+                      Tooltip(
+                        message: 'Reset card assignment',
+                        child: GestureDetector(
+                          onTap: () => _resetTruck(truck),
+                          child: Icon(
+                            Icons.refresh_rounded,
+                            size: 14,
+                            color: widget.isDark
+                                ? Colors.white38
+                                : Colors.grey.shade400,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Truck Types Chips
+            Row(
+              children: [
+                const AppText('Type: ',
+                    style: AppTextStyle.labelMedium, color: Colors.grey),
+                const SizedBox(width: 4),
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.teal.shade700,
+                    color: AppColors.primary,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    truck.loadingPass!['itemName'].toString(),
+                    truck.selectedType,
                     style: const TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.bold,
@@ -686,169 +758,195 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                     ),
                   ),
                 ),
-              ],
-            ],
-          ),
-          if (truck.hasLoadingPass &&
-              truck.loadingPass != null &&
-              truck.loadingPass!['generatedAt'] != null) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.calendar_month_rounded,
-                    size: 12,
-                    color:
-                        widget.isDark ? Colors.white38 : Colors.grey.shade500),
-                const SizedBox(width: 4),
-                AppText(
-                  'Pass Gen: ${truck.loadingPass!['generatedAt']}',
-                  style: AppTextStyle.labelMedium,
-                  color: widget.isDark ? Colors.white38 : Colors.grey.shade600,
-                  fontSize: 10,
-                ),
+                if (truck.hasLoadingPass &&
+                    truck.loadingPass != null &&
+                    truck.loadingPass!['itemName'] != null) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.shade700,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      truck.loadingPass!['itemName'].toString(),
+                      style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
-          ],
-          const SizedBox(height: 10),
-
-          // Driver Selection Dropdown
-          InkWell(
-            onTap: state == 'Pending Acceptance'
-                ? () => _showDriverSelector(truck)
-                : null,
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: BoxDecoration(
-                color: widget.isDark
-                    ? const Color(0xFF0F172A)
-                    : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                    color:
-                        widget.isDark ? Colors.white10 : Colors.grey.shade100),
-              ),
-              child: Row(
+            if (truck.hasLoadingPass &&
+                truck.loadingPass != null &&
+                truck.loadingPass!['generatedAt'] != null) ...[
+              const SizedBox(height: 8),
+              Row(
                 children: [
-                  if (truck.selectedDriver != null) ...[
-                    _buildDriverAvatar(truck.selectedDriver!),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          AppText(truck.selectedDriver!.name,
-                              style: AppTextStyle.labelMedium,
-                              fontWeight: FontWeight.bold),
-                          AppText(
-                              _formatPhoneNumber(truck.selectedDriver!.phone),
-                              style: AppTextStyle.labelMedium,
-                              color: Colors.grey),
-                        ],
-                      ),
-                    ),
-                  ] else ...[
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundColor:
-                          widget.isDark ? Colors.white10 : Colors.grey.shade200,
-                      child: Icon(Icons.person_add_rounded,
-                          size: 14,
-                          color: widget.isDark
-                              ? Colors.white38
-                              : Colors.grey.shade600),
-                    ),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          AppText('Select Driver',
-                              style: AppTextStyle.labelMedium,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey),
-                          AppText('No driver assigned yet',
-                              style: AppTextStyle.labelMedium,
-                              color: Colors.grey,
-                              fontSize: 9),
-                        ],
-                      ),
-                    ),
-                  ],
-                  if (state == 'Pending Acceptance')
-                    Icon(Icons.keyboard_arrow_down_rounded,
-                        size: 16,
-                        color: widget.isDark
-                            ? Colors.white54
-                            : Colors.grey.shade600)
-                  else
-                    Icon(Icons.lock_rounded,
-                        size: 10,
-                        color: widget.isDark
-                            ? Colors.white24
-                            : Colors.grey.shade300),
+                  Icon(Icons.calendar_month_rounded,
+                      size: 12,
+                      color: widget.isDark
+                          ? Colors.white38
+                          : Colors.grey.shade500),
+                  const SizedBox(width: 4),
+                  AppText(
+                    'Pass Gen: ${truck.loadingPass!['generatedAt']}',
+                    style: AppTextStyle.labelMedium,
+                    color:
+                        widget.isDark ? Colors.white38 : Colors.grey.shade600,
+                    fontSize: 10,
+                  ),
                 ],
               ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (truck.hasActiveTrip && truck.activeTripStatus != null) ...[
-            _buildActiveTripStatusWidget(truck),
+            ],
             const SizedBox(height: 10),
-          ],
-          // Parking Verification Panel – full inline card with photo, time and actions
-          if (truck.driverDutyStatus.toUpperCase() == 'PARKING_PENDING') ...[
-            _buildParkingVerificationPanel(truck),
-          ] else if (!(truck.hasActiveTrip && truck.hasDestinationSetup)) ...[
-            // Primary Interactive Button
-            SizedBox(
-              width: double.infinity,
-              height: 36,
-              child: _buildInteractiveButton(truck),
-            ),
-          ],
-          if (truck.selectedDriver != null &&
-              widget.onOpenTripForm != null &&
-              isFirstTripCreated) ...[
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              height: 34,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  widget.onOpenTripForm!({
-                    'driverPhone': truck.selectedDriver!.phone,
-                    'truckNo': truck.truckNo,
-                  });
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF2563EB),
-                  backgroundColor: widget.isDark
-                      ? const Color(0xFF1E293B)
-                      : const Color(0xFFEFF6FF),
-                  side: BorderSide(
+
+            // Driver Selection Dropdown
+            InkWell(
+              onTap: state == 'Pending Acceptance'
+                  ? () => _showDriverSelector(truck)
+                  : null,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: widget.isDark
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
                       color: widget.isDark
-                          ? const Color(0xFF3B82F6)
-                          : const Color(0xFFBFDBFE)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ? Colors.white10
+                          : Colors.grey.shade100),
                 ),
-                icon: const Icon(Icons.add_circle_outline_rounded,
-                    size: 16, color: Color(0xFF2563EB)),
-                label: const Text(
-                  '+ Add 2nd Trip',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2563EB),
-                  ),
+                child: Row(
+                  children: [
+                    if (truck.selectedDriver != null) ...[
+                      _buildDriverAvatar(truck.selectedDriver!),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AppText(truck.selectedDriver!.name,
+                                style: AppTextStyle.labelMedium,
+                                fontWeight: FontWeight.bold),
+                            AppText(
+                                _formatPhoneNumber(truck.selectedDriver!.phone),
+                                style: AppTextStyle.labelMedium,
+                                color: Colors.grey),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      CircleAvatar(
+                        radius: 14,
+                        backgroundColor: widget.isDark
+                            ? Colors.white10
+                            : Colors.grey.shade200,
+                        child: Icon(Icons.person_add_rounded,
+                            size: 14,
+                            color: widget.isDark
+                                ? Colors.white38
+                                : Colors.grey.shade600),
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AppText('Select Driver',
+                                style: AppTextStyle.labelMedium,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey),
+                            AppText('No driver assigned yet',
+                                style: AppTextStyle.labelMedium,
+                                color: Colors.grey,
+                                fontSize: 9),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (state == 'Pending Acceptance')
+                      Icon(Icons.keyboard_arrow_down_rounded,
+                          size: 16,
+                          color: widget.isDark
+                              ? Colors.white54
+                              : Colors.grey.shade600)
+                    else
+                      Icon(Icons.lock_rounded,
+                          size: 10,
+                          color: widget.isDark
+                              ? Colors.white24
+                              : Colors.grey.shade300),
+                  ],
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+            if (truck.hasActiveTrip && truck.activeTripStatus != null) ...[
+              _buildActiveTripStatusWidget(truck),
+              const SizedBox(height: 10),
+            ],
+            // Parking Verification Panel – full inline card with photo, time and actions
+            if (truck.driverDutyStatus.toUpperCase() == 'PARKING_PENDING') ...[
+              _buildParkingVerificationPanel(truck),
+            ] else if (!(truck.hasActiveTrip && truck.hasDestinationSetup)) ...[
+              // Primary Interactive Button
+              SizedBox(
+                width: double.infinity,
+                height: 36,
+                child: _buildInteractiveButton(truck),
+              ),
+            ],
+            if (!truck.isDayCompleted &&
+                truck.selectedDriver != null &&
+                widget.onOpenTripForm != null &&
+                isFirstTripCreated) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                height: 34,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    widget.onOpenTripForm!({
+                      'driverPhone': truck.selectedDriver!.phone,
+                      'truckNo': truck.truckNo,
+                    });
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF2563EB),
+                    backgroundColor: widget.isDark
+                        ? const Color(0xFF1E293B)
+                        : const Color(0xFFEFF6FF),
+                    side: BorderSide(
+                        color: widget.isDark
+                            ? const Color(0xFF3B82F6)
+                            : const Color(0xFFBFDBFE)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  icon: const Icon(Icons.add_circle_outline_rounded,
+                      size: 16, color: Color(0xFF2563EB)),
+                  label: const Text(
+                    '+ Add 2nd Trip',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2563EB),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -1112,7 +1210,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 if (statusTime.isNotEmpty) ...[
                   const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(4),
@@ -1312,9 +1411,11 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
             height: 34,
             child: OutlinedButton.icon(
               onPressed: () => _showDestinationSetupDialog(context, truck),
-              icon: const Icon(Icons.add_location_alt_rounded, size: 14, color: Color(0xFF2563EB)),
+              icon: const Icon(Icons.add_location_alt_rounded,
+                  size: 14, color: Color(0xFF2563EB)),
               label: Text(
-                truck.hasDestinationSetup && truck.destinationSetup?['customerName'] != null
+                truck.hasDestinationSetup &&
+                        truck.destinationSetup?['customerName'] != null
                     ? 'Edit Destination (${truck.destinationSetup!['customerName']})'
                     : '📍 Setup / Set Drop Destination',
                 style: const TextStyle(
@@ -1326,9 +1427,15 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF2563EB),
-                backgroundColor: widget.isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
-                side: BorderSide(color: widget.isDark ? const Color(0xFF3B82F6) : const Color(0xFFBFDBFE)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                backgroundColor: widget.isDark
+                    ? const Color(0xFF1E293B)
+                    : const Color(0xFFEFF6FF),
+                side: BorderSide(
+                    color: widget.isDark
+                        ? const Color(0xFF3B82F6)
+                        : const Color(0xFFBFDBFE)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
                 padding: const EdgeInsets.symmetric(horizontal: 8),
               ),
             ),
@@ -1382,7 +1489,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
   Widget _buildPhotoPreview(
       BuildContext context, String url, String label, bool isDark) {
     return GestureDetector(
-      onTap: () => DocumentViewerHelper.showDocument(context, url, title: label),
+      onTap: () =>
+          DocumentViewerHelper.showDocument(context, url, title: label),
       child: Tooltip(
         message: 'Click to view full $label',
         child: Container(
@@ -1484,8 +1592,9 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                           prefixIcon: Icon(Icons.confirmation_number_outlined),
                           border: OutlineInputBorder(),
                         ),
-                        validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? 'Pass ID is required' : null,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Pass ID is required'
+                            : null,
                       ),
                       const SizedBox(height: 10),
                       TextFormField(
@@ -1590,12 +1699,21 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         final fb = _firebaseService;
                         final tripDoc = await fb.getTripData(tripId);
                         final truckNo = (tripDoc?['truckNo'] ?? '').toString();
-                        final driverName = (tripDoc?['driverName'] ?? '').toString();
-                        final driverPhone = (tripDoc?['driverPhone'] ?? '').toString();
-                        final pickupLocation = (tripDoc?['pickupLocation'] ?? tripDoc?['vendorLocation'] ?? '').toString();
-                        final dropCity = (tripDoc?['dropCity'] ?? tripDoc?['dropLocation'] ?? '').toString();
+                        final driverName =
+                            (tripDoc?['driverName'] ?? '').toString();
+                        final driverPhone =
+                            (tripDoc?['driverPhone'] ?? '').toString();
+                        final pickupLocation = (tripDoc?['pickupLocation'] ??
+                                tripDoc?['vendorLocation'] ??
+                                '')
+                            .toString();
+                        final dropCity = (tripDoc?['dropCity'] ??
+                                tripDoc?['dropLocation'] ??
+                                '')
+                            .toString();
 
-                        final pdfBase64 = await TruckOwnerPassPdfGenerator.generatePdfBase64(
+                        final pdfBase64 =
+                            await TruckOwnerPassPdfGenerator.generatePdfBase64(
                           passId: passIdCtrl.text.trim(),
                           ownerName: ownerNameCtrl.text.trim(),
                           tripId: tripId,
@@ -1607,7 +1725,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                           dropCity: dropCity,
                         );
 
-                        finalPassUrl = await fb.uploadTruckOwnerPassPhoto(tripId, pdfBase64);
+                        finalPassUrl = await fb.uploadTruckOwnerPassPhoto(
+                            tripId, pdfBase64);
                       } else {
                         finalPassUrl = await _firebaseService
                             .uploadTruckOwnerPassPhoto(tripId, finalPassUrl);
@@ -1888,12 +2007,16 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     );
   }
 
-  Widget _buildStatusBadge(String state) {
+  Widget _buildStatusBadge(MockTruck truck, String state) {
     Color bg;
     Color text;
     String label = state;
 
-    if (state == 'Pending Acceptance') {
+    if (truck.isDayCompleted) {
+      bg = const Color(0xFFDCFCE7);
+      text = const Color(0xFF15803D);
+      label = 'Completed';
+    } else if (state == 'Pending Acceptance') {
       bg = const Color(0xFFFFF7ED);
       text = const Color(0xFFEA580C);
       label = 'Pending';
@@ -1938,13 +2061,16 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
   Widget _buildParkingVerificationPanel(MockTruck truck) {
     final pc = truck.parkingConfirmation;
     final driverPhone = truck.selectedDriver?.phone ?? '';
-    final driverId = (driverPhone.isNotEmpty ? driverPhone : (pc?['driverId'] ?? '')).toString();
+    final driverId =
+        (driverPhone.isNotEmpty ? driverPhone : (pc?['driverId'] ?? ''))
+            .toString();
     final reqId = (pc?['requestId'] ?? pc?['id'] ?? '').toString();
 
     // Parse arrival time
     String formattedDate = '';
     String formattedTime = '';
-    final arrivalRaw = pc?['arrivalTime'] ?? pc?['submittedAtIso'] ?? pc?['submittedAt'];
+    final arrivalRaw =
+        pc?['arrivalTime'] ?? pc?['submittedAtIso'] ?? pc?['submittedAt'];
     if (arrivalRaw != null) {
       try {
         DateTime? dt;
@@ -2041,9 +2167,10 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                                               child:
                                                   CircularProgressIndicator()),
                                         ),
-                                        errorWidget: (_, __, ___) =>
-                                            const Icon(Icons.broken_image,
-                                                size: 64, color: Colors.grey),
+                                        errorWidget: (_, __, ___) => const Icon(
+                                            Icons.broken_image,
+                                            size: 64,
+                                            color: Colors.grey),
                                       ),
                                     ),
                                   ),
@@ -2058,8 +2185,7 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
                                         color: Colors.black54,
-                                        borderRadius:
-                                            BorderRadius.circular(20),
+                                        borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: const Icon(Icons.close_rounded,
                                           color: Colors.white, size: 20),
@@ -2248,18 +2374,14 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                             'Approve parking confirmation for ${truck.selectedDriver?.name ?? 'driver'}?'),
                         actions: [
                           TextButton(
-                              onPressed: () =>
-                                  Navigator.pop(context, false),
+                              onPressed: () => Navigator.pop(context, false),
                               child: const Text('Cancel')),
                           ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      const Color(0xFF10B981)),
-                              onPressed: () =>
-                                  Navigator.pop(context, true),
+                                  backgroundColor: const Color(0xFF10B981)),
+                              onPressed: () => Navigator.pop(context, true),
                               child: const Text('Approve',
-                                  style:
-                                      TextStyle(color: Colors.white))),
+                                  style: TextStyle(color: Colors.white))),
                         ],
                       ),
                     );
@@ -2273,7 +2395,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         AppPopup.hideLoading();
                         AppSnackBar.showSuccess(
                           title: 'Parking Approved ✅',
-                          message: 'Driver has been verified for station arrival.',
+                          message:
+                              'Driver has been verified for station arrival.',
                         );
                       } catch (e) {
                         AppPopup.hideLoading();
@@ -2286,8 +2409,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                   },
                   icon: const Icon(Icons.check_circle_rounded, size: 13),
                   label: const Text('Approve',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 11)),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF10B981),
                     foregroundColor: Colors.white,
@@ -2325,21 +2448,18 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         ),
                         actions: [
                           TextButton(
-                              onPressed: () =>
-                                  Navigator.pop(context, null),
+                              onPressed: () => Navigator.pop(context, null),
                               child: const Text('Cancel')),
                           ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      const Color(0xFFEF4444)),
+                                  backgroundColor: const Color(0xFFEF4444)),
                               onPressed: () => Navigator.pop(
                                   context,
                                   reasonCtrl.text.trim().isNotEmpty
                                       ? reasonCtrl.text.trim()
                                       : 'Rejected by admin'),
                               child: const Text('Reject',
-                                  style:
-                                      TextStyle(color: Colors.white))),
+                                  style: TextStyle(color: Colors.white))),
                         ],
                       ),
                     );
@@ -2354,7 +2474,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                         AppPopup.hideLoading();
                         AppSnackBar.showInfo(
                           title: 'Parking Rejected',
-                          message: 'Driver has been requested to re-submit photo.',
+                          message:
+                              'Driver has been requested to re-submit photo.',
                         );
                       } catch (e) {
                         AppPopup.hideLoading();
@@ -2367,8 +2488,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                   },
                   icon: const Icon(Icons.cancel_rounded, size: 13),
                   label: const Text('Reject',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 11)),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFEF4444),
                     foregroundColor: Colors.white,
@@ -2389,6 +2510,11 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
   /// Returns a badge widget when the assigned driver is heading back to the
   /// transport station. In that state no loading pass should be generated.
   Widget? _buildReturnToStationBadge(MockTruck truck) {
+    if (truck.status == 'Pending Acceptance' ||
+        truck.status == 'Pending Confirmation' ||
+        truck.status == 'Problem') {
+      return null;
+    }
     final duty = truck.driverDutyStatus.toUpperCase();
     if (duty == 'RETURNING_TO_STATION') {
       return Container(
@@ -2397,8 +2523,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               ? const Color(0xFF1E3A5F).withValues(alpha: 0.6)
               : const Color(0xFFEFF6FF),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-              color: const Color(0xFF3B82F6).withValues(alpha: 0.5)),
+          border:
+              Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.5)),
         ),
         alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -2434,8 +2560,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
               ? const Color(0xFF064E3B).withValues(alpha: 0.4)
               : const Color(0xFFECFDF5),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-              color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+          border:
+              Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
         ),
         alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -2554,8 +2680,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                 decoration: BoxDecoration(
                   color: widget.isDark ? Colors.white10 : Colors.amber.shade50,
                   borderRadius: BorderRadius.circular(10),
-                  border:
-                      Border.all(color: Colors.amber.shade400.withValues(alpha: 0.5)),
+                  border: Border.all(
+                      color: Colors.amber.shade400.withValues(alpha: 0.5)),
                 ),
                 alignment: Alignment.center,
                 padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -2617,7 +2743,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           decoration: BoxDecoration(
             color: widget.isDark ? Colors.white10 : Colors.amber.shade50,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.amber.shade400.withValues(alpha: 0.5)),
+            border:
+                Border.all(color: Colors.amber.shade400.withValues(alpha: 0.5)),
           ),
           alignment: Alignment.center,
           child: Row(
@@ -2718,8 +2845,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                   ? const Color(0xFF064E3B).withValues(alpha: 0.3)
                   : const Color(0xFFECFDF5),
               borderRadius: BorderRadius.circular(8),
-              border:
-                  Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+              border: Border.all(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.4)),
             ),
             alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -2837,8 +2964,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     }
   }
 
-  Color _getCardBgColor(String state) {
-    if (state == 'Accepted') {
+  Color _getCardBgColor(MockTruck truck, String state) {
+    if (truck.isDayCompleted || state == 'Accepted') {
       return widget.isDark
           ? const Color(0xFF064E3B).withValues(alpha: 0.15)
           : const Color(0xFFF0FDF4);
@@ -2856,8 +2983,10 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
     return widget.isDark ? const Color(0xFF1E293B) : Colors.white;
   }
 
-  Color _getCardBorderColor(String state) {
-    if (state == 'Accepted') {
+  Color _getCardBorderColor(MockTruck truck, String state) {
+    if (truck.isDayCompleted) {
+      return const Color(0xFF10B981).withValues(alpha: 0.5);
+    } else if (state == 'Accepted') {
       return const Color(0xFF86EFAC).withValues(alpha: 0.4);
     } else if (state == 'Assigned') {
       return const Color(0xFF93C5FD).withValues(alpha: 0.4);
@@ -3100,7 +3229,10 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
           final single = (v['itemName'] ?? '').toString().trim();
           if (single.isNotEmpty) {
             return single.contains(',')
-                ? single.split(',').map((e) => e.trim()).where((s) => s.isNotEmpty)
+                ? single
+                    .split(',')
+                    .map((e) => e.trim())
+                    .where((s) => s.isNotEmpty)
                 : [single];
           }
           return <String>[];
@@ -3236,8 +3368,8 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                               labelStyle: const TextStyle(fontSize: 12),
                               border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10)),
-                              prefixIcon: const Icon(Icons.business_rounded,
-                                  size: 18),
+                              prefixIcon:
+                                  const Icon(Icons.business_rounded, size: 18),
                             ),
                             validator: (value) =>
                                 value == null || value.trim().isEmpty
@@ -3461,12 +3593,13 @@ class _TruckAssignmentDashboardState extends State<TruckAssignmentDashboard> {
                           labelStyle: const TextStyle(fontSize: 12),
                           border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10)),
-                          prefixIcon:
-                              const Icon(Icons.person_outline_rounded, size: 18),
+                          prefixIcon: const Icon(Icons.person_outline_rounded,
+                              size: 18),
                         ),
-                        validator: (value) => value == null || value.trim().isEmpty
-                            ? 'Enter royalty / owner name'
-                            : null,
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                                ? 'Enter royalty / owner name'
+                                : null,
                       ),
                     ],
                   );

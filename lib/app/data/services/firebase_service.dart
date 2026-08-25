@@ -2532,10 +2532,22 @@ class FirebaseService extends GetxService {
           'inspectionRemarks': FieldValue.delete(),
           'inspectionResults': FieldValue.delete(),
           'inspectionImages': FieldValue.delete(),
+          'driverDutyStatus': FieldValue.delete(),
+          'returnJourneyStatus': FieldValue.delete(),
+          'parkingConfirmation': FieldValue.delete(),
         },
         options: SetOptions(merge: true),
         action: 'assignTruckToDriver',
       );
+
+      // Reset driver duty fields on new assignment so they start fresh
+      try {
+        await _db.collection('users').doc(p).set({
+          'dutyStatus': 'ON_DUTY',
+          'returnJourneyStatus': FieldValue.delete(),
+          'parkingConfirmation': FieldValue.delete(),
+        }, SetOptions(merge: true));
+      } catch (_) {}
 
       await createNotification(
         toPhone: p,
@@ -2823,7 +2835,6 @@ class FirebaseService extends GetxService {
     if (truckNo.isEmpty) return;
     try {
       debugPrint('[FirebaseService] unassignTruck called for $truckNo');
-      debugPrintStack();
       await _updateTruckDoc(
         truckNo,
         {
@@ -2840,6 +2851,9 @@ class FirebaseService extends GetxService {
           'hasLoadingPass': FieldValue.delete(),
           'destinationSetup': FieldValue.delete(),
           'hasDestinationSetup': FieldValue.delete(),
+          'driverDutyStatus': FieldValue.delete(),
+          'returnJourneyStatus': FieldValue.delete(),
+          'parkingConfirmation': FieldValue.delete(),
         },
         action: 'unassignTruck',
       );
